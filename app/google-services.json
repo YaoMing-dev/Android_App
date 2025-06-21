@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1046048736614",
+    "project_id": "backendtradeup",
+    "storage_bucket": "backendtradeup.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1046048736614:android:9001b74a8977fc59a074a7",
+        "android_client_info": {
+          "package_name": "com.example.newtrade"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAbadEp9SHAUk3b0UY7tgi0p4aN5kWCWs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
