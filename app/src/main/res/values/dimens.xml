@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Margins & Padding -->
+    <dimen name="margin_xs">4dp</dimen>
+    <dimen name="margin_sm">8dp</dimen>
+    <dimen name="margin_md">12dp</dimen>
+    <dimen name="margin_lg">16dp</dimen>
+    <dimen name="margin_xl">20dp</dimen>
+    <dimen name="margin_xxl">24dp</dimen>
+    <dimen name="margin_xxxl">32dp</dimen>
+
+    <dimen name="padding_xs">4dp</dimen>
+    <dimen name="padding_sm">8dp</dimen>
+    <dimen name="padding_md">12dp</dimen>
+    <dimen name="padding_lg">16dp</dimen>
+    <dimen name="padding_xl">20dp</dimen>
+    <dimen name="padding_xxl">24dp</dimen>
+    <dimen name="padding_xxxl">32dp</dimen>
+
+    <!-- Text Sizes -->
+    <dimen name="text_size_xs">10sp</dimen>
+    <dimen name="text_size_sm">12sp</dimen>
+    <dimen name="text_size_md">14sp</dimen>
+    <dimen name="text_size_lg">16sp</dimen>
+    <dimen name="text_size_xl">18sp</dimen>
+    <dimen name="text_size_xxl">20sp</dimen>
+    <dimen name="text_size_xxxl">24sp</dimen>
+    <dimen name="text_size_display">28sp</dimen>
+    <dimen name="text_size_headline">32sp</dimen>
+
+    <!-- Component Heights -->
+    <dimen name="button_height">48dp</dimen>
+    <dimen name="button_height_sm">36dp</dimen>
+    <dimen name="button_height_lg">56dp</dimen>
+    <dimen name="input_height">56dp</dimen>
+    <dimen name="toolbar_height">56dp</dimen>
+    <dimen name="bottom_nav_height">56dp</dimen>
+    <dimen name="fab_size">56dp</dimen>
+    <dimen name="fab_size_mini">40dp</dimen>
+
+    <!-- Corner Radius -->
+    <dimen name="radius_xs">2dp</dimen>
+    <dimen name="radius_sm">4dp</dimen>
+    <dimen name="radius_md">8dp</dimen>
+    <dimen name="radius_lg">12dp</dimen>
+    <dimen name="radius_xl">16dp</dimen>
+    <dimen name="radius_xxl">20dp</dimen>
+    <dimen name="radius_round">24dp</dimen>
+    <dimen name="radius_circle">50dp</dimen>
+
+    <!-- Elevation -->
+    <dimen name="elevation_xs">1dp</dimen>
+    <dimen name="elevation_sm">2dp</dimen>
+    <dimen name="elevation_md">4dp</dimen>
+    <dimen name="elevation_lg">8dp</dimen>
+    <dimen name="elevation_xl">12dp</dimen>
+    <dimen name="elevation_xxl">16dp</dimen>
+
+    <!-- Icon Sizes -->
+    <dimen name="icon_size_xs">12dp</dimen>
+    <dimen name="icon_size_sm">16dp</dimen>
+    <dimen name="icon_size_md">20dp</dimen>
+    <dimen name="icon_size_lg">24dp</dimen>
+    <dimen name="icon_size_xl">32dp</dimen>
+    <dimen name="icon_size_xxl">40dp</dimen>
+    <dimen name="icon_size_xxxl">48dp</dimen>
+
+    <!-- Avatar Sizes -->
+    <dimen name="avatar_size_xs">20dp</dimen>
+    <dimen name="avatar_size_sm">24dp</dimen>
+    <dimen name="avatar_size_md">32dp</dimen>
+    <dimen name="avatar_size_lg">40dp</dimen>
+    <dimen name="avatar_size_xl">48dp</dimen>
+    <dimen name="avatar_size_xxl">64dp</dimen>
+    <dimen name="avatar_size_xxxl">80dp</dimen>
+    <dimen name="avatar_size_profile">120dp</dimen>
+
+    <!-- Product Card Dimensions -->
+    <dimen name="product_card_height">280dp</dimen>
+    <dimen name="product_image_height">160dp</dimen>
+    <dimen name="product_image_height_lg">200dp</dimen>
+    <dimen name="product_card_width">160dp</dimen>
+    <dimen name="product_card_margin">8dp</dimen>
+
+    <!-- Category Item Dimensions -->
+    <dimen name="category_item_width">80dp</dimen>
+    <dimen name="category_item_height">80dp</dimen>
+    <dimen name="category_icon_size">32dp</dimen>
+
+    <!-- Chat Bubble Dimensions -->
+    <dimen name="chat_bubble_radius">16dp</dimen>
+    <dimen name="chat_bubble_padding_horizontal">12dp</dimen>
+    <dimen name="chat_bubble_padding_vertical">8dp</dimen>
+    <dimen name="chat_bubble_margin">4dp</dimen>
+    <dimen name="chat_avatar_size">32dp</dimen>
+
+    <!-- Search Bar Dimensions -->
+    <dimen name="search_bar_height">48dp</dimen>
+    <dimen name="search_bar_radius">24dp</dimen>
+    <dimen name="search_bar_margin">16dp</dimen>
+
+    <!-- Filter Chip Dimensions -->
+    <dimen name="filter_chip_height">32dp</dimen>
+    <dimen name="filter_chip_padding">12dp</dimen>
+    <dimen name="filter_chip_margin">4dp</dimen>
+
+    <!-- Bottom Sheet -->
+    <dimen name="bottom_sheet_corner_radius">16dp</dimen>
+    <dimen name="bottom_sheet_handle_width">40dp</dimen>
+    <dimen name="bottom_sheet_handle_height">4dp</dimen>
+    <dimen name="bottom_sheet_handle_margin">12dp</dimen>
+
+    <!-- Divider -->
+    <dimen name="divider_height">1dp</dimen>
+    <dimen name="divider_height_thick">2dp</dimen>
+    <dimen name="divider_margin">16dp</dimen>
+
+    <!-- Progress Indicators -->
+    <dimen name="progress_bar_size">48dp</dimen>
+    <dimen name="progress_bar_size_sm">32dp</dimen>
+    <dimen name="progress_bar_size_lg">64dp</dimen>
+    <dimen name="progress_indicator_height">4dp</dimen>
+
+    <!-- Badge Dimensions -->
+    <dimen name="badge_size">16dp</dimen>
+    <dimen name="badge_size_lg">20dp</dimen>
+    <dimen name="badge_text_size">10sp</dimen>
+
+    <!-- Rating Stars -->
+    <dimen name="star_size">16dp</dimen>
+    <dimen name="star_size_lg">20dp</dimen>
+    <dimen name="star_spacing">2dp</dimen>
+
+    <!-- OTP Input -->
+    <dimen name="otp_input_size">48dp</dimen>
+    <dimen name="otp_input_margin">6dp</dimen>
+    <dimen name="otp_input_radius">8dp</dimen>
+
+    <!-- Image Gallery -->
+    <dimen name="gallery_item_size">80dp</dimen>
+    <dimen name="gallery_item_margin">4dp</dimen>
+    <dimen name="gallery_item_radius">8dp</dimen>
+
+    <!-- Minimum Touch Target -->
+    <dimen name="min_touch_target">48dp</dimen>
+
+    <!-- Specific Layouts -->
+    <dimen name="splash_logo_size">120dp</dimen>
+    <dimen name="login_header_height">200dp</dimen>
+    <dimen name="profile_header_height">160dp</dimen>
+    <dimen name="product_detail_image_height">300dp</dimen>
+
+    <!-- Grid Spacing -->
+    <dimen name="grid_spacing">8dp</dimen>
+    <dimen name="grid_spacing_sm">4dp</dimen>
+    <dimen name="grid_spacing_lg">12dp</dimen>
+
+    <!-- List Item Heights -->
+    <dimen name="list_item_height">56dp</dimen>
+    <dimen name="list_item_height_sm">48dp</dimen>
+    <dimen name="list_item_height_lg">64dp</dimen>
+    <dimen name="list_item_height_xl">72dp</dimen>
+</resources>

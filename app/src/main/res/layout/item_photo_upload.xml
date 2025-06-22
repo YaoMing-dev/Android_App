@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="@dimen/gallery_item_size"
+    android:layout_height="@dimen/gallery_item_size"
+    android:layout_margin="@dimen/gallery_item_margin"
+    app:cardCornerRadius="@dimen/gallery_item_radius"
+    app:cardElevation="@dimen/elevation_sm"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/divider_color">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Photo Image -->
+        <ImageView
+            android:id="@+id/iv_photo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            tools:src="@tools:sample/backgrounds/scenic"
+            tools:visibility="visible" />
+
+        <!-- Add Photo Placeholder -->
+        <LinearLayout
+            android:id="@+id/ll_add_photo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="?attr/selectableItemBackground">
+
+            <ImageView
+                android:layout_width="@dimen/icon_size_lg"
+                android:layout_height="@dimen/icon_size_lg"
+                android:src="@drawable/ic_add_photo"
+                app:tint="@color/text_secondary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/margin_xs"
+                android:text="Add"
+                android:textSize="@dimen/text_size_xs"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
+
+        <!-- Remove Button -->
+        <ImageView
+            android:id="@+id/iv_remove"
+            android:layout_width="@dimen/icon_size_md"
+            android:layout_height="@dimen/icon_size_md"
+            android:layout_gravity="top|end"
+            android:layout_margin="@dimen/margin_xs"
+            android:background="@drawable/circle_background_white"
+            android:padding="@dimen/padding_xs"
+            android:src="@drawable/ic_close"
+            android:visibility="gone"
+            app:tint="@color/text_secondary"
+            tools:visibility="visible" />
+
+        <!-- Primary Badge -->
+        <TextView
+            android:id="@+id/tv_primary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="@dimen/margin_xs"
+            android:background="@drawable/rounded_background_primary"
+            android:paddingHorizontal="@dimen/padding_xs"
+            android:paddingVertical="2dp"
+            android:text="Cover"
+            android:textColor="@color/white"
+            android:textSize="8sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+    </FrameLayout>
+
+</com.google.android.material.card.MaterialCardView>

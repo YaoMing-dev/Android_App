@@ -1,5 +1,107 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Primary Colors -->
+    <color name="primary_color">#2196F3</color>
+    <color name="primary_dark">#1976D2</color>
+    <color name="primary_light">#BBDEFB</color>
+    <color name="primary_variant">#1565C0</color>
+
+    <!-- Secondary Colors -->
+    <color name="secondary_color">#FF9800</color>
+    <color name="secondary_dark">#F57C00</color>
+    <color name="secondary_light">#FFE0B2</color>
+
+    <!-- Background Colors -->
+    <color name="background_light">#FAFAFA</color>
+    <color name="background_white">#FFFFFF</color>
+    <color name="background_dark">#212121</color>
+    <color name="background_gray">#F5F5F5</color>
+    <color name="background_card">#FFFFFF</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_hint">#BDBDBD</color>
+    <color name="text_disabled">#E0E0E0</color>
+    <color name="text_white">#FFFFFF</color>
+    <color name="text_link">#2196F3</color>
+
+    <!-- Status Colors -->
+    <color name="success_color">#4CAF50</color>
+    <color name="error_color">#F44336</color>
+    <color name="warning_color">#FF9800</color>
+    <color name="info_color">#2196F3</color>
+    <color name="pending_color">#FFC107</color>
+
+    <!-- UI Colors -->
+    <color name="divider_color">#E0E0E0</color>
+    <color name="shadow_color">#1F000000</color>
+    <color name="overlay_color">#80000000</color>
+    <color name="transparent">#00000000</color>
+    <color name="ripple_color">#1F2196F3</color>
+
+    <!-- System Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray">#9E9E9E</color>
+    <color name="light_gray">#F5F5F5</color>
+    <color name="dark_gray">#424242</color>
+
+    <!-- Bottom Navigation -->
+    <color name="bottom_nav_selected">#2196F3</color>
+    <color name="bottom_nav_unselected">#9E9E9E</color>
+
+    <!-- Product Status -->
+    <color name="status_available">#4CAF50</color>
+    <color name="status_sold">#9E9E9E</color>
+    <color name="status_pending">#FF9800</color>
+    <color name="status_paused">#FFC107</color>
+    <color name="status_expired">#F44336</color>
+
+    <!-- Product Condition -->
+    <color name="condition_new">#4CAF50</color>
+    <color name="condition_like_new">#8BC34A</color>
+    <color name="condition_good">#FFC107</color>
+    <color name="condition_fair">#FF9800</color>
+    <color name="condition_poor">#F44336</color>
+
+    <!-- Chat Colors -->
+    <color name="chat_sent">#E3F2FD</color>
+    <color name="chat_received">#F5F5F5</color>
+    <color name="chat_timestamp">#9E9E9E</color>
+    <color name="online_status">#4CAF50</color>
+    <color name="offline_status">#9E9E9E</color>
+    <color name="typing_indicator">#2196F3</color>
+
+    <!-- Offer Colors -->
+    <color name="offer_accepted">#4CAF50</color>
+    <color name="offer_rejected">#F44336</color>
+    <color name="offer_pending">#FF9800</color>
+    <color name="offer_countered">#2196F3</color>
+    <color name="offer_expired">#9E9E9E</color>
+
+    <!-- Rating Colors -->
+    <color name="star_color">#FFC107</color>
+    <color name="star_empty">#E0E0E0</color>
+    <color name="rating_excellent">#4CAF50</color>
+    <color name="rating_good">#8BC34A</color>
+    <color name="rating_average">#FFC107</color>
+    <color name="rating_poor">#FF5722</color>
+
+    <!-- Special UI Colors -->
+    <color name="splash_gradient_start">#2196F3</color>
+    <color name="splash_gradient_end">#1976D2</color>
+    <color name="button_disabled">#E0E0E0</color>
+    <color name="input_error">#F44336</color>
+    <color name="input_success">#4CAF50</color>
+
+    <!-- Category Colors -->
+    <color name="category_electronics">#2196F3</color>
+    <color name="category_fashion">#E91E63</color>
+    <color name="category_home">#FF9800</color>
+    <color name="category_sports">#4CAF50</color>
+    <color name="category_books">#9C27B0</color>
+    <color name="category_automotive">#F44336</color>
+    <color name="category_toys">#FF5722</color>
+    <color name="category_beauty">#E91E63</color>
 </resources>

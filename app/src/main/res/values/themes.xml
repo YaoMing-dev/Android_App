@@ -1,9 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+
+    <!-- Base theme for the application -->
     <style name="Base.Theme.Newtrade" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/primary_color</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/primary_light</item>
+        <item name="colorOnPrimaryContainer">@color/primary_dark</item>
+
+        <item name="colorSecondary">@color/secondary_color</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/secondary_light</item>
+        <item name="colorOnSecondaryContainer">@color/secondary_dark</item>
+
+        <item name="colorTertiary">@color/info_color</item>
+        <item name="colorOnTertiary">@color/white</item>
+
+        <item name="colorError">@color/error_color</item>
+        <item name="colorOnError">@color/white</item>
+        <item name="colorErrorContainer">@color/error_color</item>
+        <item name="colorOnErrorContainer">@color/white</item>
+
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurfaceVariant">@color/background_gray</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+
+        <item name="colorBackground">@color/background_light</item>
+        <item name="colorOnBackground">@color/text_primary</item>
+
+        <item name="colorOutline">@color/divider_color</item>
+        <item name="colorOutlineVariant">@color/divider_color</item>
+
+        <!-- System bars -->
+        <item name="android:statusBarColor" tools:targetApi="l">@color/primary_dark</item>
+        <item name="android:navigationBarColor" tools:targetApi="l">@color/white</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o">true</item>
+
+        <!-- Window properties -->
+        <item name="android:windowBackground">@color/background_light</item>
+        <item name="android:windowContentTransitions" tools:targetApi="l">true</item>
+        <item name="android:windowActivityTransitions" tools:targetApi="l">true</item>
+        <item name="android:windowSharedElementEnterTransition" tools:targetApi="l">@android:transition/move</item>
+        <item name="android:windowSharedElementExitTransition" tools:targetApi="l">@android:transition/move</item>
+
+        <!-- Material Design 3 Component Styles -->
+        <item name="materialButtonStyle">@style/AppButton</item>
+        <item name="textInputStyle">@style/AppTextInputLayout</item>
+        <item name="materialCardViewStyle">@style/AppCard</item>
+        <item name="chipStyle">@style/AppChip</item>
+        <item name="toolbarStyle">@style/AppToolbar</item>
+        <item name="bottomNavigationStyle">@style/AppBottomNavigation</item>
+        <item name="tabStyle">@style/AppTabLayout</item>
+
+        <!-- Dialog styles -->
+        <item name="materialAlertDialogTheme">@style/AppDialog.Alert</item>
+        <item name="bottomSheetDialogTheme">@style/AppBottomSheetDialog</item>
+
+        <!-- Typography -->
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.App.Headline1</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.App.Headline2</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.App.Title</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.App.Subtitle</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.App.Body</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.App.Caption</item>
     </style>
 
+    <!-- Main theme -->
     <style name="Theme.Newtrade" parent="Base.Theme.Newtrade" />
+
+    <!-- Splash screen theme -->
+    <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_gradient</item>
+        <item name="android:statusBarColor">@color/splash_gradient_start</item>
+        <item name="android:navigationBarColor">@color/splash_gradient_end</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+
+    <!-- Theme overlays for specific components -->
+    <style name="ThemeOverlay.App.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/AppBottomSheet</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
+    </style>
+
+    <style name="ThemeOverlay.App.Toolbar" parent="ThemeOverlay.Material3.Toolbar.Surface">
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurface">@color/white</item>
+    </style>
+
+    <style name="ThemeOverlay.App.ActionBar" parent="ThemeOverlay.Material3.ActionBar.Surface">
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurface">@color/white</item>
+    </style>
+
 </resources>

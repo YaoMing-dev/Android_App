@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_call"
+        android:title="Call"
+        android:icon="@drawable/ic_phone"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_video_call"
+        android:title="Video Call"
+        android:icon="@drawable/ic_videocam"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_view_profile"
+        android:title="View Profile"
+        android:icon="@drawable/ic_person"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_block_user"
+        android:title="@string/block_user"
+        android:icon="@drawable/ic_block"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_report_conversation"
+        android:title="@string/report_conversation"
+        android:icon="@drawable/ic_flag"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_clear_chat"
+        android:title="Clear Chat"
+        android:icon="@drawable/ic_delete"
+        app:showAsAction="never" />
+
+</menu>

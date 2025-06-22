@@ -18,7 +18,7 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:orientation="vertical"
-            android:layout_marginTop="20dp">
+            android:layout_marginTop="40dp">
 
             <ImageView
                 android:layout_width="60dp"
@@ -30,7 +30,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="Create Account"
-                android:textSize="24sp"
+                android:textSize="26sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary" />
 
@@ -38,7 +38,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Join TradeUp community"
+                android:text="Join the TradeUp community"
                 android:textColor="@color/text_secondary" />
 
         </LinearLayout>
@@ -57,7 +57,8 @@
                 android:layout_height="wrap_content"
                 android:hint="Full Name"
                 app:startIconDrawable="@drawable/ic_person"
-                app:boxStrokeColor="@color/primary_color">
+                app:boxStrokeColor="@color/primary_color"
+                app:errorEnabled="true">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_display_name"
@@ -75,7 +76,8 @@
                 android:layout_marginTop="16dp"
                 android:hint="Email Address"
                 app:startIconDrawable="@drawable/ic_email"
-                app:boxStrokeColor="@color/primary_color">
+                app:boxStrokeColor="@color/primary_color"
+                app:errorEnabled="true">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_email"
@@ -94,7 +96,9 @@
                 android:hint="Password"
                 app:startIconDrawable="@drawable/ic_lock"
                 app:endIconMode="password_toggle"
-                app:boxStrokeColor="@color/primary_color">
+                app:boxStrokeColor="@color/primary_color"
+                app:errorEnabled="true"
+                app:helperText="Minimum 8 characters">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_password"
@@ -113,7 +117,8 @@
                 android:hint="Confirm Password"
                 app:startIconDrawable="@drawable/ic_lock"
                 app:endIconMode="password_toggle"
-                app:boxStrokeColor="@color/primary_color">
+                app:boxStrokeColor="@color/primary_color"
+                app:errorEnabled="true">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_confirm_password"
@@ -127,14 +132,15 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
+                android:layout_marginTop="24dp"
                 android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="top">
 
                 <CheckBox
                     android:id="@+id/cb_terms"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -142,8 +148,9 @@
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
                     android:text="I agree to the Terms of Service and Privacy Policy"
-                    android:textSize="12sp"
-                    android:textColor="@color/text_secondary" />
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:lineSpacingExtra="2dp" />
 
             </LinearLayout>
 

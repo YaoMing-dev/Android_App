@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_share"
+        android:title="@string/share"
+        android:icon="@drawable/ic_share"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_save"
+        android:title="@string/save_product"
+        android:icon="@drawable/ic_bookmark_border"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_report"
+        android:title="@string/report_product"
+        android:icon="@drawable/ic_flag"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_view_on_map"
+        android:title="View on Map"
+        android:icon="@drawable/ic_map"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_copy_link"
+        android:title="Copy Link"
+        android:icon="@drawable/ic_link"
+        app:showAsAction="never" />
+
+</menu>

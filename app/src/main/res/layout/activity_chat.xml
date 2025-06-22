@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- App Bar -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/white"
+        app:elevation="@dimen/elevation_md">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:navigationIcon="@drawable/ic_arrow_back"
+            app:menu="@menu/chat_menu">
+
+            <!-- Custom Title Layout -->
+            <LinearLayout
+                android:id="@+id/ll_chat_header"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:background="?attr/selectableItemBackground"
+                android:paddingEnd="@dimen/padding_xl">
+
+                <de.hdodenhof.circleimageview.CircleImageView
+                    android:id="@+id/iv_other_user_avatar"
+                    android:layout_width="@dimen/avatar_size_md"
+                    android:layout_height="@dimen/avatar_size_md"
+                    android:src="@drawable/placeholder_avatar"
+                    tools:src="@tools:sample/avatars" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/margin_md"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_other_user_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/text_size_md"
+                        android:textStyle="bold"
+                        tools:text="John Doe" />
+
+                    <TextView
+                        android:id="@+id/tv_online_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_size_xs"
+                        tools:text="Online" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
+        <!-- Product Info Banner -->
+        <LinearLayout
+            android:id="@+id/ll_product_banner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/background_gray"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="@dimen/padding_md"
+            android:visibility="visible">
+
+            <ImageView
+                android:id="@+id/iv_product_image"
+                android:layout_width="@dimen/avatar_size_md"
+                android:layout_height="@dimen/avatar_size_md"
+                android:background="@drawable/rounded_background_gray"
+                android:scaleType="centerCrop"
+                tools:src="@tools:sample/backgrounds/scenic" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/margin_md"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_product_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_size_md"
+                    android:textStyle="bold"
+                    tools:text="iPhone 13 Pro Max 256GB" />
+
+                <TextView
+                    android:id="@+id/tv_product_price"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/primary_color"
+                    android:textSize="@dimen/text_size_sm"
+                    android:textStyle="bold"
+                    tools:text="₫18,500,000" />
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_view_product"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/button_height_sm"
+                android:text="View"
+                app:icon="@drawable/ic_open_in_new"
+                app:iconSize="@dimen/icon_size_sm" />
+
+        </LinearLayout>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Messages List -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_messages"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/padding_lg"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        tools:itemCount="8"
+        tools:listitem="@layout/item_message_received" />
+
+    <!-- Typing Indicator -->
+    <LinearLayout
+        android:id="@+id/ll_typing_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="@dimen/margin_lg"
+        android:layout_marginBottom="80dp"
+        android:background="@drawable/chat_bubble_received"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/chat_bubble_padding_horizontal"
+        android:paddingVertical="@dimen/chat_bubble_padding_vertical"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/margin_sm"
+            android:text="@string/typing"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/text_size_sm" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:layout_width="24dp"
+            android:layout_height="2dp"
+            android:indeterminate="true"
+            app:indicatorColor="@color/typing_indicator"
+            app:trackThickness="2dp" />
+
+    </LinearLayout>
+
+    <!-- Message Input -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@color/white"
+        android:elevation="@dimen/elevation_lg"
+        android:gravity="bottom"
+        android:orientation="vertical"
+        android:padding="@dimen/padding_lg">
+
+        <!-- Quick Actions (Optional) -->
+        <LinearLayout
+            android:id="@+id/ll_quick_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/margin_md"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_make_offer"
+                style="@style/Widget.Material3.Chip.Assist"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/margin_sm"
+                android:text="Make Offer"
+                app:chipIcon="@drawable/ic_local_offer" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chip_schedule_meetup"
+                style="@style/Widget.Material3.Chip.Assist"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Schedule Meetup"
+                app:chipIcon="@drawable/ic_schedule" />
+
+        </LinearLayout>
+
+        <!-- Message Input Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <!-- Attachment Button -->
+            <ImageView
+                android:id="@+id/iv_attach"
+                android:layout_width="@dimen/button_height"
+                android:layout_height="@dimen/button_height"
+                android:layout_marginEnd="@dimen/margin_sm"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="@dimen/padding_md"
+                android:src="@drawable/ic_attach_file"
+                app:tint="@color/text_secondary" />
+
+            <!-- Message Input Field -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_message"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/type_message"
+                app:boxStrokeWidth="0dp"
+                app:boxStrokeWidthFocused="0dp"
+                app:hintEnabled="false">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/message_input_background"
+                    android:hint="@string/type_message"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLines="4"
+                    android:paddingHorizontal="@dimen/padding_lg"
+                    android:paddingVertical="@dimen/padding_md" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Send Button -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fab_send"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/margin_sm"
+                android:enabled="false"
+                app:fabSize="mini"
+                app:srcCompat="@drawable/ic_send"
+                app:tint="@color/white" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
