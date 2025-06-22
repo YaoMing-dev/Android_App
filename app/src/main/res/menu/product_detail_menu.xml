@@ -3,33 +3,26 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/action_share"
-        android:title="@string/share"
-        android:icon="@drawable/ic_share"
+        android:id="@+id/action_favorite"
+        android:icon="@drawable/ic_favorite"
+        android:title="Add to Favorites"
         app:showAsAction="ifRoom" />
 
     <item
-        android:id="@+id/action_save"
-        android:title="@string/save_product"
-        android:icon="@drawable/ic_bookmark_border"
+        android:id="@+id/action_share"
+        android:icon="@drawable/ic_share"
+        android:title="Share"
         app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_report"
-        android:title="@string/report_product"
-        android:icon="@drawable/ic_flag"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/action_view_on_map"
-        android:title="View on Map"
-        android:icon="@drawable/ic_map"
+        android:title="Report"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/action_copy_link"
-        android:title="Copy Link"
         android:icon="@drawable/ic_link"
+        android:title="Copy Link"
         app:showAsAction="never" />
 
 </menu>

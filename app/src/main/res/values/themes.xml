@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Base theme for the application -->
     <style name="Base.Theme.Newtrade" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Primary Colors -->
         <item name="colorPrimary">@color/primary_color</item>
@@ -27,24 +26,21 @@
         <item name="colorSurfaceVariant">@color/background_gray</item>
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>
 
-        <!-- Background Colors -->
-        <item name="colorBackground">@color/background_light</item>
+        <!-- FIX: Thay colorBackground thành android:colorBackground -->
+        <item name="android:colorBackground">@color/background_light</item>
         <item name="colorOnBackground">@color/text_primary</item>
 
         <!-- Outline Colors -->
         <item name="colorOutline">@color/divider_color</item>
-        <item name="colorOutlineVariant">@color/divider_color</item>
 
         <!-- System bars -->
-        <item name="android:statusBarColor" tools:targetApi="l">@color/primary_dark</item>
-        <item name="android:navigationBarColor" tools:targetApi="l">@color/white</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
-        <item name="android:windowLightNavigationBar" tools:targetApi="o">true</item>
+        <item name="android:statusBarColor" >@color/primary_dark</item>
+        <item name="android:navigationBarColor" >@color/white</item>
+        <item name="android:windowLightStatusBar" >false</item>
+
 
         <!-- Window properties -->
         <item name="android:windowBackground">@color/background_light</item>
-        <item name="android:windowContentTransitions" tools:targetApi="l">true</item>
-        <item name="android:windowActivityTransitions" tools:targetApi="l">true</item>
 
         <!-- Material Design 3 Component Styles -->
         <item name="materialButtonStyle">@style/AppButton</item>
@@ -68,18 +64,14 @@
         <item name="textAppearanceBodySmall">@style/TextAppearance.App.Caption</item>
     </style>
 
-    <!-- Main theme -->
     <style name="Theme.Newtrade" parent="Base.Theme.Newtrade" />
 
-    <!-- Splash screen theme -->
     <style name="SplashTheme" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_gradient</item>
         <item name="android:statusBarColor">@color/splash_gradient_start</item>
         <item name="android:navigationBarColor">@color/splash_gradient_end</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:windowFullscreen">false</item>
-        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+
     </style>
 
 </resources>
