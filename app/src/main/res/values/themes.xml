@@ -3,33 +3,35 @@
 
     <!-- Base theme for the application -->
     <style name="Base.Theme.Newtrade" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
+        <!-- Primary Colors -->
         <item name="colorPrimary">@color/primary_color</item>
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorPrimaryContainer">@color/primary_light</item>
         <item name="colorOnPrimaryContainer">@color/primary_dark</item>
 
+        <!-- Secondary Colors -->
         <item name="colorSecondary">@color/secondary_color</item>
         <item name="colorOnSecondary">@color/white</item>
         <item name="colorSecondaryContainer">@color/secondary_light</item>
         <item name="colorOnSecondaryContainer">@color/secondary_dark</item>
 
-        <item name="colorTertiary">@color/info_color</item>
-        <item name="colorOnTertiary">@color/white</item>
-
+        <!-- Error Colors -->
         <item name="colorError">@color/error_color</item>
         <item name="colorOnError">@color/white</item>
         <item name="colorErrorContainer">@color/error_color</item>
         <item name="colorOnErrorContainer">@color/white</item>
 
+        <!-- Surface Colors -->
         <item name="colorSurface">@color/white</item>
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorSurfaceVariant">@color/background_gray</item>
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>
 
+        <!-- Background Colors -->
         <item name="colorBackground">@color/background_light</item>
         <item name="colorOnBackground">@color/text_primary</item>
 
+        <!-- Outline Colors -->
         <item name="colorOutline">@color/divider_color</item>
         <item name="colorOutlineVariant">@color/divider_color</item>
 
@@ -43,8 +45,6 @@
         <item name="android:windowBackground">@color/background_light</item>
         <item name="android:windowContentTransitions" tools:targetApi="l">true</item>
         <item name="android:windowActivityTransitions" tools:targetApi="l">true</item>
-        <item name="android:windowSharedElementEnterTransition" tools:targetApi="l">@android:transition/move</item>
-        <item name="android:windowSharedElementExitTransition" tools:targetApi="l">@android:transition/move</item>
 
         <!-- Material Design 3 Component Styles -->
         <item name="materialButtonStyle">@style/AppButton</item>
@@ -80,23 +80,6 @@
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowFullscreen">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-    </style>
-
-    <!-- Theme overlays for specific components -->
-    <style name="ThemeOverlay.App.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
-        <item name="bottomSheetStyle">@style/AppBottomSheet</item>
-        <item name="android:windowIsFloating">false</item>
-        <item name="android:windowSoftInputMode">adjustResize</item>
-    </style>
-
-    <style name="ThemeOverlay.App.Toolbar" parent="ThemeOverlay.Material3.Toolbar.Surface">
-        <item name="colorOnSurface">@color/text_primary</item>
-        <item name="colorSurface">@color/white</item>
-    </style>
-
-    <style name="ThemeOverlay.App.ActionBar" parent="ThemeOverlay.Material3.ActionBar.Surface">
-        <item name="colorOnSurface">@color/text_primary</item>
-        <item name="colorSurface">@color/white</item>
     </style>
 
 </resources>
