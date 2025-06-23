@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/newtrade/api/ApiClient.java
 package com.example.newtrade.api;
 
 import android.content.Context;
@@ -24,24 +23,30 @@ public class ApiClient {
 
     private static final String TAG = "ApiClient";
     private static Retrofit retrofit = null;
-    private static OkHttpClient okHttpClient = null; // ✅ ADD: Store OkHttpClient
+    private static OkHttpClient okHttpClient = null;
+    private static Context appContext = null;
 
     // Service instances
     private static AuthService authService;
     private static UserService userService;
     private static ProductService productService;
 
-    // ✅ FIXED: Remove static context - pass context as parameter
     public static void init(Context context) {
         if (retrofit == null) {
-            retrofit = createRetrofit(context);
+            appContext = context.getApplicationContext();
+
+            // Test network connectivity
+            Constants.checkNetworkAndLog(context);
+            Constants.testBackendConnectivity(context);
+
+            retrofit = createRetrofit(appContext);
 
             // Initialize services
             authService = retrofit.create(AuthService.class);
             userService = retrofit.create(UserService.class);
             productService = retrofit.create(ProductService.class);
 
-            Log.d(TAG, "ApiClient initialized with base URL: " + Constants.BASE_URL);
+            Log.d(TAG, "✅ ApiClient initialized with base URL: " + Constants.BASE_URL);
         }
     }
 
@@ -57,37 +62,78 @@ public class ApiClient {
                 Log.d("HTTP", message));
         loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
 
-        // Auth interceptor - adds User-ID header
+        // Auth interceptor
         Interceptor authInterceptor = new Interceptor() {
             @Override
             public Response intercept(Chain chain) throws IOException {
                 Request originalRequest = chain.request();
-
-                // Skip adding User-ID for auth endpoints
                 String url = originalRequest.url().toString();
-                if (url.contains("/api/auth/")) {
-                    return chain.proceed(originalRequest);
+
+                Log.d(TAG, "🔍 API Request: " + originalRequest.method() + " " + url);
+
+                // Skip User-ID header for auth endpoints (except session validation and logout)
+                if (url.contains("/api/auth/") &&
+                        !url.contains("/validate-session") &&
+                        !url.contains("/logout")) {
+
+                    Request newRequest = originalRequest.newBuilder()
+                            .addHeader("Content-Type", "application/json")
+                            .addHeader("Accept", "application/json")
+                            .build();
+
+                    Log.d(TAG, "🔍 Auth endpoint - no User-ID header added");
+                    return chain.proceed(newRequest);
                 }
 
                 // Add User-ID header for authenticated requests
-                long userId = SharedPrefsManager.getInstance(context).getUserId();
+                SharedPrefsManager prefsManager = SharedPrefsManager.getInstance(context);
+                long userId = prefsManager.getUserId();
+
                 if (userId > 0) {
                     Request newRequest = originalRequest.newBuilder()
                             .addHeader("User-ID", String.valueOf(userId))
                             .addHeader("Content-Type", "application/json")
+                            .addHeader("Accept", "application/json")
                             .build();
 
-                    Log.d(TAG, "Adding User-ID header: " + userId);
+                    Log.d(TAG, "🔍 Adding User-ID header: " + userId);
                     return chain.proceed(newRequest);
+                } else {
+                    Log.w(TAG, "🔍 No User-ID found, proceeding without auth header");
+                    return chain.proceed(originalRequest);
                 }
-
-                return chain.proceed(originalRequest);
             }
         };
 
-        // ✅ FIXED: Store OkHttpClient reference
+        // Network error interceptor
+        Interceptor networkErrorInterceptor = new Interceptor() {
+            @Override
+            public Response intercept(Chain chain) throws IOException {
+                Request request = chain.request();
+
+                try {
+                    Response response = chain.proceed(request);
+
+                    // Log response details
+                    Log.d(TAG, "🔍 Response: " + response.code() + " " + response.message());
+
+                    if (!response.isSuccessful()) {
+                        Log.e(TAG, "❌ HTTP Error: " + response.code() + " for " + request.url());
+                    }
+
+                    return response;
+
+                } catch (IOException e) {
+                    Log.e(TAG, "❌ Network error for " + request.url() + ": " + e.getMessage());
+                    throw e;
+                }
+            }
+        };
+
+        // Build OkHttpClient
         okHttpClient = new OkHttpClient.Builder()
                 .addInterceptor(authInterceptor)
+                .addInterceptor(networkErrorInterceptor)
                 .addInterceptor(loggingInterceptor)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -95,6 +141,7 @@ public class ApiClient {
                 .retryOnConnectionFailure(true)
                 .build();
 
+        // Build Retrofit
         return new Retrofit.Builder()
                 .baseUrl(Constants.BASE_URL)
                 .client(okHttpClient)
@@ -105,56 +152,35 @@ public class ApiClient {
     // Service getters
     public static AuthService getAuthService() {
         if (authService == null) {
-            authService = retrofit.create(AuthService.class);
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
         }
         return authService;
     }
 
     public static UserService getUserService() {
         if (userService == null) {
-            userService = retrofit.create(UserService.class);
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
         }
         return userService;
     }
 
     public static ProductService getProductService() {
         if (productService == null) {
-            productService = retrofit.create(ProductService.class);
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
         }
         return productService;
     }
 
     // Utility methods
-    public static boolean isNetworkAvailable() {
-        // Simple network check - you can enhance this
-        return true; // For now, assume network is always available
+    public static boolean isInitialized() {
+        return retrofit != null;
     }
 
-    // ✅ FIXED: Remove problematic updateBaseUrl method for now
-    // We can add this later if needed
-
-    // Error handling utility
-    public static String getErrorMessage(Throwable throwable) {
-        if (throwable == null) {
-            return Constants.ERROR_UNKNOWN;
-        }
-
-        String message = throwable.getMessage();
-        if (message == null || message.isEmpty()) {
-            return Constants.ERROR_UNKNOWN;
-        }
-
-        // Handle common HTTP errors
-        if (message.contains("timeout")) {
-            return "Kết nối timeout, vui lòng thử lại";
-        } else if (message.contains("Unable to resolve host")) {
-            return Constants.ERROR_NETWORK;
-        } else if (message.contains("401")) {
-            return Constants.ERROR_UNAUTHORIZED;
-        } else if (message.contains("500")) {
-            return Constants.ERROR_SERVER;
-        }
-
-        return message;
+    public static void resetClient() {
+        retrofit = null;
+        authService = null;
+        userService = null;
+        productService = null;
+        Log.d(TAG, "ApiClient reset");
     }
 }

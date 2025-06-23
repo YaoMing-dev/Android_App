@@ -3,9 +3,11 @@ package com.example.newtrade.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 public class SharedPrefsManager {
 
+    private static final String TAG = "SharedPrefsManager";
     private static SharedPrefsManager instance;
     private static SharedPreferences sharedPreferences;
 
@@ -30,6 +32,8 @@ public class SharedPrefsManager {
         editor.putBoolean(Constants.PREF_IS_LOGGED_IN, true);
         editor.putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, isEmailVerified);
         editor.apply();
+
+        Log.d(TAG, "User session saved - ID: " + userId + ", Email: " + email);
     }
 
     public void clearUserSession() {
@@ -40,6 +44,8 @@ public class SharedPrefsManager {
         editor.remove(Constants.PREF_IS_LOGGED_IN);
         editor.remove(Constants.PREF_IS_EMAIL_VERIFIED);
         editor.apply();
+
+        Log.d(TAG, "User session cleared");
     }
 
     public boolean isLoggedIn() {
@@ -75,6 +81,7 @@ public class SharedPrefsManager {
         sharedPreferences.edit()
                 .putString(Constants.PREF_FCM_TOKEN, fcmToken)
                 .apply();
+        Log.d(TAG, "FCM token saved");
     }
 
     public String getFcmToken() {
@@ -99,14 +106,6 @@ public class SharedPrefsManager {
         return sharedPreferences.getBoolean(key, defaultValue);
     }
 
-    public void saveInt(String key, int value) {
-        sharedPreferences.edit().putInt(key, value).apply();
-    }
-
-    public int getInt(String key, int defaultValue) {
-        return sharedPreferences.getInt(key, defaultValue);
-    }
-
     public void saveLong(String key, long value) {
         sharedPreferences.edit().putLong(key, value).apply();
     }
@@ -115,13 +114,12 @@ public class SharedPrefsManager {
         return sharedPreferences.getLong(key, defaultValue);
     }
 
-    // ===== DEBUG METHODS =====
+    public void removeKey(String key) {
+        sharedPreferences.edit().remove(key).apply();
+    }
 
-    public void logUserSession() {
-        android.util.Log.d("SharedPrefs", "User ID: " + getUserId());
-        android.util.Log.d("SharedPrefs", "Email: " + getUserEmail());
-        android.util.Log.d("SharedPrefs", "Name: " + getUserName());
-        android.util.Log.d("SharedPrefs", "Logged In: " + isLoggedIn());
-        android.util.Log.d("SharedPrefs", "Email Verified: " + isEmailVerified());
+    public void clearAll() {
+        sharedPreferences.edit().clear().apply();
+        Log.d(TAG, "All preferences cleared");
     }
 }

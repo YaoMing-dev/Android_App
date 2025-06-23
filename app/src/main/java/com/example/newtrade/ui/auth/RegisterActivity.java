@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -20,8 +19,9 @@ import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.models.User;
-import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
+import com.example.newtrade.utils.ValidationUtils;
+import com.google.gson.Gson;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,12 +34,11 @@ public class RegisterActivity extends AppCompatActivity {
 
     private static final String TAG = "RegisterActivity";
 
-    // UI Components - ✅ FIXED IDs to match layout
+    // UI Components
     private EditText etDisplayName, etEmail, etPassword, etConfirmPassword;
     private CheckBox cbTerms;
     private Button btnRegister;
     private TextView tvLogin;
-    // ❌ REMOVED: progressBar (not in layout)
 
     // Utils
     private SharedPrefsManager prefsManager;
@@ -68,6 +67,13 @@ public class RegisterActivity extends AppCompatActivity {
 
         // Initially disable register button
         btnRegister.setEnabled(false);
+
+        // Check if views are found
+        if (etDisplayName == null || etEmail == null || etPassword == null ||
+                etConfirmPassword == null || btnRegister == null) {
+            Log.e(TAG, "❌ Required views not found in layout");
+            Toast.makeText(this, "Layout error - missing required fields", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void initUtils() {
@@ -94,13 +100,12 @@ public class RegisterActivity extends AppCompatActivity {
         etPassword.addTextChangedListener(textWatcher);
         etConfirmPassword.addTextChangedListener(textWatcher);
 
+        // Terms checkbox listener
         cbTerms.setOnCheckedChangeListener((buttonView, isChecked) -> validateForm());
 
         // Click listeners
         btnRegister.setOnClickListener(v -> attemptRegister());
         tvLogin.setOnClickListener(v -> navigateToLogin());
-
-        // ❌ REMOVED: btn_back listener (not in layout)
     }
 
     private void validateForm() {
@@ -109,11 +114,11 @@ public class RegisterActivity extends AppCompatActivity {
         String password = etPassword.getText().toString().trim();
         String confirmPassword = etConfirmPassword.getText().toString().trim();
 
-        boolean isValid = !displayName.isEmpty()
-                && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
-                && password.length() >= Constants.MIN_PASSWORD_LENGTH
-                && password.equals(confirmPassword)
-                && cbTerms.isChecked();
+        boolean isValid = ValidationUtils.isValidDisplayName(displayName) &&
+                ValidationUtils.isValidEmail(email) &&
+                ValidationUtils.isValidPassword(password) &&
+                ValidationUtils.isPasswordMatch(password, confirmPassword) &&
+                cbTerms.isChecked();
 
         btnRegister.setEnabled(isValid && !isLoading);
     }
@@ -125,32 +130,36 @@ public class RegisterActivity extends AppCompatActivity {
         String confirmPassword = etConfirmPassword.getText().toString().trim();
 
         // Validate display name
-        if (displayName.isEmpty() || displayName.length() < 2) {
-            etDisplayName.setError("Tên hiển thị phải có ít nhất 2 ký tự");
+        String displayNameError = ValidationUtils.getDisplayNameError(displayName);
+        if (displayNameError != null) {
+            etDisplayName.setError(displayNameError);
             return;
         }
 
         // Validate email
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            etEmail.setError("Email không hợp lệ");
+        String emailError = ValidationUtils.getEmailError(email);
+        if (emailError != null) {
+            etEmail.setError(emailError);
             return;
         }
 
         // Validate password
-        if (password.length() < Constants.MIN_PASSWORD_LENGTH) {
-            etPassword.setError("Mật khẩu phải có ít nhất " + Constants.MIN_PASSWORD_LENGTH + " ký tự");
+        String passwordError = ValidationUtils.getPasswordError(password);
+        if (passwordError != null) {
+            etPassword.setError(passwordError);
             return;
         }
 
-        // Validate password confirmation
-        if (!password.equals(confirmPassword)) {
-            etConfirmPassword.setError("Mật khẩu xác nhận không khớp");
+        // Validate confirm password
+        String confirmPasswordError = ValidationUtils.getConfirmPasswordError(password, confirmPassword);
+        if (confirmPasswordError != null) {
+            etConfirmPassword.setError(confirmPasswordError);
             return;
         }
 
-        // Validate terms
+        // Check terms
         if (!cbTerms.isChecked()) {
-            showError("Bạn phải đồng ý với Điều khoản dịch vụ");
+            Toast.makeText(this, "Vui lòng đồng ý với điều khoản sử dụng", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -158,6 +167,8 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     private void performRegister(String displayName, String email, String password) {
+        Log.d(TAG, "🔍 Attempting registration for: " + email);
+
         showLoading(true);
 
         Map<String, String> request = new HashMap<>();
@@ -171,42 +182,72 @@ public class RegisterActivity extends AppCompatActivity {
                                    @NonNull Response<StandardResponse<User>> response) {
                 showLoading(false);
 
+                Log.d(TAG, "🔍 Register response code: " + response.code());
+
                 if (response.isSuccessful() && response.body() != null) {
                     StandardResponse<User> apiResponse = response.body();
+                    Log.d(TAG, "🔍 Register response: " + new Gson().toJson(apiResponse));
 
                     if (apiResponse.isSuccess() && apiResponse.hasData()) {
-                        User user = apiResponse.getData();
-                        handleRegisterSuccess(user);
+                        handleRegisterSuccess(apiResponse.getData(), email);
                     } else {
-                        showError(apiResponse.getMessage());
+                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Đăng ký thất bại");
                     }
                 } else {
-                    showError("Đăng ký thất bại");
+                    // Try to parse error response
+                    try {
+                        if (response.errorBody() != null) {
+                            String errorJson = response.errorBody().string();
+                            Log.e(TAG, "❌ Register error body: " + errorJson);
+
+                            // Try to parse as StandardResponse
+                            StandardResponse<?> errorResponse = new Gson().fromJson(errorJson, StandardResponse.class);
+                            if (errorResponse != null && errorResponse.getMessage() != null) {
+                                showError(errorResponse.getMessage());
+                            } else {
+                                showError("Đăng ký thất bại. Thử lại sau.");
+                            }
+                        } else {
+                            showError("Đăng ký thất bại. Thử lại sau.");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing error response", e);
+                        showError("Đăng ký thất bại. Thử lại sau.");
+                    }
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<User>> call, @NonNull Throwable t) {
                 showLoading(false);
-                Log.e(TAG, "Register failed", t);
-                showError(ApiClient.getErrorMessage(t));
+                Log.e(TAG, "❌ Register network error", t);
+
+                if (t instanceof java.net.ConnectException) {
+                    showError("Không thể kết nối đến server. Kiểm tra kết nối mạng.");
+                } else if (t instanceof java.net.SocketTimeoutException) {
+                    showError("Kết nối timeout. Thử lại sau.");
+                } else {
+                    showError("Lỗi mạng: " + t.getMessage());
+                }
             }
         });
     }
 
-    private void handleRegisterSuccess(User user) {
-        Log.d(TAG, "Registration successful for user: " + user.getDisplayName());
+    private void handleRegisterSuccess(User user, String email) {
+        Log.d(TAG, "✅ Registration successful for user: " + user.getDisplayName());
 
-        // Save basic user info (but don't mark as fully logged in until email is verified)
-        prefsManager.saveString("pending_user_email", user.getEmail());
-        prefsManager.saveString("pending_user_name", user.getDisplayName());
-
-        // Show success message
-        Toast.makeText(this, "Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.",
-                Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Đăng ký thành công! Vui lòng xác thực email.", Toast.LENGTH_LONG).show();
 
         // Navigate to OTP verification
-        navigateToOtpVerification(user.getEmail());
+        navigateToOtpVerification(email, true);
+    }
+
+    private void navigateToOtpVerification(String email, boolean fromRegister) {
+        Intent intent = new Intent(this, OtpVerificationActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("fromRegister", fromRegister);
+        startActivity(intent);
+        finish(); // Don't allow back to register after successful registration
     }
 
     private void navigateToLogin() {
@@ -215,21 +256,12 @@ public class RegisterActivity extends AppCompatActivity {
         finish();
     }
 
-    private void navigateToOtpVerification(String email) {
-        Intent intent = new Intent(this, OtpVerificationActivity.class);
-        intent.putExtra("email", email);
-        intent.putExtra("from_register", true);
-        startActivity(intent);
-        finish();
-    }
-
-    // ✅ FIXED: No more progressBar - use button state instead
     private void showLoading(boolean show) {
         isLoading = show;
         btnRegister.setEnabled(!show && isFormValid());
-        btnRegister.setText(show ? "Đang đăng ký..." : "Create Account");
+        btnRegister.setText(show ? "Đang đăng ký..." : "Đăng ký");
 
-        // Disable form inputs during loading
+        // Disable inputs during loading
         etDisplayName.setEnabled(!show);
         etEmail.setEnabled(!show);
         etPassword.setEnabled(!show);
@@ -243,15 +275,16 @@ public class RegisterActivity extends AppCompatActivity {
         String password = etPassword.getText().toString().trim();
         String confirmPassword = etConfirmPassword.getText().toString().trim();
 
-        return !displayName.isEmpty()
-                && android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
-                && password.length() >= Constants.MIN_PASSWORD_LENGTH
-                && password.equals(confirmPassword)
-                && cbTerms.isChecked();
+        return ValidationUtils.isValidDisplayName(displayName) &&
+                ValidationUtils.isValidEmail(email) &&
+                ValidationUtils.isValidPassword(password) &&
+                ValidationUtils.isPasswordMatch(password, confirmPassword) &&
+                cbTerms.isChecked();
     }
 
     private void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Log.e(TAG, "Error: " + message);
     }
 
     @Override

@@ -15,7 +15,7 @@ public class StandardResponse<T> {
     private T data;
 
     @SerializedName("timestamp")
-    private long timestamp;
+    private String timestamp;
 
     // Constructors
     public StandardResponse() {}
@@ -24,47 +24,47 @@ public class StandardResponse<T> {
         this.success = success;
         this.message = message;
         this.data = data;
-        this.timestamp = System.currentTimeMillis();
     }
 
-    // Static factory methods
-    public static <T> StandardResponse<T> success(T data, String message) {
-        return new StandardResponse<>(true, message, data);
+    // Getters and setters
+    public boolean isSuccess() {
+        return success;
     }
 
-    public static <T> StandardResponse<T> error(String message) {
-        return new StandardResponse<>(false, message, null);
+    public void setSuccess(boolean success) {
+        this.success = success;
     }
 
-    // Getters and Setters
-    public boolean isSuccess() { return success; }
-    public void setSuccess(boolean success) { this.success = success; }
+    public String getMessage() {
+        return message;
+    }
 
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
+    public void setMessage(String message) {
+        this.message = message;
+    }
 
-    public T getData() { return data; }
-    public void setData(T data) { this.data = data; }
+    public T getData() {
+        return data;
+    }
 
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    public void setData(T data) {
+        this.data = data;
+    }
 
-    // Helper methods
+    public String getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(String timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    // Utility methods
     public boolean hasData() {
         return data != null;
     }
 
     public boolean isError() {
         return !success;
-    }
-
-    @Override
-    public String toString() {
-        return "StandardResponse{" +
-                "success=" + success +
-                ", message='" + message + '\'' +
-                ", data=" + data +
-                ", timestamp=" + timestamp +
-                '}';
     }
 }

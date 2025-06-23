@@ -2,32 +2,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- ✅ FIXED: Network Permissions -->
+    <!-- ===== ESSENTIAL PERMISSIONS ===== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- ✅ FIXED: Location Permissions -->
+    <!-- Location permissions for future features -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- ✅ FIXED: Camera Permission với hardware feature -->
+    <!-- Camera permission for future image upload -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
-    <uses-feature
-        android:name="android.hardware.camera.autofocus"
-        android:required="false" />
 
-    <!-- ✅ UPDATED: Storage Permissions for Android 13+ -->
+    <!-- Storage permissions for image handling -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29"
-        tools:ignore="ScopedStorage" />
 
-    <!-- ✅ FIXED: Notification Permission -->
+    <!-- Android 14+ Selected Photos Access -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+
+    <!-- Notification permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -39,58 +38,56 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Newtrade"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:usesCleartextTraffic="true"
-        tools:targetApi="31">
+        tools:targetApi="34">
 
-        <!-- ✅ FIXED: LoginActivity as LAUNCHER -->
+        <!-- ===== LOGIN ACTIVITY - LAUNCHER ===== -->
         <activity
             android:name=".ui.auth.LoginActivity"
             android:exported="true"
-            android:theme="@style/Theme.Newtrade">
+            android:theme="@style/Theme.Newtrade"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- ✅ FIXED: MainActivity -->
+        <!-- ===== MAIN ACTIVITY ===== -->
         <activity
             android:name=".MainActivity"
             android:exported="false"
-            android:theme="@style/Theme.Newtrade" />
+            android:theme="@style/Theme.Newtrade"
+            android:screenOrientation="portrait" />
 
-        <!-- ✅ FIXED: Auth Activities với tên đúng -->
+        <!-- ===== AUTHENTICATION ACTIVITIES ===== -->
         <activity
             android:name=".ui.auth.RegisterActivity"
             android:exported="false"
-            android:theme="@style/Theme.Newtrade" />
+            android:theme="@style/Theme.Newtrade"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
+            android:parentActivityName=".ui.auth.LoginActivity" />
 
         <activity
             android:name=".ui.auth.OtpVerificationActivity"
             android:exported="false"
-            android:theme="@style/Theme.Newtrade" />
+            android:theme="@style/Theme.Newtrade"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
+            android:parentActivityName=".ui.auth.LoginActivity" />
 
         <activity
             android:name=".ui.auth.ForgotPasswordActivity"
             android:exported="false"
-            android:theme="@style/Theme.Newtrade" />
+            android:theme="@style/Theme.Newtrade"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
+            android:parentActivityName=".ui.auth.LoginActivity" />
 
-        <!-- ✅ ADDED: Future Activities (commented out for now) -->
-        <!--
-        <activity
-            android:name=".ui.product.AddProductActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ui.product.ProductDetailActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ui.chat.ChatActivity"
-            android:exported="false" />
-        -->
-
-        <!-- ✅ FIXED: Firebase Messaging Service -->
+        <!-- ===== FIREBASE MESSAGING SERVICE ===== -->
         <service
             android:name=".services.TradeUpFirebaseMessagingService"
             android:exported="false">
@@ -99,13 +96,18 @@
             </intent-filter>
         </service>
 
-        <!-- ✅ ADDED: Firebase default notification metadata -->
+        <!-- ===== FIREBASE METADATA ===== -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notification" />
+
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/primary_color" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="default_channel" />
 
     </application>
 

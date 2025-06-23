@@ -9,23 +9,45 @@ import java.util.List;
 
 public class Product {
 
+    @SerializedName("id")
     private Long id;
+
+    @SerializedName("title")
     private String title;
+
+    @SerializedName("description")
     private String description;
+
+    @SerializedName("price")
     private BigDecimal price;
+
+    @SerializedName("condition")
     private String condition;
+
+    @SerializedName("status")
     private String status;
+
+    @SerializedName("location")
     private String location;
+
     @SerializedName("contactInfo")
     private String contactInfo;
+
     @SerializedName("viewCount")
     private Integer viewCount;
+
+    @SerializedName("category")
     private Category category;
+
+    @SerializedName("seller")
     private User seller;
+
     @SerializedName("imageUrls")
     private List<String> imageUrls;
+
     @SerializedName("createdAt")
     private Date createdAt;
+
     @SerializedName("updatedAt")
     private Date updatedAt;
 
@@ -81,7 +103,9 @@ public class Product {
     public String getContactInfo() { return contactInfo; }
     public void setContactInfo(String contactInfo) { this.contactInfo = contactInfo; }
 
-    public Integer getViewCount() { return viewCount; }
+    public Integer getViewCount() {
+        return viewCount != null ? viewCount : 0;
+    }
     public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
 
     public Category getCategory() { return category; }
@@ -101,12 +125,16 @@ public class Product {
 
     // Helper methods
     public String getFormattedPrice() {
-        if (price == null) return "0 ₫";
-        return String.format("%,.0f ₫", price);
+        if (price == null) return "Miễn phí";
+        return Constants.formatPrice(price.doubleValue());
     }
 
     public String getConditionDisplay() {
         return Constants.getProductConditionDisplay(condition);
+    }
+
+    public String getStatusDisplay() {
+        return Constants.getProductStatusDisplay(status);
     }
 
     public String getMainImageUrl() {
@@ -116,12 +144,43 @@ public class Product {
         return null;
     }
 
+    public boolean hasImages() {
+        return imageUrls != null && !imageUrls.isEmpty();
+    }
+
+    public int getImageCount() {
+        return imageUrls != null ? imageUrls.size() : 0;
+    }
+
     public boolean isAvailable() {
         return STATUS_AVAILABLE.equals(status);
     }
 
     public boolean isSold() {
         return STATUS_SOLD.equals(status);
+    }
+
+    public boolean isReserved() {
+        return STATUS_RESERVED.equals(status);
+    }
+
+    public double getPriceAsDouble() {
+        return price != null ? price.doubleValue() : 0.0;
+    }
+
+    public String getCategoryName() {
+        return category != null ? category.getName() : "Khác";
+    }
+
+    public String getSellerName() {
+        return seller != null ? seller.getDisplayName() : "Người bán";
+    }
+
+    public String getTimeAgo() {
+        if (createdAt != null) {
+            return Constants.getTimeAgo(createdAt.getTime());
+        }
+        return "";
     }
 
     @Override
@@ -134,5 +193,18 @@ public class Product {
                 ", status='" + status + '\'' +
                 ", location='" + location + '\'' +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Product product = (Product) o;
+        return id != null && id.equals(product.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id != null ? id.hashCode() : 0;
     }
 }

@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -19,6 +18,7 @@ import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.models.User;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.ValidationUtils;
@@ -28,6 +28,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
+import com.google.gson.Gson;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -67,6 +68,7 @@ public class LoginActivity extends AppCompatActivity {
 
         // Check if already logged in
         if (prefsManager.isLoggedIn()) {
+            Log.d(TAG, "User already logged in, redirecting to main");
             navigateToMain();
             return;
         }
@@ -84,6 +86,12 @@ public class LoginActivity extends AppCompatActivity {
 
         // Initially disable login button
         btnLogin.setEnabled(false);
+
+        // Check if views are found
+        if (etEmail == null || etPassword == null || btnLogin == null) {
+            Log.e(TAG, "❌ Required views not found in layout");
+            Toast.makeText(this, "Layout error - missing required fields", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void initGoogleSignIn() {
@@ -128,9 +136,7 @@ public class LoginActivity extends AppCompatActivity {
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
 
-        boolean isValid = ValidationUtils.isValidEmail(email)
-                && ValidationUtils.isValidPassword(password);
-
+        boolean isValid = ValidationUtils.isValidEmail(email) && ValidationUtils.isValidPassword(password);
         btnLogin.setEnabled(isValid && !isLoading);
     }
 
@@ -156,6 +162,9 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void performLogin(String email, String password) {
+        Log.d(TAG, "🔍 Attempting login for: " + email);
+        Log.d(TAG, "🔍 Backend URL: " + Constants.BASE_URL);
+
         showLoading(true);
 
         Map<String, String> request = new HashMap<>();
@@ -168,46 +177,43 @@ public class LoginActivity extends AppCompatActivity {
                                    @NonNull Response<StandardResponse<Map<String, Object>>> response) {
                 showLoading(false);
 
+                Log.d(TAG, "🔍 Login response code: " + response.code());
+
                 if (response.isSuccessful() && response.body() != null) {
                     StandardResponse<Map<String, Object>> apiResponse = response.body();
+                    Log.d(TAG, "🔍 Login response: " + new Gson().toJson(apiResponse));
 
                     if (apiResponse.isSuccess() && apiResponse.hasData()) {
-                        Map<String, Object> data = apiResponse.getData();
-
-                        // Parse user data (assuming it's in the response)
-                        if (data.containsKey("user")) {
-                            // Handle successful login
-                            handleLoginSuccess(data);
-                        } else {
-                            showError("Dữ liệu người dùng không hợp lệ");
-                        }
+                        handleLoginSuccess(apiResponse.getData());
                     } else {
-                        showError(apiResponse.getMessage());
+                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Đăng nhập thất bại");
                     }
                 } else {
-                    try {
-                        String errorMessage = "Đăng nhập thất bại";
-                        if (response.errorBody() != null) {
-                            // Try to parse error response
-                            errorMessage = "Email hoặc mật khẩu không đúng";
-                        }
-                        showError(errorMessage);
-                    } catch (Exception e) {
-                        showError("Đăng nhập thất bại");
-                    }
+                    Log.e(TAG, "❌ Login failed - Response code: " + response.code());
+                    showError("Đăng nhập thất bại. Kiểm tra email và mật khẩu.");
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 showLoading(false);
-                Log.e(TAG, "Login failed", t);
-                showError(ApiClient.getErrorMessage(t));
+                Log.e(TAG, "❌ Login network error", t);
+
+                if (t instanceof java.net.ConnectException) {
+                    showError("Không thể kết nối đến server. Kiểm tra kết nối mạng.");
+                } else if (t instanceof java.net.SocketTimeoutException) {
+                    showError("Kết nối timeout. Thử lại sau.");
+                } else {
+                    showError("Lỗi mạng: " + t.getMessage());
+                }
             }
         });
     }
 
     private void signInWithGoogle() {
+        if (isLoading) return;
+
+        Log.d(TAG, "Starting Google Sign-In");
         Intent signInIntent = googleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, Constants.RC_GOOGLE_SIGN_IN);
     }
@@ -218,23 +224,14 @@ public class LoginActivity extends AppCompatActivity {
 
         if (requestCode == Constants.RC_GOOGLE_SIGN_IN) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-            handleGoogleSignInResult(task);
-        }
-    }
-
-    private void handleGoogleSignInResult(Task<GoogleSignInAccount> completedTask) {
-        try {
-            GoogleSignInAccount account = completedTask.getResult(ApiException.class);
-            String idToken = account.getIdToken();
-
-            if (idToken != null) {
-                performGoogleSignIn(idToken);
-            } else {
-                showError("Không thể lấy Google ID token");
+            try {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                Log.d(TAG, "Google sign-in successful: " + account.getEmail());
+                performGoogleSignIn(account.getIdToken());
+            } catch (ApiException e) {
+                Log.e(TAG, "Google sign-in failed", e);
+                showError("Google đăng nhập thất bại");
             }
-        } catch (ApiException e) {
-            Log.w(TAG, "Google sign in failed", e);
-            showError("Google đăng nhập thất bại: " + e.getMessage());
         }
     }
 
@@ -256,7 +253,7 @@ public class LoginActivity extends AppCompatActivity {
                     if (apiResponse.isSuccess() && apiResponse.hasData()) {
                         handleLoginSuccess(apiResponse.getData());
                     } else {
-                        showError(apiResponse.getMessage());
+                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Google đăng nhập thất bại");
                     }
                 } else {
                     showError("Google đăng nhập thất bại");
@@ -266,38 +263,49 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 showLoading(false);
-                Log.e(TAG, "Google sign in failed", t);
-                showError(ApiClient.getErrorMessage(t));
+                Log.e(TAG, "Google sign-in network error", t);
+                showError("Lỗi mạng khi đăng nhập Google");
             }
         });
     }
 
     private void handleLoginSuccess(Map<String, Object> data) {
         try {
-            // Extract user data from response
-            Map<String, Object> userData = (Map<String, Object>) data.get("user");
+            // Parse user data from response
+            Object userObj = data.get("user");
+            if (userObj instanceof Map) {
+                Map<String, Object> userMap = (Map<String, Object>) userObj;
 
-            if (userData != null) {
-                Long userId = ((Number) userData.get("id")).longValue();
-                String email = (String) userData.get("email");
-                String displayName = (String) userData.get("displayName");
-                Boolean isEmailVerified = (Boolean) userData.get("isEmailVerified");
+                // Extract user info
+                Long userId = null;
+                Object idObj = userMap.get("id");
+                if (idObj instanceof Number) {
+                    userId = ((Number) idObj).longValue();
+                }
 
-                // Save user session
-                prefsManager.saveUserSession(userId, email, displayName,
-                        isEmailVerified != null ? isEmailVerified : false);
+                String email = (String) userMap.get("email");
+                String displayName = (String) userMap.get("displayName");
+                Boolean isEmailVerified = (Boolean) userMap.get("isEmailVerified");
 
-                Log.d(TAG, "Login successful for user: " + displayName);
+                if (userId != null && email != null && displayName != null) {
+                    // Save user session
+                    prefsManager.saveUserSession(userId, email, displayName,
+                            isEmailVerified != null ? isEmailVerified : false);
 
-                // Check if email verification is required
-                Boolean requiresOtp = (Boolean) data.get("requiresOtp");
-                if (requiresOtp != null && requiresOtp) {
-                    navigateToOtpVerification(email);
+                    Log.d(TAG, "✅ Login successful for user: " + displayName);
+
+                    // Check if email verification is required
+                    Boolean requiresOtp = (Boolean) data.get("requiresOtp");
+                    if (requiresOtp != null && requiresOtp) {
+                        navigateToOtpVerification(email);
+                    } else {
+                        navigateToMain();
+                    }
                 } else {
-                    navigateToMain();
+                    showError("Dữ liệu người dùng không hợp lệ");
                 }
             } else {
-                showError("Dữ liệu người dùng không hợp lệ");
+                showError("Định dạng phản hồi không hợp lệ");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing login response", e);
@@ -331,7 +339,7 @@ public class LoginActivity extends AppCompatActivity {
     private void showLoading(boolean show) {
         isLoading = show;
         btnLogin.setEnabled(!show && isFormValid());
-        btnLogin.setText(show ? "Đang đăng nhập..." : "Sign In");
+        btnLogin.setText(show ? "Đang đăng nhập..." : "Đăng nhập");
         btnGoogleSignIn.setEnabled(!show);
 
         // Disable inputs during loading
@@ -343,12 +351,12 @@ public class LoginActivity extends AppCompatActivity {
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
 
-        return ValidationUtils.isValidEmail(email)
-                && ValidationUtils.isValidPassword(password);
+        return ValidationUtils.isValidEmail(email) && ValidationUtils.isValidPassword(password);
     }
 
     private void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Log.e(TAG, "Error: " + message);
     }
 
     @Override

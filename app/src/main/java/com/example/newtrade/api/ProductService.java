@@ -2,72 +2,43 @@
 package com.example.newtrade.api;
 
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.models.Product;
 
 import java.util.List;
 import java.util.Map;
 
 import retrofit2.Call;
-import retrofit2.http.Body;
-import retrofit2.http.DELETE;
 import retrofit2.http.GET;
-import retrofit2.http.POST;
-import retrofit2.http.PUT;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 
 public interface ProductService {
 
-    // Get all products with filters
+    // Get all products with pagination
     @GET("api/products")
-    Call<StandardResponse<Map<String, Object>>> getAllProducts(
+    Call<StandardResponse<Map<String, Object>>> getProducts(
             @Query("page") int page,
             @Query("size") int size,
-            @Query("sortBy") String sortBy,
-            @Query("sortDir") String sortDir,
-            @Query("categoryId") Long categoryId,
-            @Query("condition") String condition,
-            @Query("minPrice") Double minPrice,
-            @Query("maxPrice") Double maxPrice
-    );
-
-    // Search products
-    @GET("api/products/search")
-    Call<StandardResponse<Map<String, Object>>> searchProducts(
-            @Query("query") String query,
-            @Query("page") int page,
-            @Query("size") int size,
-            @Query("categoryId") Long categoryId,
-            @Query("condition") String condition,
-            @Query("minPrice") Double minPrice,
-            @Query("maxPrice") Double maxPrice
+            @Query("search") String search,
+            @Query("category") String category
     );
 
     // Get product by ID
     @GET("api/products/{id}")
-    Call<StandardResponse<Product>> getProduct(@Path("id") Long productId);
+    Call<StandardResponse<Map<String, Object>>> getProductById(@Path("id") Long productId);
 
-    // Create new product
-    @POST("api/products")
-    Call<StandardResponse<Product>> createProduct(@Body Map<String, Object> request);
-
-    // Update product
-    @PUT("api/products/{id}")
-    Call<StandardResponse<Product>> updateProduct(@Path("id") Long productId, @Body Map<String, Object> request);
-
-    // Delete product
-    @DELETE("api/products/{id}")
-    Call<StandardResponse<String>> deleteProduct(@Path("id") Long productId);
-
-    // Mark product as sold
-    @PUT("api/products/{id}/mark-sold")
-    Call<StandardResponse<String>> markProductAsSold(@Path("id") Long productId);
-
-    // Get user's products
+    // Get products by user
     @GET("api/products/user/{userId}")
-    Call<StandardResponse<Map<String, Object>>> getUserProducts(
-            @Path("userId") Long userId,
-            @Query("page") int page,
-            @Query("size") int size
+    Call<StandardResponse<List<Map<String, Object>>>> getProductsByUser(@Path("userId") Long userId);
+
+    // Get featured products
+    @GET("api/products/featured")
+    Call<StandardResponse<List<Map<String, Object>>>> getFeaturedProducts();
+
+    // Get nearby products
+    @GET("api/products/nearby")
+    Call<StandardResponse<List<Map<String, Object>>>> getNearbyProducts(
+            @Query("latitude") double latitude,
+            @Query("longitude") double longitude,
+            @Query("radius") int radius
     );
 }

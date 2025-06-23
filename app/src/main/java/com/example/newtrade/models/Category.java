@@ -7,14 +7,24 @@ import java.util.Date;
 
 public class Category {
 
+    @SerializedName("id")
     private Long id;
+
+    @SerializedName("name")
     private String name;
+
+    @SerializedName("description")
     private String description;
+
+    @SerializedName("icon")
     private String icon;
+
     @SerializedName("isActive")
     private Boolean isActive;
+
     @SerializedName("createdAt")
     private Date createdAt;
+
     @SerializedName("updatedAt")
     private Date updatedAt;
 
@@ -41,7 +51,10 @@ public class Category {
     public String getIcon() { return icon; }
     public void setIcon(String icon) { this.icon = icon; }
 
-    public Boolean getIsActive() { return isActive; }
+    public Boolean getIsActive() {
+        return isActive != null ? isActive : false;
+    }
+
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
 
     public Date getCreatedAt() { return createdAt; }
@@ -58,6 +71,10 @@ public class Category {
         return Constants.getImageUrl(icon);
     }
 
+    public boolean isActive() {
+        return getIsActive();
+    }
+
     @Override
     public String toString() {
         return "Category{" +
@@ -66,5 +83,18 @@ public class Category {
                 ", description='" + description + '\'' +
                 ", isActive=" + isActive +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Category category = (Category) o;
+        return id != null && id.equals(category.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id != null ? id.hashCode() : 0;
     }
 }

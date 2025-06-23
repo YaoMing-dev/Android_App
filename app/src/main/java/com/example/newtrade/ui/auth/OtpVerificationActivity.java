@@ -7,7 +7,7 @@ import android.os.CountDownTimer;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.view.View;
+import android.view.KeyEvent;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -21,8 +21,11 @@ import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.models.User;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
+import com.example.newtrade.utils.ValidationUtils;
+import com.google.gson.Gson;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,13 +37,13 @@ import retrofit2.Response;
 public class OtpVerificationActivity extends AppCompatActivity {
 
     private static final String TAG = "OtpVerificationActivity";
+    private static final int RESEND_TIMER_SECONDS = Constants.OTP_RESEND_TIME_SECONDS;
 
-    // UI Components - ✅ FIXED IDs to match layout
+    // UI Components
     private TextView tvSubtitle, tvTimer, tvResend;
     private EditText etOtp1, etOtp2, etOtp3, etOtp4, etOtp5, etOtp6;
     private Button btnVerify;
     private LinearLayout llBack;
-    // ❌ REMOVED: progressBar (not in layout)
 
     // Data
     private String email;
@@ -57,27 +60,40 @@ public class OtpVerificationActivity extends AppCompatActivity {
         setContentView(R.layout.activity_otp_verification);
 
         // Get data from intent
-        email = getIntent().getStringExtra("email");
-        fromRegister = getIntent().getBooleanExtra("from_register", false);
-
-        if (email == null || email.isEmpty()) {
-            showError("Email không hợp lệ");
-            finish();
-            return;
-        }
+        getIntentData();
 
         initViews();
         initUtils();
         setupListeners();
         setupOtpInputs();
+
+        // Update subtitle with email
+        updateSubtitle();
+
+        // Start resend timer
         startResendTimer();
+
+        // Send OTP automatically
+        sendOtp();
 
         Log.d(TAG, "OtpVerificationActivity created for email: " + email);
     }
 
+    private void getIntentData() {
+        Intent intent = getIntent();
+        email = intent.getStringExtra("email");
+        fromRegister = intent.getBooleanExtra("fromRegister", false);
+
+        if (email == null || email.isEmpty()) {
+            Log.e(TAG, "❌ Email not provided in intent");
+            Toast.makeText(this, "Lỗi: Không có email", Toast.LENGTH_LONG).show();
+            finish();
+        }
+    }
+
     private void initViews() {
-        tvSubtitle = findViewById(R.id.tv_subtitle); // ✅ FIXED: was tv_email
-        tvTimer = findViewById(R.id.tv_timer);       // ✅ FIXED: was tv_resend_timer
+        tvSubtitle = findViewById(R.id.tv_subtitle);
+        tvTimer = findViewById(R.id.tv_timer);
         tvResend = findViewById(R.id.tv_resend);
         etOtp1 = findViewById(R.id.et_otp_1);
         etOtp2 = findViewById(R.id.et_otp_2);
@@ -88,11 +104,15 @@ public class OtpVerificationActivity extends AppCompatActivity {
         btnVerify = findViewById(R.id.btn_verify);
         llBack = findViewById(R.id.ll_back);
 
-        // Set email in subtitle
-        tvSubtitle.setText("We've sent a 6-digit code to\n" + email);
-
         // Initially disable verify button
         btnVerify.setEnabled(false);
+
+        // Check if views are found
+        if (etOtp1 == null || etOtp2 == null || etOtp3 == null ||
+                etOtp4 == null || etOtp5 == null || etOtp6 == null || btnVerify == null) {
+            Log.e(TAG, "❌ Required OTP views not found in layout");
+            Toast.makeText(this, "Layout error - missing OTP fields", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void initUtils() {
@@ -100,9 +120,12 @@ public class OtpVerificationActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        btnVerify.setOnClickListener(v -> attemptVerifyOtp());
+        btnVerify.setOnClickListener(v -> attemptOtpVerification());
         tvResend.setOnClickListener(v -> resendOtp());
-        llBack.setOnClickListener(v -> onBackPressed());
+
+        if (llBack != null) {
+            llBack.setOnClickListener(v -> onBackPressed());
+        }
     }
 
     private void setupOtpInputs() {
@@ -110,7 +133,9 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
         for (int i = 0; i < otpInputs.length; i++) {
             final int index = i;
-            otpInputs[i].addTextChangedListener(new TextWatcher() {
+            EditText currentInput = otpInputs[i];
+
+            currentInput.addTextChangedListener(new TextWatcher() {
                 @Override
                 public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
@@ -121,25 +146,35 @@ public class OtpVerificationActivity extends AppCompatActivity {
                         if (index < otpInputs.length - 1) {
                             otpInputs[index + 1].requestFocus();
                         }
-                    } else if (s.length() == 0) {
-                        // Move to previous input
-                        if (index > 0) {
-                            otpInputs[index - 1].requestFocus();
-                        }
                     }
-
                     validateOtp();
                 }
 
                 @Override
                 public void afterTextChanged(Editable s) {}
             });
+
+            // Handle backspace
+            currentInput.setOnKeyListener((v, keyCode, event) -> {
+                if (keyCode == KeyEvent.KEYCODE_DEL && event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (currentInput.getText().toString().isEmpty() && index > 0) {
+                        otpInputs[index - 1].requestFocus();
+                    }
+                }
+                return false;
+            });
+        }
+    }
+
+    private void updateSubtitle() {
+        if (tvSubtitle != null) {
+            tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email);
         }
     }
 
     private void validateOtp() {
         String otp = getOtpCode();
-        btnVerify.setEnabled(otp.length() == Constants.OTP_LENGTH && !isLoading);
+        btnVerify.setEnabled(!isLoading && ValidationUtils.isValidOtp(otp));
     }
 
     private String getOtpCode() {
@@ -151,23 +186,55 @@ public class OtpVerificationActivity extends AppCompatActivity {
                 etOtp6.getText().toString();
     }
 
-    private void attemptVerifyOtp() {
-        String otpCode = getOtpCode();
+    private void sendOtp() {
+        Log.d(TAG, "🔍 Sending OTP to: " + email);
 
-        if (otpCode.length() != Constants.OTP_LENGTH) {
-            showError("Vui lòng nhập đầy đủ mã OTP");
+        Map<String, String> request = new HashMap<>();
+        request.put("email", email);
+
+        ApiClient.getAuthService().sendOtp(request).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, String>>> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Map<String, String>> apiResponse = response.body();
+                    Log.d(TAG, "✅ OTP sent successfully");
+                    // Don't show success message, just log
+                } else {
+                    Log.e(TAG, "❌ Failed to send OTP - Response code: " + response.code());
+                    showError("Gửi mã OTP thất bại");
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "❌ Send OTP network error", t);
+                showError("Lỗi mạng khi gửi OTP");
+            }
+        });
+    }
+
+    private void attemptOtpVerification() {
+        String otp = getOtpCode();
+
+        // Validate OTP
+        String otpError = ValidationUtils.getOtpError(otp);
+        if (otpError != null) {
+            showError(otpError);
             return;
         }
 
-        performVerifyOtp(otpCode);
+        performOtpVerification(otp);
     }
 
-    private void performVerifyOtp(String otpCode) {
+    private void performOtpVerification(String otp) {
+        Log.d(TAG, "🔍 Verifying OTP for: " + email);
+
         showLoading(true);
 
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
-        request.put("otpCode", otpCode);
+        request.put("otpCode", otp);
 
         ApiClient.getAuthService().verifyOtp(request).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
@@ -175,101 +242,125 @@ public class OtpVerificationActivity extends AppCompatActivity {
                                    @NonNull Response<StandardResponse<Map<String, Object>>> response) {
                 showLoading(false);
 
+                Log.d(TAG, "🔍 OTP verification response code: " + response.code());
+
                 if (response.isSuccessful() && response.body() != null) {
                     StandardResponse<Map<String, Object>> apiResponse = response.body();
+                    Log.d(TAG, "🔍 OTP verification response: " + new Gson().toJson(apiResponse));
 
-                    if (apiResponse.isSuccess()) {
-                        handleVerificationSuccess(apiResponse.getData());
+                    if (apiResponse.isSuccess() && apiResponse.hasData()) {
+                        handleOtpVerificationSuccess(apiResponse.getData());
                     } else {
-                        showError(apiResponse.getMessage());
-                        clearOtpInputs();
+                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Xác thực OTP thất bại");
                     }
                 } else {
-                    showError("Xác thực OTP thất bại");
-                    clearOtpInputs();
+                    Log.e(TAG, "❌ OTP verification failed - Response code: " + response.code());
+                    showError("Mã OTP không chính xác hoặc đã hết hạn");
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 showLoading(false);
-                Log.e(TAG, "OTP verification failed", t);
-                showError(ApiClient.getErrorMessage(t));
-                clearOtpInputs();
+                Log.e(TAG, "❌ OTP verification network error", t);
+                showError("Lỗi mạng khi xác thực OTP");
             }
         });
     }
 
-    private void handleVerificationSuccess(Map<String, Object> data) {
-        Log.d(TAG, "OTP verification successful for email: " + email);
-
-        // Mark email as verified
-        prefsManager.setEmailVerified(true);
-
-        Toast.makeText(this, "Xác thực email thành công!", Toast.LENGTH_SHORT).show();
-
-        if (fromRegister) {
-            // If coming from registration, navigate to login
-            navigateToLogin();
-        } else {
-            // If coming from login, navigate to main
-            navigateToMain();
-        }
-    }
-
     private void resendOtp() {
+        Log.d(TAG, "Resending OTP");
+
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
 
-        ApiClient.getAuthService().resendOtp(request).enqueue(new Callback<StandardResponse<String>>() {
+        ApiClient.getAuthService().resendOtp(request).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
             @Override
-            public void onResponse(@NonNull Call<StandardResponse<String>> call,
-                                   @NonNull Response<StandardResponse<String>> response) {
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, String>>> response) {
                 if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<String> apiResponse = response.body();
+                    StandardResponse<Map<String, String>> apiResponse = response.body();
 
                     if (apiResponse.isSuccess()) {
-                        showError("Mã OTP mới đã được gửi");
+                        Toast.makeText(OtpVerificationActivity.this, "Mã OTP đã được gửi lại", Toast.LENGTH_SHORT).show();
                         startResendTimer();
                         clearOtpInputs();
                     } else {
-                        showError(apiResponse.getMessage());
+                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Gửi lại OTP thất bại");
                     }
                 } else {
-                    showError("Không thể gửi lại OTP");
+                    showError("Gửi lại OTP thất bại");
                 }
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<String>> call, @NonNull Throwable t) {
-                Log.e(TAG, "Resend OTP failed", t);
-                showError("Không thể gửi lại OTP");
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "Resend OTP network error", t);
+                showError("Lỗi mạng khi gửi lại OTP");
             }
         });
     }
 
-    private void startResendTimer() {
-        tvResend.setVisibility(View.GONE);
-        tvTimer.setVisibility(View.VISIBLE);
+    private void handleOtpVerificationSuccess(Map<String, Object> data) {
+        Log.d(TAG, "✅ OTP verification successful");
 
+        // Parse user data from response
+        Object userObj = data.get("user");
+        if (userObj instanceof Map) {
+            Map<String, Object> userMap = (Map<String, Object>) userObj;
+
+            // Extract user info
+            Long userId = null;
+            Object idObj = userMap.get("id");
+            if (idObj instanceof Number) {
+                userId = ((Number) idObj).longValue();
+            }
+
+            String userEmail = (String) userMap.get("email");
+            String displayName = (String) userMap.get("displayName");
+
+            if (userId != null && userEmail != null && displayName != null) {
+                // Save user session with email verified
+                prefsManager.saveUserSession(userId, userEmail, displayName, true);
+
+                Toast.makeText(this, "Xác thực email thành công!", Toast.LENGTH_SHORT).show();
+                navigateToMain();
+            } else {
+                showError("Dữ liệu người dùng không hợp lệ");
+            }
+        } else {
+            showError("Định dạng phản hồi không hợp lệ");
+        }
+    }
+
+    private void navigateToMain() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void startResendTimer() {
         if (resendTimer != null) {
             resendTimer.cancel();
         }
 
-        resendTimer = new CountDownTimer(Constants.OTP_RESEND_TIME_SECONDS * 1000, 1000) {
+        tvResend.setEnabled(false);
+        tvResend.setText("Gửi lại (" + RESEND_TIMER_SECONDS + "s)");
+
+        resendTimer = new CountDownTimer(RESEND_TIMER_SECONDS * 1000, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
                 int seconds = (int) (millisUntilFinished / 1000);
-                tvTimer.setText("Resend code in " + String.format("%02d:%02d", seconds / 60, seconds % 60));
+                tvResend.setText("Gửi lại (" + seconds + "s)");
             }
 
             @Override
             public void onFinish() {
-                tvTimer.setVisibility(View.GONE);
-                tvResend.setVisibility(View.VISIBLE);
+                tvResend.setEnabled(true);
+                tvResend.setText("Gửi lại mã");
             }
         };
-
         resendTimer.start();
     }
 
@@ -283,27 +374,12 @@ public class OtpVerificationActivity extends AppCompatActivity {
         etOtp1.requestFocus();
     }
 
-    private void navigateToLogin() {
-        Intent intent = new Intent(this, LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-    }
-
-    private void navigateToMain() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-    }
-
-    // ✅ FIXED: No more progressBar - use button state instead
     private void showLoading(boolean show) {
         isLoading = show;
-        btnVerify.setEnabled(!show && getOtpCode().length() == Constants.OTP_LENGTH);
-        btnVerify.setText(show ? "Đang xác thực..." : "Verify Code");
+        btnVerify.setEnabled(!show && ValidationUtils.isValidOtp(getOtpCode()));
+        btnVerify.setText(show ? "Đang xác thực..." : "Xác thực");
 
-        // Disable all OTP inputs during loading
+        // Disable OTP inputs during loading
         etOtp1.setEnabled(!show);
         etOtp2.setEnabled(!show);
         etOtp3.setEnabled(!show);
@@ -314,6 +390,7 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
     private void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Log.e(TAG, "Error: " + message);
     }
 
     @Override
@@ -327,8 +404,12 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
+        // If coming from register, go back to login instead of register
         if (fromRegister) {
-            navigateToLogin();
+            Intent intent = new Intent(this, LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
         } else {
             super.onBackPressed();
         }

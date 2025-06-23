@@ -4,6 +4,7 @@ package com.example.newtrade;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.navigation.NavController;
@@ -39,9 +40,12 @@ public class MainActivity extends AppCompatActivity {
 
         // Check authentication
         if (!prefsManager.isLoggedIn()) {
+            Log.d(TAG, "User not logged in, redirecting to login");
             navigateToLogin();
             return;
         }
+
+        Log.d(TAG, "User logged in: " + prefsManager.getUserName() + " (ID: " + prefsManager.getUserId() + ")");
 
         setContentView(R.layout.activity_main);
 
@@ -49,42 +53,29 @@ public class MainActivity extends AppCompatActivity {
         setupNavigation();
         setupFirebaseMessaging();
 
-        Log.d(TAG, "MainActivity created for user: " + prefsManager.getUserName());
+        Log.d(TAG, "MainActivity created successfully");
     }
 
     private void initViews() {
         bottomNavigation = findViewById(R.id.bottom_navigation);
+
+        if (bottomNavigation == null) {
+            Log.e(TAG, "❌ Bottom navigation not found in layout");
+            Toast.makeText(this, "Layout error - bottom navigation missing", Toast.LENGTH_LONG).show();
+            return;
+        }
     }
 
     private void setupNavigation() {
-        navController = Navigation.findNavController(this, R.id.nav_host_fragment);
-        NavigationUI.setupWithNavController(bottomNavigation, navController);
+        try {
+            navController = Navigation.findNavController(this, R.id.nav_host_fragment);
+            NavigationUI.setupWithNavController(bottomNavigation, navController);
 
-        // Handle navigation item selection
-        bottomNavigation.setOnItemSelectedListener(item -> {
-            int itemId = item.getItemId();
-
-            if (itemId == R.id.nav_home) {
-                navController.navigate(R.id.homeFragment);
-                return true;
-            } else if (itemId == R.id.nav_search) {
-                navController.navigate(R.id.searchFragment);
-                return true;
-            } else if (itemId == R.id.nav_add_product) {
-                navController.navigate(R.id.addProductFragment);
-                return true;
-            } else if (itemId == R.id.nav_messages) {
-                navController.navigate(R.id.messagesFragment);
-                return true;
-            } else if (itemId == R.id.nav_profile) {
-                navController.navigate(R.id.profileFragment);
-                return true;
-            }
-
-            return false;
-        });
-
-        Log.d(TAG, "Navigation setup completed");
+            Log.d(TAG, "✅ Navigation setup completed");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Navigation setup failed", e);
+            Toast.makeText(this, "Navigation setup error", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void setupFirebaseMessaging() {
@@ -102,9 +93,14 @@ public class MainActivity extends AppCompatActivity {
                     // Save token locally
                     prefsManager.saveFcmToken(token);
 
-                    // TODO: Send token to server
-                    // ApiClient.getUserService().updateFcmToken(token);
+                    // TODO: Send token to server when UserService is implemented
+                    // sendFcmTokenToServer(token);
                 });
+    }
+
+    private void sendFcmTokenToServer(String token) {
+        // TODO: Implement when ready
+        Log.d(TAG, "TODO: Send FCM token to server");
     }
 
     private void navigateToLogin() {
@@ -120,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Double check authentication when returning to app
         if (!prefsManager.isLoggedIn()) {
+            Log.d(TAG, "Session lost, redirecting to login");
             navigateToLogin();
         }
     }
@@ -127,13 +124,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         // Handle back button based on current fragment
-        if (navController.getCurrentDestination() != null &&
+        if (navController != null && navController.getCurrentDestination() != null &&
                 navController.getCurrentDestination().getId() == R.id.homeFragment) {
             // If on home, exit app
             super.onBackPressed();
-        } else {
+        } else if (bottomNavigation != null) {
             // Otherwise navigate to home
             bottomNavigation.setSelectedItemId(R.id.nav_home);
+        } else {
+            super.onBackPressed();
         }
     }
 

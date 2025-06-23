@@ -18,6 +18,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.ValidationUtils;
+import com.google.gson.Gson;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -57,10 +59,16 @@ public class ForgotPasswordActivity extends AppCompatActivity {
 
         // Initially disable reset button
         btnReset.setEnabled(false);
+
+        // Check if views are found
+        if (etEmail == null || btnReset == null) {
+            Log.e(TAG, "❌ Required views not found in layout");
+            Toast.makeText(this, "Layout error - missing required fields", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void setupListeners() {
-        // Text change listener for email validation
+        // Text change listener for validation
         etEmail.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -77,20 +85,25 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         // Click listeners
         btnReset.setOnClickListener(v -> attemptPasswordReset());
         tvLogin.setOnClickListener(v -> navigateToLogin());
-        llBack.setOnClickListener(v -> onBackPressed());
+
+        if (llBack != null) {
+            llBack.setOnClickListener(v -> onBackPressed());
+        }
     }
 
     private void validateForm() {
         String email = etEmail.getText().toString().trim();
-        boolean isValid = android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches();
+        boolean isValid = ValidationUtils.isValidEmail(email);
         btnReset.setEnabled(isValid && !isLoading);
     }
 
     private void attemptPasswordReset() {
         String email = etEmail.getText().toString().trim();
 
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            etEmail.setError("Email không hợp lệ");
+        // Validate email
+        String emailError = ValidationUtils.getEmailError(email);
+        if (emailError != null) {
+            etEmail.setError(emailError);
             return;
         }
 
@@ -98,70 +111,81 @@ public class ForgotPasswordActivity extends AppCompatActivity {
     }
 
     private void performPasswordReset(String email) {
+        Log.d(TAG, "🔍 Attempting password reset for: " + email);
+
         showLoading(true);
 
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
 
-        ApiClient.getAuthService().sendPasswordReset(request).enqueue(new Callback<StandardResponse<String>>() {
+        ApiClient.getAuthService().forgotPassword(request).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
             @Override
-            public void onResponse(@NonNull Call<StandardResponse<String>> call,
-                                   @NonNull Response<StandardResponse<String>> response) {
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, String>>> response) {
                 showLoading(false);
 
+                Log.d(TAG, "🔍 Password reset response code: " + response.code());
+
                 if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<String> apiResponse = response.body();
+                    StandardResponse<Map<String, String>> apiResponse = response.body();
+                    Log.d(TAG, "🔍 Password reset response: " + new Gson().toJson(apiResponse));
 
                     if (apiResponse.isSuccess()) {
-                        handleResetSuccess(email);
+                        handlePasswordResetSuccess(email);
                     } else {
-                        // For security, don't reveal if email exists or not
-                        handleResetSuccess(email);
+                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Gửi email khôi phục thất bại");
                     }
                 } else {
-                    // For security, don't reveal if email exists or not
-                    handleResetSuccess(email);
+                    Log.e(TAG, "❌ Password reset failed - Response code: " + response.code());
+                    showError("Gửi email khôi phục thất bại. Thử lại sau.");
                 }
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<String>> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
                 showLoading(false);
-                Log.e(TAG, "Password reset failed", t);
-                // For security, don't reveal network errors
-                handleResetSuccess(email);
+                Log.e(TAG, "❌ Password reset network error", t);
+
+                if (t instanceof java.net.ConnectException) {
+                    showError("Không thể kết nối đến server. Kiểm tra kết nối mạng.");
+                } else if (t instanceof java.net.SocketTimeoutException) {
+                    showError("Kết nối timeout. Thử lại sau.");
+                } else {
+                    showError("Lỗi mạng: " + t.getMessage());
+                }
             }
         });
     }
 
-    private void handleResetSuccess(String email) {
-        Log.d(TAG, "Password reset request completed for email: " + email);
+    private void handlePasswordResetSuccess(String email) {
+        Log.d(TAG, "✅ Password reset email sent successfully");
 
         Toast.makeText(this,
-                "Nếu email này tồn tại trong hệ thống, chúng tôi đã gửi link reset mật khẩu.",
+                "Chúng tôi đã gửi hướng dẫn khôi phục mật khẩu đến email " + email + ". Vui lòng kiểm tra hộp thư.",
                 Toast.LENGTH_LONG).show();
 
-        // Navigate back to login after showing message
+        // Navigate back to login after successful request
         navigateToLogin();
     }
 
     private void navigateToLogin() {
         Intent intent = new Intent(this, LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
         finish();
     }
 
     private void showLoading(boolean show) {
         isLoading = show;
-        btnReset.setEnabled(!show && isFormValid());
-        btnReset.setText(show ? "Đang gửi..." : "Send Reset Link");
+        btnReset.setEnabled(!show && ValidationUtils.isValidEmail(etEmail.getText().toString().trim()));
+        btnReset.setText(show ? "Đang gửi..." : "Gửi email khôi phục");
+
+        // Disable input during loading
         etEmail.setEnabled(!show);
     }
 
-    private boolean isFormValid() {
-        String email = etEmail.getText().toString().trim();
-        return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches();
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Log.e(TAG, "Error: " + message);
     }
 
     @Override
