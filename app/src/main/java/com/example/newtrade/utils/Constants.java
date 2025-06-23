@@ -23,7 +23,7 @@ public class Constants {
     public static final String PREF_IS_EMAIL_VERIFIED = "is_email_verified";
 
     // ===== GOOGLE OAUTH =====
-    public static final String GOOGLE_CLIENT_ID = "197776863490-0j3eukit867ircvr4nbddjrurf7c2gr0.apps.googleusercontent.com";
+    public static final String GOOGLE_CLIENT_ID = "638175281882-hb8iu5pi2cjpd0g7vfkttck4140lo3mn.apps.googleusercontent.com";
 
     // ===== REQUEST CODES =====
     public static final int RC_GOOGLE_SIGN_IN = 1001;
@@ -108,6 +108,58 @@ public class Constants {
     }
 
     /**
+     * Get network error message from throwable
+     */
+    public static String getNetworkErrorMessage(Throwable throwable) {
+        if (throwable instanceof java.net.ConnectException) {
+            return "Không thể kết nối đến server. Kiểm tra kết nối mạng.";
+        } else if (throwable instanceof java.net.SocketTimeoutException) {
+            return "Kết nối quá chậm, vui lòng thử lại";
+        } else if (throwable instanceof java.net.UnknownHostException) {
+            return "Không thể kết nối đến server";
+        } else {
+            return ERROR_UNKNOWN + ": " + throwable.getMessage();
+        }
+    }
+
+    /**
+     * Test network connectivity to backend
+     */
+    public static void testBackendConnectivity(Context context) {
+        Log.d(TAG, "=== TESTING BACKEND CONNECTIVITY ===");
+
+        // Check network
+        boolean hasNetwork = checkNetworkAndLog(context);
+        if (!hasNetwork) {
+            Log.e(TAG, "❌ No network connection available");
+            return;
+        }
+
+        // Test in background thread
+        new Thread(() -> {
+            try {
+                java.net.URL url = new java.net.URL(BASE_URL + "api/auth/health");
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+
+                int responseCode = connection.getResponseCode();
+                Log.d(TAG, "✅ Backend connectivity test: " + responseCode);
+
+                if (responseCode == 200) {
+                    Log.d(TAG, "✅ Backend is reachable and healthy");
+                } else {
+                    Log.e(TAG, "❌ Backend returned error code: " + responseCode);
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Backend connectivity test failed: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
      * Get full image URL from image path
      */
     public static String getImageUrl(String imagePath) {
@@ -156,106 +208,6 @@ public class Constants {
             }
         }
         return status;
-    }
-
-    /**
-     * Format price to Vietnamese currency format
-     */
-    public static String formatPrice(double price) {
-        if (price <= 0) {
-            return "Miễn phí";
-        }
-
-        if (price >= 1000000000) {
-            return String.format("%.1f tỷ", price / 1000000000);
-        } else if (price >= 1000000) {
-            return String.format("%.1f triệu", price / 1000000);
-        } else if (price >= 1000) {
-            return String.format("%.0f nghìn", price / 1000);
-        } else {
-            return String.format("%.0f ₫", price);
-        }
-    }
-
-    /**
-     * ✅ Get time ago string - FIX FOR PRODUCT.JAVA
-     * @param timestamp Timestamp in milliseconds
-     * @return Time ago string in Vietnamese
-     */
-    public static String getTimeAgo(long timestamp) {
-        long now = System.currentTimeMillis();
-        long diff = now - timestamp;
-
-        if (diff < 60000) { // < 1 minute
-            return "Vừa xong";
-        } else if (diff < 3600000) { // < 1 hour
-            int minutes = (int) (diff / 60000);
-            return minutes + " phút trước";
-        } else if (diff < 86400000) { // < 1 day
-            int hours = (int) (diff / 3600000);
-            return hours + " giờ trước";
-        } else if (diff < 2592000000L) { // < 30 days
-            int days = (int) (diff / 86400000);
-            return days + " ngày trước";
-        } else if (diff < 31536000000L) { // < 1 year
-            int months = (int) (diff / 2592000000L);
-            return months + " tháng trước";
-        } else {
-            int years = (int) (diff / 31536000000L);
-            return years + " năm trước";
-        }
-    }
-
-    /**
-     * Get user-friendly error message
-     */
-    public static String getUserFriendlyError(Throwable throwable) {
-        if (throwable instanceof java.net.ConnectException) {
-            return "Không thể kết nối đến server. Kiểm tra kết nối mạng.";
-        } else if (throwable instanceof java.net.SocketTimeoutException) {
-            return "Kết nối quá chậm, vui lòng thử lại";
-        } else if (throwable instanceof java.net.UnknownHostException) {
-            return "Không thể kết nối đến server";
-        } else {
-            return ERROR_UNKNOWN + ": " + throwable.getMessage();
-        }
-    }
-
-    /**
-     * Test network connectivity to backend
-     */
-    public static void testBackendConnectivity(Context context) {
-        Log.d(TAG, "=== TESTING BACKEND CONNECTIVITY ===");
-
-        // Check network
-        boolean hasNetwork = checkNetworkAndLog(context);
-        if (!hasNetwork) {
-            Log.e(TAG, "❌ No network connection available");
-            return;
-        }
-
-        // Test in background thread
-        new Thread(() -> {
-            try {
-                java.net.URL url = new java.net.URL(BASE_URL + "api/auth/health");
-                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-
-                int responseCode = connection.getResponseCode();
-                Log.d(TAG, "✅ Backend connectivity test: " + responseCode);
-
-                if (responseCode == 200) {
-                    Log.d(TAG, "✅ Backend is reachable and healthy");
-                } else {
-                    Log.e(TAG, "❌ Backend returned error code: " + responseCode);
-                }
-
-            } catch (Exception e) {
-                Log.e(TAG, "❌ Backend connectivity test failed: " + e.getMessage());
-            }
-        }).start();
     }
 
     /**
@@ -326,5 +278,148 @@ public class Constants {
         return throwable instanceof java.net.ConnectException ||
                 throwable instanceof java.net.SocketTimeoutException ||
                 throwable instanceof java.net.UnknownHostException;
+    }
+
+    /**
+     * Format price to Vietnamese currency format
+     */
+    public static String formatPrice(double price) {
+        if (price == 0) {
+            return "Miễn phí";
+        }
+
+        java.text.DecimalFormat formatter = new java.text.DecimalFormat("#,###");
+        return formatter.format(price) + " VNĐ";
+    }
+
+    /**
+     * Format price from BigDecimal to Vietnamese currency format
+     */
+    public static String formatPrice(java.math.BigDecimal price) {
+        if (price == null || price.compareTo(java.math.BigDecimal.ZERO) == 0) {
+            return "Miễn phí";
+        }
+        return formatPrice(price.doubleValue());
+    }
+
+    /**
+     * Get time ago string from timestamp
+     */
+    public static String getTimeAgo(long timeInMillis) {
+        long now = System.currentTimeMillis();
+        long diff = now - timeInMillis;
+
+        // Convert to seconds
+        long seconds = diff / 1000;
+
+        if (seconds < 60) {
+            return "Vừa xong";
+        }
+
+        // Convert to minutes
+        long minutes = seconds / 60;
+        if (minutes < 60) {
+            return minutes + " phút trước";
+        }
+
+        // Convert to hours
+        long hours = minutes / 60;
+        if (hours < 24) {
+            return hours + " giờ trước";
+        }
+
+        // Convert to days
+        long days = hours / 24;
+        if (days < 7) {
+            return days + " ngày trước";
+        }
+
+        // Convert to weeks
+        long weeks = days / 7;
+        if (weeks < 4) {
+            return weeks + " tuần trước";
+        }
+
+        // Convert to months
+        long months = days / 30;
+        if (months < 12) {
+            return months + " tháng trước";
+        }
+
+        // Convert to years
+        long years = days / 365;
+        return years + " năm trước";
+    }
+
+    /**
+     * Get time ago string from Date
+     */
+    public static String getTimeAgo(java.util.Date date) {
+        if (date == null) {
+            return "";
+        }
+        return getTimeAgo(date.getTime());
+    }
+
+    /**
+     * Format file size in human readable format
+     */
+    public static String formatFileSize(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+
+        int exp = (int) (Math.log(bytes) / Math.log(1024));
+        String pre = "KMGTPE".charAt(exp - 1) + "";
+        return String.format("%.1f %sB", bytes / Math.pow(1024, exp), pre);
+    }
+
+    /**
+     * Format distance in Vietnamese
+     */
+    public static String formatDistance(double distanceKm) {
+        if (distanceKm < 1) {
+            return String.format("%.0f m", distanceKm * 1000);
+        } else if (distanceKm < 10) {
+            return String.format("%.1f km", distanceKm);
+        } else {
+            return String.format("%.0f km", distanceKm);
+        }
+    }
+
+    /**
+     * Truncate text to specified length
+     */
+    public static String truncateText(String text, int maxLength) {
+        if (text == null || text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength - 3) + "...";
+    }
+
+    /**
+     * Capitalize first letter of each word
+     */
+    public static String capitalizeWords(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return text;
+        }
+
+        String[] words = text.toLowerCase().split("\\s+");
+        StringBuilder result = new StringBuilder();
+
+        for (int i = 0; i < words.length; i++) {
+            if (i > 0) {
+                result.append(" ");
+            }
+            if (words[i].length() > 0) {
+                result.append(Character.toUpperCase(words[i].charAt(0)));
+                if (words[i].length() > 1) {
+                    result.append(words[i].substring(1));
+                }
+            }
+        }
+
+        return result.toString();
     }
 }

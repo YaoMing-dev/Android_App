@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/newtrade/ui/auth/OtpVerificationActivity.java
 package com.example.newtrade.ui.auth;
 
 import android.content.Intent;
