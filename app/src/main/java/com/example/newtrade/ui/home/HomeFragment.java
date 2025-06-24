@@ -147,22 +147,132 @@ public class HomeFragment extends Fragment {
     }
 
     private void loadData() {
-        try {
-            // Load sample data for now
-            loadSampleCategories();
-            loadSampleProducts();
-
-            if (swipeRefresh != null) {
-                swipeRefresh.setRefreshing(false);
-            }
-
-            Log.d(TAG, "✅ Data loaded");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error loading data", e);
-            if (swipeRefresh != null) {
-                swipeRefresh.setRefreshing(false);
-            }
+        if (swipeRefresh != null) {
+            swipeRefresh.setRefreshing(true);
         }
+
+        // Load categories từ backend
+        loadCategoriesFromBackend();
+
+        // Load products từ backend
+        loadProductsFromBackend();
+    }
+
+    private void loadCategoriesFromBackend() {
+        ApiClient.getApiService().getCategories()
+                .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
+                                           Response<StandardResponse<List<Map<String, Object>>>> response) {
+
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            List<Map<String, Object>> categoryData = response.body().getData();
+
+                            categories.clear();
+                            for (Map<String, Object> data : categoryData) {
+                                Category category = new Category();
+                                category.setId(((Number) data.get("id")).longValue());
+                                category.setName((String) data.get("name"));
+                                category.setDescription((String) data.get("description"));
+                                category.setIcon((String) data.get("icon"));
+                                category.setActive(true);
+                                categories.add(category);
+                            }
+
+                            if (categoryAdapter != null) {
+                                categoryAdapter.notifyDataSetChanged();
+                            }
+
+                            Log.d(TAG, "✅ Loaded " + categories.size() + " categories from backend");
+                        } else {
+                            Log.e(TAG, "❌ Failed to load categories: " + (response.body() != null ? response.body().getMessage() : "Unknown error"));
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
+                        Log.e(TAG, "❌ Categories API call failed", t);
+                        Toast.makeText(getContext(), "Failed to load categories: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void loadProductsFromBackend() {
+        ApiClient.getApiService().getProducts(0, 20, null, null)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+
+                        if (swipeRefresh != null) {
+                            swipeRefresh.setRefreshing(false);
+                        }
+
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            Map<String, Object> data = response.body().getData();
+                            List<Map<String, Object>> productsList = (List<Map<String, Object>>) data.get("content");
+
+                            products.clear();
+                            if (productsList != null) {
+                                for (Map<String, Object> productData : productsList) {
+                                    Product product = parseProductFromMap(productData);
+                                    products.add(product);
+                                }
+                            }
+
+                            if (productAdapter != null) {
+                                productAdapter.notifyDataSetChanged();
+                            }
+
+                            updateEmptyView();
+                            Log.d(TAG, "✅ Loaded " + products.size() + " products from backend");
+                        } else {
+                            Log.e(TAG, "❌ Failed to load products: " + (response.body() != null ? response.body().getMessage() : "Unknown error"));
+                            Toast.makeText(getContext(), "Failed to load products", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.e(TAG, "❌ Products API call failed", t);
+                        if (swipeRefresh != null) {
+                            swipeRefresh.setRefreshing(false);
+                        }
+                        Toast.makeText(getContext(), "Failed to load products: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private Product parseProductFromMap(Map<String, Object> data) {
+        Product product = new Product();
+
+        if (data.get("id") != null) {
+            product.setId(((Number) data.get("id")).longValue());
+        }
+        product.setTitle((String) data.get("title"));
+        product.setDescription((String) data.get("description"));
+
+        if (data.get("price") != null) {
+            product.setPrice(((Number) data.get("price")).doubleValue());
+        }
+
+        product.setCondition((String) data.get("conditionType"));
+        product.setLocation((String) data.get("location"));
+        product.setStatus((String) data.get("status"));
+        product.setCategoryName((String) data.get("categoryName"));
+        product.setUserDisplayName((String) data.get("userDisplayName"));
+
+        if (data.get("viewCount") != null) {
+            product.setViewCount(((Number) data.get("viewCount")).intValue());
+        }
+
+        // Parse image URLs
+        List<String> imageUrls = (List<String>) data.get("imageUrls");
+        product.setImageUrls(imageUrls);
+
+        product.setCreatedAt((String) data.get("createdAt"));
+
+        return product;
     }
 
     private void loadSampleCategories() {
