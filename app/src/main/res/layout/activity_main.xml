@@ -12,7 +12,7 @@
         android:name="androidx.navigation.fragment.NavHostFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginBottom="80dp"
+        android:layout_marginBottom="56dp"
         app:defaultNavHost="true"
         app:navGraph="@navigation/main_nav_graph" />
 
@@ -20,13 +20,15 @@
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
-        android:layout_height="80dp"
+        android:layout_height="56dp"
         android:layout_gravity="bottom"
         android:background="@color/white"
-        android:paddingBottom="16dp"
         app:elevation="8dp"
+        app:itemIconSize="24dp"
         app:itemIconTint="@color/bottom_nav_color_selector"
         app:itemTextColor="@color/bottom_nav_color_selector"
+        app:itemPaddingTop="8dp"
+        app:itemPaddingBottom="8dp"
         app:menu="@menu/bottom_navigation_menu"
         app:labelVisibilityMode="labeled" />
 
