@@ -5,12 +5,14 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,6 +30,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Category;
@@ -35,17 +38,22 @@ import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.textfield.TextInputEditText;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -66,6 +74,7 @@ public class AddProductFragment extends Fragment {
     // Data
     private List<Category> categories = new ArrayList<>();
     private Uri selectedImageUri;
+    private String uploadedImageUrl; // 🔥 THÊM NÀY ĐỂ LƯU URL SAU KHI UPLOAD
     private SharedPrefsManager prefsManager;
     private FusedLocationProviderClient fusedLocationClient;
 
@@ -118,155 +127,134 @@ public class AddProductFragment extends Fragment {
     }
 
     private void loadCategories() {
-        Log.d(TAG, "Loading categories from API...");
+        Log.d(TAG, "Loading categories from backend...");
 
         ApiClient.getApiService().getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
             @Override
             public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
                                    Response<StandardResponse<List<Map<String, Object>>>> response) {
+                try {
+                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                        List<Map<String, Object>> categoryData = response.body().getData();
+                        categories.clear();
 
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    List<Map<String, Object>> categoryData = response.body().getData();
-
-                    categories.clear();
-                    if (categoryData != null) {
                         for (Map<String, Object> data : categoryData) {
                             Category category = new Category();
                             category.setId(((Number) data.get("id")).longValue());
                             category.setName((String) data.get("name"));
-                            category.setDescription((String) data.get("description"));
                             categories.add(category);
                         }
-                    }
 
-                    setupCategorySpinner();
-                    Log.d(TAG, "✅ Loaded " + categories.size() + " categories");
-                } else {
-                    Log.e(TAG, "❌ Failed to load categories");
-                    Toast.makeText(getContext(), "Failed to load categories", Toast.LENGTH_SHORT).show();
+                        setupCategorySpinner();
+                        Log.d(TAG, "✅ Loaded " + categories.size() + " categories");
+                    } else {
+                        Log.w(TAG, "❌ Failed to load categories from backend");
+                        loadSampleCategories();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Error parsing categories", e);
+                    loadSampleCategories();
                 }
             }
 
             @Override
             public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
                 Log.e(TAG, "❌ Categories API call failed", t);
-                Toast.makeText(getContext(), "Network error loading categories", Toast.LENGTH_SHORT).show();
+                loadSampleCategories();
             }
         });
     }
 
+    private void loadSampleCategories() {
+        // Fallback categories
+        categories.clear();
+        categories.add(new Category(1L, "Electronics", "Electronics devices", "", true));
+        categories.add(new Category(2L, "Fashion", "Clothing and accessories", "", true));
+        categories.add(new Category(3L, "Home & Garden", "Home decor and garden", "", true));
+        categories.add(new Category(4L, "Books & Education", "Books and educational materials", "", true));
+        categories.add(new Category(5L, "Sports & Recreation", "Sports and outdoor equipment", "", true));
+
+        setupCategorySpinner();
+        Log.d(TAG, "✅ Loaded sample categories");
+    }
+
     private void setupCategorySpinner() {
         List<String> categoryNames = new ArrayList<>();
-        categoryNames.add("Select Category");
+        categoryNames.add("Select Category"); // Default option
 
         for (Category category : categories) {
             categoryNames.add(category.getName());
         }
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                requireContext(),
-                android.R.layout.simple_spinner_item,
-                categoryNames
-        );
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, categoryNames);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategory.setAdapter(adapter);
     }
 
     private void setupConditionSpinner() {
-        String[] conditions = {"Select Condition", "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
-        String[] conditionDisplay = {"Select Condition", "New", "Like New", "Good", "Fair", "Poor"};
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                requireContext(),
-                android.R.layout.simple_spinner_item,
-                conditionDisplay
-        );
+        String[] conditions = {"Select Condition", "New", "Like New", "Good", "Fair", "Poor"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, conditions);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCondition.setAdapter(adapter);
     }
 
     private void setupListeners() {
-        btnSelectImage.setOnClickListener(v -> selectImage());
-        btnGetLocation.setOnClickListener(v -> getCurrentLocation());
-        btnPublish.setOnClickListener(v -> publishProduct());
+        if (btnSelectImage != null) {
+            btnSelectImage.setOnClickListener(v -> selectImage());
+        }
+
+        if (btnGetLocation != null) {
+            btnGetLocation.setOnClickListener(v -> getCurrentLocation());
+        }
+
+        if (btnPublish != null) {
+            btnPublish.setOnClickListener(v -> publishProduct());
+        }
     }
 
     private void selectImage() {
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        intent.setType("image/*");
         startActivityForResult(intent, REQUEST_IMAGE_PICK);
     }
 
-    // ✅ LOCATION METHOD - CHỈ SỬA CÁI NÀY THÔI
     private void getCurrentLocation() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
 
             ActivityCompat.requestPermissions(requireActivity(),
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    REQUEST_LOCATION_PERMISSION);
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
             return;
         }
 
-        btnGetLocation.setEnabled(false);
-        btnGetLocation.setText("Getting location...");
-
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(requireActivity(), new OnSuccessListener<Location>() {
-                    @Override
-                    public void onSuccess(Location location) {
-                        btnGetLocation.setEnabled(true);
-                        btnGetLocation.setText("📍 Use My Location");
-
-                        if (location != null) {
-                            getAddressFromLocation(location.getLatitude(), location.getLongitude());
-                        } else {
-                            Toast.makeText(getContext(), "Unable to get current location", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    btnGetLocation.setEnabled(true);
-                    btnGetLocation.setText("📍 Use My Location");
-                    Toast.makeText(getContext(), "Failed to get location: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
+        try {
+            fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
+                if (location != null) {
+                    getAddressFromLocation(location.getLatitude(), location.getLongitude());
+                } else {
+                    Toast.makeText(getContext(), "Unable to get current location", Toast.LENGTH_SHORT).show();
+                }
+            });
+        } catch (SecurityException e) {
+            Log.e(TAG, "❌ Location permission error", e);
+        }
     }
 
-    // ✅ ADDRESS METHOD - SỬA ĐỂ TƯƠNG THÍCH API LEVEL
     private void getAddressFromLocation(double latitude, double longitude) {
         try {
             Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
-
-            // ✅ SỬA: Dùng method sync cho API level thấp hơn
             List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
 
             if (addresses != null && !addresses.isEmpty()) {
                 Address address = addresses.get(0);
-
-                StringBuilder addressBuilder = new StringBuilder();
-
-                if (address.getSubThoroughfare() != null) {
-                    addressBuilder.append(address.getSubThoroughfare()).append(" ");
-                }
-                if (address.getThoroughfare() != null) {
-                    addressBuilder.append(address.getThoroughfare()).append(", ");
-                }
-                if (address.getSubLocality() != null) {
-                    addressBuilder.append(address.getSubLocality()).append(", ");
-                }
-                if (address.getLocality() != null) {
-                    addressBuilder.append(address.getLocality()).append(", ");
-                }
-                if (address.getAdminArea() != null) {
-                    addressBuilder.append(address.getAdminArea());
+                String fullAddress = address.getAddressLine(0);
+                if (fullAddress != null) {
+                    etLocation.setText(fullAddress);
                 }
 
-                String fullAddress = addressBuilder.toString();
-                if (fullAddress.endsWith(", ")) {
-                    fullAddress = fullAddress.substring(0, fullAddress.length() - 2);
-                }
-
-                etLocation.setText(fullAddress);
-                Toast.makeText(getContext(), "Location detected!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "📍 Location detected: " + fullAddress, Toast.LENGTH_SHORT).show();
                 Log.d(TAG, "✅ Location detected: " + fullAddress);
             } else {
                 Toast.makeText(getContext(), "Unable to determine address", Toast.LENGTH_SHORT).show();
@@ -284,10 +272,130 @@ public class AddProductFragment extends Fragment {
         if (requestCode == REQUEST_IMAGE_PICK && resultCode == Activity.RESULT_OK && data != null) {
             selectedImageUri = data.getData();
             if (selectedImageUri != null) {
-                ivProductImage.setImageURI(selectedImageUri);
-                btnSelectImage.setText("✅ Photo Selected");
+                // Show selected image immediately
+                Glide.with(this)
+                        .load(selectedImageUri)
+                        .centerCrop()
+                        .into(ivProductImage);
+
+                btnSelectImage.setText("📤 Uploading...");
+                btnSelectImage.setEnabled(false);
+
+                // 🔥 UPLOAD NGAY KHI CHỌN XONG
+                uploadImageToServer();
             }
         }
+    }
+
+    // 🔥 THÊM METHOD UPLOAD ẢNH
+    private void uploadImageToServer() {
+        try {
+            // Convert URI to File
+            File imageFile = createFileFromUri(selectedImageUri);
+            if (imageFile == null) {
+                Toast.makeText(getContext(), "Failed to process image", Toast.LENGTH_SHORT).show();
+                resetImageButton();
+                return;
+            }
+
+            // Create multipart body
+            RequestBody requestFile = RequestBody.create(MediaType.parse("image/*"), imageFile);
+            MultipartBody.Part body = MultipartBody.Part.createFormData("file", imageFile.getName(), requestFile);
+
+            // Call upload API
+            ApiClient.getApiService().uploadProductImage(body)
+                    .enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+                        @Override
+                        public void onResponse(Call<StandardResponse<Map<String, String>>> call,
+                                               Response<StandardResponse<Map<String, String>>> response) {
+
+                            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                                Map<String, String> data = response.body().getData();
+                                uploadedImageUrl = data.get("imageUrl"); // 🔥 LƯU URL
+
+                                btnSelectImage.setText("✅ Image Ready");
+                                btnSelectImage.setEnabled(true);
+                                Toast.makeText(getContext(), "Image uploaded successfully! 🎉", Toast.LENGTH_SHORT).show();
+
+                                Log.d(TAG, "✅ Image uploaded: " + uploadedImageUrl);
+                            } else {
+                                Toast.makeText(getContext(), "Failed to upload image", Toast.LENGTH_SHORT).show();
+                                resetImageButton();
+                                Log.e(TAG, "❌ Upload failed: " + response.message());
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
+                            Log.e(TAG, "❌ Image upload failed", t);
+                            Toast.makeText(getContext(), "Upload failed: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                            resetImageButton();
+                        }
+                    });
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error preparing image upload", e);
+            Toast.makeText(getContext(), "Error processing image", Toast.LENGTH_SHORT).show();
+            resetImageButton();
+        }
+    }
+
+    private File createFileFromUri(Uri uri) {
+        try {
+            InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
+            if (inputStream == null) return null;
+
+            String fileName = getFileName(uri);
+            if (fileName == null) fileName = "image_" + System.currentTimeMillis() + ".jpg";
+
+            File file = new File(requireContext().getCacheDir(), fileName);
+            FileOutputStream outputStream = new FileOutputStream(file);
+
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = inputStream.read(buffer)) > 0) {
+                outputStream.write(buffer, 0, length);
+            }
+
+            outputStream.close();
+            inputStream.close();
+
+            return file;
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error creating file from URI", e);
+            return null;
+        }
+    }
+
+    private String getFileName(Uri uri) {
+        String result = null;
+        if (uri.getScheme().equals("content")) {
+            Cursor cursor = requireContext().getContentResolver().query(uri, null, null, null, null);
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (nameIndex >= 0) {
+                        result = cursor.getString(nameIndex);
+                    }
+                }
+            } finally {
+                if (cursor != null) cursor.close();
+            }
+        }
+        if (result == null) {
+            result = uri.getPath();
+            int cut = result.lastIndexOf('/');
+            if (cut != -1) {
+                result = result.substring(cut + 1);
+            }
+        }
+        return result;
+    }
+
+    private void resetImageButton() {
+        btnSelectImage.setText("📷 Select Photo");
+        btnSelectImage.setEnabled(true);
+        uploadedImageUrl = null;
     }
 
     @Override
@@ -315,11 +423,7 @@ public class AddProductFragment extends Fragment {
         Map<String, Object> productData = new HashMap<>();
         productData.put("title", etTitle.getText().toString().trim());
         productData.put("description", etDescription.getText().toString().trim());
-
-        // Price
-        String priceText = etPrice.getText().toString().trim();
-        productData.put("price", Double.parseDouble(priceText));
-
+        productData.put("price", Double.parseDouble(etPrice.getText().toString().trim()));
         productData.put("location", etLocation.getText().toString().trim());
 
         // Category
@@ -328,11 +432,18 @@ public class AddProductFragment extends Fragment {
             productData.put("categoryId", categories.get(categoryIndex).getId());
         }
 
-        // Condition - đúng field name
-        String[] conditions = {"", "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
+        // Condition - theo backend enum
+        String[] conditionValues = {"", "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
         int conditionIndex = spinnerCondition.getSelectedItemPosition();
-        if (conditionIndex > 0 && conditionIndex < conditions.length) {
-            productData.put("condition", conditions[conditionIndex]);
+        if (conditionIndex > 0 && conditionIndex < conditionValues.length) {
+            productData.put("condition", conditionValues[conditionIndex]);
+        }
+
+        // 🔥 THÊM IMAGE URL VÀO PRODUCT DATA
+        if (uploadedImageUrl != null) {
+            List<String> imageUrls = new ArrayList<>();
+            imageUrls.add(uploadedImageUrl);
+            productData.put("imageUrls", imageUrls);
         }
 
         // Optional fields
@@ -345,7 +456,7 @@ public class AddProductFragment extends Fragment {
             productData.put("tags", tags);
         }
 
-        Log.d(TAG, "Product data: " + productData.toString());
+        Log.d(TAG, "🚀 Publishing product: " + productData.toString());
 
         // Call API
         ApiClient.getApiService().createProduct(productData)
@@ -437,9 +548,9 @@ public class AddProductFragment extends Fragment {
             return false;
         }
 
-        // Image (required theo đề thi)
-        if (selectedImageUri == null) {
-            Toast.makeText(getContext(), "Please select at least one image", Toast.LENGTH_SHORT).show();
+        // Image validation - theo yêu cầu đề thi
+        if (uploadedImageUrl == null) {
+            Toast.makeText(getContext(), "Please select and upload an image first", Toast.LENGTH_SHORT).show();
             return false;
         }
 
@@ -456,7 +567,8 @@ public class AddProductFragment extends Fragment {
         spinnerCondition.setSelection(0);
         cbNegotiable.setChecked(false);
         ivProductImage.setImageResource(R.drawable.ic_add_photo_placeholder);
-        btnSelectImage.setText("📷 Select Photo");
+        resetImageButton();
         selectedImageUri = null;
+        uploadedImageUrl = null;
     }
 }

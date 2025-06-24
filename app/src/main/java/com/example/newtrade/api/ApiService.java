@@ -6,14 +6,9 @@ import com.example.newtrade.models.StandardResponse;
 import java.util.List;
 import java.util.Map;
 
-import okhttp3.MultipartBody;  // ✅ THÊM IMPORT NÀY
+import okhttp3.MultipartBody;
 import retrofit2.Call;
-import retrofit2.http.Body;
-import retrofit2.http.GET;
-import retrofit2.http.Multipart;  // ✅ THÊM IMPORT NÀY
-import retrofit2.http.POST;
-import retrofit2.http.Part;  // ✅ THÊM IMPORT NÀY
-import retrofit2.http.Query;
+import retrofit2.http.*;
 
 public interface ApiService {
 
@@ -40,14 +35,47 @@ public interface ApiService {
     @GET("api/products")
     Call<StandardResponse<Map<String, Object>>> getProducts();
 
-    // ✅ THÊM ENDPOINT TẠO SẢN PHẨM
     @POST("api/products")
     Call<StandardResponse<Map<String, Object>>> createProduct(@Body Map<String, Object> productData);
 
-    // ✅ UPLOAD IMAGE ENDPOINT
+    @GET("api/products/{id}")
+    Call<StandardResponse<Map<String, Object>>> getProductDetail(@Path("id") Long productId);
+
+    // ===== SEARCH =====
+    @GET("api/products/search")
+    Call<StandardResponse<Map<String, Object>>> searchProducts(
+            @Query("query") String query,
+            @Query("page") int page,
+            @Query("size") int size,
+            @Query("categoryId") Long categoryId,
+            @Query("condition") String condition,
+            @Query("minPrice") Double minPrice,
+            @Query("maxPrice") Double maxPrice
+    );
+
+    // ===== USER MANAGEMENT =====
+    @GET("api/users/{id}/profile")
+    Call<StandardResponse<Map<String, Object>>> getUserProfile(@Path("id") Long userId);
+
+    @PUT("api/users/{id}/profile")
+    Call<StandardResponse<Map<String, Object>>> updateUserProfile(
+            @Path("id") Long userId,
+            @Body Map<String, Object> profileData
+    );
+
+    @GET("api/users/{id}/stats")
+    Call<StandardResponse<Map<String, Object>>> getUserStats(@Path("id") Long userId);
+
+    // ===== FILE UPLOAD =====
     @Multipart
-    @POST("api/products/upload-image")
+    @POST("api/files/upload/product")
     Call<StandardResponse<Map<String, String>>> uploadProductImage(
+            @Part MultipartBody.Part image
+    );
+
+    @Multipart
+    @POST("api/files/upload/avatar")
+    Call<StandardResponse<Map<String, String>>> uploadAvatar(
             @Part MultipartBody.Part image
     );
 

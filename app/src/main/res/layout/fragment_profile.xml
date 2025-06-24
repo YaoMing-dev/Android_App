@@ -1,47 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_gray">
+    android:background="@color/background_light">
 
-    <!-- App Bar -->
-    <com.google.android.material.appbar.AppBarLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/white"
-        app:elevation="8dp">
-
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            app:title="Profile"
-            app:titleTextColor="@color/text_primary">
-
-            <!-- Profile Menu Icon -->
-            <ImageView
-                android:id="@+id/iv_profile_menu"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_gravity="end"
-                android:layout_marginEnd="16dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="8dp"
-                android:src="@drawable/ic_more_vert"
-                app:tint="@color/text_primary" />
-
-        </com.google.android.material.appbar.MaterialToolbar>
-
-    </com.google.android.material.appbar.AppBarLayout>
-
-    <!-- Main Content -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="match_parent">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -57,41 +24,55 @@
                 android:orientation="vertical"
                 android:padding="24dp">
 
+                <!-- Profile Picture -->
                 <de.hdodenhof.circleimageview.CircleImageView
-                    android:id="@+id/iv_profile_avatar"
+                    android:id="@+id/iv_profile_picture"
                     android:layout_width="80dp"
                     android:layout_height="80dp"
-                    android:src="@drawable/placeholder_avatar"
-                    app:civ_border_width="2dp"
-                    app:civ_border_color="@color/primary_color" />
+                    android:src="@drawable/ic_person"
+                    app:civ_border_color="@color/primary_color"
+                    app:civ_border_width="2dp" />
 
+                <!-- User Info -->
                 <TextView
                     android:id="@+id/tv_display_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
+                    android:text="Lý Mi"
                     android:textColor="@color/text_primary"
                     android:textSize="20sp"
-                    android:textStyle="bold"
-                    tools:text="John Doe" />
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tv_email"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
+                    android:text="miyamoth129@gmail.com"
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp"
-                    tools:text="john.doe@example.com" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/tv_member_since"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
+                    android:text="Member since 2023"
                     android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    tools:text="Member since January 2024" />
+                    android:textSize="12sp" />
+
+                <!-- Menu Icon -->
+                <ImageView
+                    android:id="@+id/iv_profile_menu"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="end"
+                    android:layout_marginTop="-60dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_more_vert"
+                    app:tint="@color/text_secondary" />
 
             </LinearLayout>
 
@@ -99,11 +80,12 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:background="@color/white"
                 android:orientation="horizontal"
-                android:padding="16dp"
-                android:layout_marginTop="8dp">
+                android:paddingVertical="20dp">
 
+                <!-- Listings -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -115,21 +97,21 @@
                         android:id="@+id/tv_listings_count"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:text="0"
                         android:textColor="@color/primary_color"
                         android:textSize="24sp"
-                        android:textStyle="bold"
-                        tools:text="12" />
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
                         android:text="Listings"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
                 </LinearLayout>
 
+                <!-- Sold -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -141,21 +123,21 @@
                         android:id="@+id/tv_sold_count"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:text="0"
                         android:textColor="@color/success_color"
                         android:textSize="24sp"
-                        android:textStyle="bold"
-                        tools:text="8" />
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
                         android:text="Sold"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
                 </LinearLayout>
 
+                <!-- Bought -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -167,15 +149,14 @@
                         android:id="@+id/tv_bought_count"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/info_color"
+                        android:text="0"
+                        android:textColor="@color/secondary_color"
                         android:textSize="24sp"
-                        android:textStyle="bold"
-                        tools:text="15" />
+                        android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
                         android:text="Bought"
                         android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
@@ -184,13 +165,13 @@
 
             </LinearLayout>
 
-            <!-- Menu Items -->
+            <!-- Menu Section -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:background="@color/white"
-                android:orientation="vertical"
-                android:layout_marginTop="8dp">
+                android:orientation="vertical">
 
                 <!-- My Listings -->
                 <LinearLayout
@@ -238,7 +219,7 @@
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_bookmark"
+                        android:src="@drawable/ic_favorite_border"
                         app:tint="@color/text_secondary" />
 
                     <TextView
@@ -271,7 +252,7 @@
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_shopping_bag"
+                        android:src="@drawable/ic_shopping_cart"
                         app:tint="@color/text_secondary" />
 
                     <TextView
@@ -440,7 +421,6 @@
                         app:tint="@color/error_color" />
 
                     <TextView
-                        android:id="@+id/tv_logout"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
