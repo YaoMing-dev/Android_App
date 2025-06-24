@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/newtrade/utils/SharedPrefsManager.java
 package com.example.newtrade.utils;
 
 import android.content.Context;
@@ -125,11 +124,15 @@ public class SharedPrefsManager {
 
     public void clearUserData() {
         SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.clear(); // Xóa tất cả data
+        editor.clear();
         editor.apply();
         Log.d(TAG, "✅ All user data cleared");
     }
 
-    // Hoặc nếu muốn chỉ xóa user session:
+    // ===== COMPATIBILITY METHODS =====
 
+    public Long getCurrentUserId() {
+        long userId = getUserId();
+        return userId > 0 ? userId : null;
+    }
 }

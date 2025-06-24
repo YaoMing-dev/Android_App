@@ -1,4 +1,3 @@
-// File: app/src/main/java/com/example/newtrade/ui/product/AddProductFragment.java
 package com.example.newtrade.ui.product;
 
 import android.Manifest;
@@ -46,6 +45,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,6 +65,10 @@ public class AddProductFragment extends Fragment {
     private static final int REQUEST_IMAGE_PICK = 1001;
     private static final int REQUEST_LOCATION_PERMISSION = 1002;
 
+    // Price limits according to database DECIMAL(12,2)
+    private static final BigDecimal MAX_PRICE = new BigDecimal("9999999999.99");
+    private static final BigDecimal MIN_PRICE = new BigDecimal("0");
+
     // UI Components
     private ImageView ivProductImage;
     private TextInputEditText etTitle, etDescription, etPrice, etLocation, etTags;
@@ -73,9 +77,9 @@ public class AddProductFragment extends Fragment {
     private Button btnSelectImage, btnGetLocation, btnPublish;
 
     // Data
-    private List<Category> categories = new ArrayList<>();
+    private final List<Category> categories = new ArrayList<>();
     private Uri selectedImageUri;
-    private String uploadedImageUrl; // 🔥 LƯU URL SAU KHI UPLOAD
+    private String uploadedImageUrl;
     private boolean isUploading = false;
     private SharedPrefsManager prefsManager;
     private FusedLocationProviderClient fusedLocationClient;
@@ -131,37 +135,26 @@ public class AddProductFragment extends Fragment {
     private void loadCategories() {
         Log.d(TAG, "Loading categories from backend...");
 
-        ApiClient.getApiService().getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
+        ApiClient.getApiService().getCategories().enqueue(new Callback<StandardResponse<List<Category>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
-                                   Response<StandardResponse<List<Map<String, Object>>>> response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                        List<Map<String, Object>> categoryData = response.body().getData();
+            public void onResponse(@NonNull Call<StandardResponse<List<Category>>> call, @NonNull Response<StandardResponse<List<Category>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    List<Category> loadedCategories = response.body().getData();
+                    if (loadedCategories != null) {
                         categories.clear();
-
-                        for (Map<String, Object> data : categoryData) {
-                            Category category = new Category();
-                            category.setId(((Number) data.get("id")).longValue());
-                            category.setName((String) data.get("name"));
-                            categories.add(category);
-                        }
-
+                        categories.addAll(loadedCategories);
                         setupCategorySpinner();
-                        Log.d(TAG, "✅ Loaded " + categories.size() + " categories");
-                    } else {
-                        Log.w(TAG, "❌ Failed to load categories from backend");
-                        loadSampleCategories();
+                        Log.d(TAG, "✅ Categories loaded: " + categories.size());
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error parsing categories", e);
+                } else {
+                    Log.e(TAG, "❌ Failed to load categories");
                     loadSampleCategories();
                 }
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
-                Log.e(TAG, "❌ Categories API call failed", t);
+            public void onFailure(@NonNull Call<StandardResponse<List<Category>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "❌ Categories API error", t);
                 loadSampleCategories();
             }
         });
@@ -169,13 +162,13 @@ public class AddProductFragment extends Fragment {
 
     private void loadSampleCategories() {
         categories.clear();
-        categories.add(new Category(1L, "Electronics", "Electronics devices", "electronics", true));
-        categories.add(new Category(2L, "Fashion", "Clothing and accessories", "fashion", true));
-        categories.add(new Category(3L, "Home & Garden", "Home decor and garden", "home", true));
-        categories.add(new Category(4L, "Books", "Books and educational materials", "books", true));
-        categories.add(new Category(5L, "Sports", "Sports and outdoor equipment", "sports", true));
-        categories.add(new Category(6L, "Beauty", "Beauty and health products", "beauty", true));
-        categories.add(new Category(7L, "Vehicles", "Cars and motorbikes", "vehicles", true));
+        categories.add(new Category(1L, "Electronics", "Phones, laptops, gadgets", "smartphone", true));
+        categories.add(new Category(2L, "Fashion", "Clothing, shoes, accessories", "shirt", true));
+        categories.add(new Category(3L, "Home & Garden", "Furniture, appliances", "home", true));
+        categories.add(new Category(4L, "Sports", "Exercise equipment, outdoor gear", "dumbbell", true));
+        categories.add(new Category(5L, "Books", "Books and educational materials", "book", true));
+        categories.add(new Category(6L, "Vehicles", "Cars, motorcycles, parts", "car", true));
+        categories.add(new Category(7L, "Beauty", "Cosmetics, health products", "heart", true));
         categories.add(new Category(8L, "Toys", "Toys and kids items", "toys", true));
 
         setupCategorySpinner();
@@ -184,7 +177,7 @@ public class AddProductFragment extends Fragment {
 
     private void setupCategorySpinner() {
         List<String> categoryNames = new ArrayList<>();
-        categoryNames.add("Select Category"); // Default option
+        categoryNames.add("Select Category");
 
         for (Category category : categories) {
             categoryNames.add(category.getName());
@@ -218,6 +211,96 @@ public class AddProductFragment extends Fragment {
         }
     }
 
+    private boolean validateForm() {
+        // Title validation
+        if (TextUtils.isEmpty(getTextFromEditText(etTitle))) {
+            setErrorAndFocus(etTitle, "Title is required");
+            return false;
+        }
+
+        // Description validation
+        if (TextUtils.isEmpty(getTextFromEditText(etDescription))) {
+            setErrorAndFocus(etDescription, "Description is required");
+            return false;
+        }
+
+        // Price validation
+        String priceStr = getTextFromEditText(etPrice);
+        if (TextUtils.isEmpty(priceStr)) {
+            setErrorAndFocus(etPrice, "Price is required");
+            return false;
+        }
+
+        try {
+            BigDecimal price = new BigDecimal(priceStr);
+
+            if (price.compareTo(MIN_PRICE) < 0) {
+                setErrorAndFocus(etPrice, "Price cannot be negative");
+                return false;
+            }
+
+            if (price.compareTo(MAX_PRICE) > 0) {
+                NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+                String maxPriceFormatted = formatter.format(MAX_PRICE);
+                setErrorAndFocus(etPrice, "Price cannot exceed " + maxPriceFormatted);
+                Toast.makeText(getContext(),
+                        "Maximum price allowed is " + maxPriceFormatted,
+                        Toast.LENGTH_LONG).show();
+                return false;
+            }
+
+            if (price.scale() > 2) {
+                setErrorAndFocus(etPrice, "Price can have maximum 2 decimal places");
+                return false;
+            }
+
+        } catch (NumberFormatException e) {
+            setErrorAndFocus(etPrice, "Invalid price format");
+            return false;
+        }
+
+        // Location validation
+        if (TextUtils.isEmpty(getTextFromEditText(etLocation))) {
+            setErrorAndFocus(etLocation, "Location is required");
+            return false;
+        }
+
+        // Category validation
+        if (spinnerCategory.getSelectedItemPosition() == 0) {
+            Toast.makeText(getContext(), "Please select a category", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        // Condition validation
+        if (spinnerCondition.getSelectedItemPosition() == 0) {
+            Toast.makeText(getContext(), "Please select condition", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        // Image validation
+        if (uploadedImageUrl == null) {
+            Toast.makeText(getContext(), "Please select and upload an image first", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        return true;
+    }
+
+    @NonNull
+    private String getTextFromEditText(@Nullable TextInputEditText editText) {
+        if (editText != null && editText.getText() != null) {
+            return editText.getText().toString().trim();
+        }
+        return "";
+    }
+
+    private void setErrorAndFocus(@Nullable TextInputEditText editText, String error) {
+        if (editText != null) {
+            editText.setError(error);
+            editText.requestFocus();
+        }
+    }
+
     private void selectImage() {
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         intent.setType("image/*");
@@ -233,28 +316,35 @@ public class AddProductFragment extends Fragment {
             return;
         }
 
-        btnGetLocation.setText("📍 Getting location...");
-        btnGetLocation.setEnabled(false);
+        if (btnGetLocation != null) {
+            btnGetLocation.setText("📍 Getting location...");
+            btnGetLocation.setEnabled(false);
+        }
 
         try {
             fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
-                btnGetLocation.setText("📍 Get Location");
-                btnGetLocation.setEnabled(true);
+                resetLocationButton();
 
                 if (location != null) {
                     getAddressFromLocation(location.getLatitude(), location.getLongitude());
                 } else {
-                    Toast.makeText(getContext(), "Unable to get current location", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Unable to get current location. Please enter manually.", Toast.LENGTH_LONG).show();
                 }
             }).addOnFailureListener(e -> {
-                btnGetLocation.setText("📍 Get Location");
-                btnGetLocation.setEnabled(true);
+                resetLocationButton();
                 Toast.makeText(getContext(), "Failed to get location: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "❌ Location error", e);
             });
         } catch (SecurityException e) {
+            resetLocationButton();
+            Log.e(TAG, "❌ Location permission error", e);
+        }
+    }
+
+    private void resetLocationButton() {
+        if (btnGetLocation != null) {
             btnGetLocation.setText("📍 Get Location");
             btnGetLocation.setEnabled(true);
-            Log.e(TAG, "❌ Location permission error", e);
         }
     }
 
@@ -266,7 +356,7 @@ public class AddProductFragment extends Fragment {
             if (addresses != null && !addresses.isEmpty()) {
                 Address address = addresses.get(0);
                 String fullAddress = address.getAddressLine(0);
-                if (fullAddress != null) {
+                if (fullAddress != null && etLocation != null) {
                     etLocation.setText(fullAddress);
                     Toast.makeText(getContext(), "📍 Location detected", Toast.LENGTH_SHORT).show();
                     Log.d(TAG, "✅ Location detected: " + fullAddress);
@@ -288,108 +378,110 @@ public class AddProductFragment extends Fragment {
             selectedImageUri = data.getData();
             if (selectedImageUri != null) {
                 // Show selected image immediately
-                Glide.with(this)
-                        .load(selectedImageUri)
-                        .centerCrop()
-                        .into(ivProductImage);
+                if (ivProductImage != null) {
+                    Glide.with(this)
+                            .load(selectedImageUri)
+                            .centerCrop()
+                            .into(ivProductImage);
+                }
 
-                // 🔥 UPLOAD NGAY KHI CHỌN XONG
-                uploadImageToServer();
+                // Upload image to backend
+                uploadImageToBackend();
             }
         }
     }
 
-    // 🔥 UPLOAD ẢNH LÊN SERVER
-    private void uploadImageToServer() {
-        if (isUploading) return;
+    private void uploadImageToBackend() {
+        if (selectedImageUri == null || isUploading) return;
 
         isUploading = true;
-        btnSelectImage.setText("📤 Uploading...");
-        btnSelectImage.setEnabled(false);
+        updateImageButton("Uploading...", false);
 
         try {
-            // Convert URI to File
-            File imageFile = createFileFromUri(selectedImageUri);
-            if (imageFile == null) {
-                Toast.makeText(getContext(), "Failed to process image", Toast.LENGTH_SHORT).show();
+            File file = createFileFromUri(selectedImageUri);
+            if (file == null) {
                 resetImageButton();
+                Toast.makeText(getContext(), "Failed to process selected image", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Create multipart body
-            RequestBody requestFile = RequestBody.create(MediaType.parse("image/*"), imageFile);
-            MultipartBody.Part body = MultipartBody.Part.createFormData("file", imageFile.getName(), requestFile);
+            RequestBody requestFile = RequestBody.create(MediaType.parse("image/*"), file);
+            MultipartBody.Part body = MultipartBody.Part.createFormData("file", file.getName(), requestFile);
 
-            // Call upload API
-            ApiClient.getApiService().uploadProductImage(body)
-                    .enqueue(new Callback<StandardResponse<Map<String, String>>>() {
-                        @Override
-                        public void onResponse(Call<StandardResponse<Map<String, String>>> call,
-                                               Response<StandardResponse<Map<String, String>>> response) {
+            ApiClient.getApiService().uploadProductImage(body).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+                @Override
+                public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Response<StandardResponse<Map<String, String>>> response) {
+                    resetImageButton();
 
-                            isUploading = false;
-
-                            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                                Map<String, String> data = response.body().getData();
-                                uploadedImageUrl = data.get("imageUrl"); // 🔥 LƯU URL
-
-                                btnSelectImage.setText("✅ Image Ready");
-                                btnSelectImage.setEnabled(true);
-
-                                // 🔥 HIỂN THỊ ẢNH ĐÃ UPLOAD
-                                if (uploadedImageUrl != null && !uploadedImageUrl.isEmpty()) {
-                                    Glide.with(AddProductFragment.this)
-                                            .load(uploadedImageUrl)
-                                            .centerCrop()
-                                            .into(ivProductImage);
-                                }
-
-                                Toast.makeText(getContext(), "Image uploaded successfully! 🎉", Toast.LENGTH_SHORT).show();
-                                Log.d(TAG, "✅ Image uploaded: " + uploadedImageUrl);
-                            } else {
-                                Toast.makeText(getContext(), "Failed to upload image", Toast.LENGTH_SHORT).show();
-                                resetImageButton();
-                                Log.e(TAG, "❌ Upload failed: " + response.message());
-                            }
+                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                        Map<String, String> data = response.body().getData();
+                        if (data != null) {
+                            uploadedImageUrl = data.get("imageUrl");
+                            updateImageButton("✅ Image Uploaded", true);
+                            Toast.makeText(getContext(), "Image uploaded successfully!", Toast.LENGTH_SHORT).show();
+                            Log.d(TAG, "✅ Image uploaded: " + uploadedImageUrl);
                         }
+                    } else {
+                        Toast.makeText(getContext(), "Failed to upload image", Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "❌ Image upload failed");
+                    }
 
-                        @Override
-                        public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
-                            isUploading = false;
-                            Log.e(TAG, "❌ Image upload failed", t);
-                            Toast.makeText(getContext(), "Upload failed: " + t.getMessage(), Toast.LENGTH_SHORT).show();
-                            resetImageButton();
-                        }
-                    });
+                    if (file.exists()) {
+                        boolean deleted = file.delete();
+                        Log.d(TAG, "Temp file deleted: " + deleted);
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
+                    resetImageButton();
+                    Toast.makeText(getContext(), "Upload error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "❌ Image upload error", t);
+
+                    if (file.exists()) {
+                        boolean deleted = file.delete();
+                        Log.d(TAG, "Temp file deleted: " + deleted);
+                    }
+                }
+            });
 
         } catch (Exception e) {
-            isUploading = false;
-            Log.e(TAG, "❌ Error preparing image upload", e);
-            Toast.makeText(getContext(), "Error processing image", Toast.LENGTH_SHORT).show();
             resetImageButton();
+            Toast.makeText(getContext(), "Error preparing image: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "❌ Image preparation error", e);
         }
     }
 
+    private void updateImageButton(String text, boolean enabled) {
+        if (btnSelectImage != null) {
+            btnSelectImage.setText(text);
+            btnSelectImage.setEnabled(enabled);
+        }
+    }
+
+    private void resetImageButton() {
+        updateImageButton("📷 Select Image", true);
+        isUploading = false;
+    }
+
+    @Nullable
     private File createFileFromUri(Uri uri) {
         try {
             InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
             if (inputStream == null) return null;
 
             String fileName = getFileName(uri);
-            if (fileName == null) fileName = "image_" + System.currentTimeMillis() + ".jpg";
-
             File file = new File(requireContext().getCacheDir(), fileName);
-            FileOutputStream outputStream = new FileOutputStream(file);
 
-            byte[] buffer = new byte[1024];
-            int length;
-            while ((length = inputStream.read(buffer)) > 0) {
-                outputStream.write(buffer, 0, length);
+            try (FileOutputStream outputStream = new FileOutputStream(file)) {
+                byte[] buffer = new byte[1024];
+                int length;
+                while ((length = inputStream.read(buffer)) > 0) {
+                    outputStream.write(buffer, 0, length);
+                }
             }
 
-            outputStream.close();
             inputStream.close();
-
             return file;
         } catch (IOException e) {
             Log.e(TAG, "❌ Error creating file from URI", e);
@@ -397,9 +489,10 @@ public class AddProductFragment extends Fragment {
         }
     }
 
+    @NonNull
     private String getFileName(Uri uri) {
         String result = null;
-        if (uri.getScheme().equals("content")) {
+        if ("content".equals(uri.getScheme())) {
             try (Cursor cursor = requireContext().getContentResolver().query(uri, null, null, null, null)) {
                 if (cursor != null && cursor.moveToFirst()) {
                     int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
@@ -411,181 +504,100 @@ public class AddProductFragment extends Fragment {
         }
         if (result == null) {
             result = uri.getPath();
-            int cut = result.lastIndexOf('/');
-            if (cut != -1) {
-                result = result.substring(cut + 1);
+            if (result != null) {
+                int cut = result.lastIndexOf('/');
+                if (cut != -1) {
+                    result = result.substring(cut + 1);
+                }
             }
         }
-        return result;
+        return result != null ? result : "image.jpg";
     }
 
-    private void resetImageButton() {
-        btnSelectImage.setText("📷 Select Image");
-        btnSelectImage.setEnabled(true);
-        isUploading = false;
-    }
-
-    // 🔥 PUBLISH PRODUCT
     private void publishProduct() {
         if (!validateForm()) {
             return;
         }
 
-        btnPublish.setText("Publishing...");
-        btnPublish.setEnabled(false);
+        updatePublishButton("Publishing...", false);
 
         try {
-            // Prepare product data
             Map<String, Object> productData = new HashMap<>();
-            productData.put("title", etTitle.getText().toString().trim());
-            productData.put("description", etDescription.getText().toString().trim());
+            productData.put("title", getTextFromEditText(etTitle));
+            productData.put("description", getTextFromEditText(etDescription));
 
-            // Parse price
-            String priceStr = etPrice.getText().toString().trim();
-            productData.put("price", Double.parseDouble(priceStr));
+            String priceStr = getTextFromEditText(etPrice);
+            BigDecimal price = new BigDecimal(priceStr);
+            productData.put("price", price);
 
-            // Get selected category ID
-            int categoryIndex = spinnerCategory.getSelectedItemPosition() - 1; // -1 vì có "Select Category"
-            if (categoryIndex >= 0 && categoryIndex < categories.size()) {
-                productData.put("categoryId", categories.get(categoryIndex).getId());
+            int categoryIndex = spinnerCategory.getSelectedItemPosition();
+            if (categoryIndex > 0 && categoryIndex <= categories.size()) {
+                productData.put("categoryId", categories.get(categoryIndex - 1).getId());
             }
 
-            // Get selected condition
-            String[] conditions = {"NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
-            int conditionIndex = spinnerCondition.getSelectedItemPosition() - 1; // -1 vì có "Select Condition"
-            if (conditionIndex >= 0 && conditionIndex < conditions.length) {
-                productData.put("condition", conditions[conditionIndex]);
-            }
+            productData.put("condition", spinnerCondition.getSelectedItem().toString());
+            productData.put("location", getTextFromEditText(etLocation));
 
-            productData.put("location", etLocation.getText().toString().trim());
-            productData.put("negotiable", cbNegotiable.isChecked());
-
-            // Add image URLs
             List<String> imageUrls = new ArrayList<>();
-            if (uploadedImageUrl != null) {
-                imageUrls.add(uploadedImageUrl);
-            }
+            imageUrls.add(uploadedImageUrl);
             productData.put("imageUrls", imageUrls);
 
-            // Add tags if any
-            String tags = etTags.getText().toString().trim();
+            String tags = getTextFromEditText(etTags);
             if (!TextUtils.isEmpty(tags)) {
                 productData.put("tags", tags);
             }
 
-            // Call API
+            Log.d(TAG, "Publishing product: " + productData);
+
             ApiClient.getApiService().createProduct(productData).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                 @Override
-                public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                       Response<StandardResponse<Map<String, Object>>> response) {
-
-                    btnPublish.setText("Publish Product");
-                    btnPublish.setEnabled(true);
+                public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                    updatePublishButton("Publish Product", true);
 
                     if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                        Toast.makeText(getContext(), "Product published successfully! 🎉", Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), "🎉 Product published successfully! 🎉", Toast.LENGTH_LONG).show();
                         clearForm();
                         Log.d(TAG, "✅ Product published successfully");
                     } else {
                         String errorMsg = response.body() != null ? response.body().getMessage() : "Unknown error";
-                        Toast.makeText(getContext(), "Failed to publish: " + errorMsg, Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), "❌ Publish failed: " + errorMsg, Toast.LENGTH_LONG).show();
                         Log.e(TAG, "❌ Publish failed: " + errorMsg);
                     }
                 }
 
                 @Override
-                public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                    btnPublish.setText("Publish Product");
-                    btnPublish.setEnabled(true);
-
-                    Toast.makeText(getContext(), "Network error: " + t.getMessage(), Toast.LENGTH_LONG).show();
+                public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                    updatePublishButton("Publish Product", true);
+                    Toast.makeText(getContext(), "❌ Network error: " + t.getMessage(), Toast.LENGTH_LONG).show();
                     Log.e(TAG, "❌ Publish network error", t);
                 }
             });
 
         } catch (Exception e) {
-            btnPublish.setText("Publish Product");
-            btnPublish.setEnabled(true);
-
-            Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            updatePublishButton("Publish Product", true);
+            Toast.makeText(getContext(), "❌ Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
             Log.e(TAG, "❌ Publish error", e);
         }
     }
 
-    private boolean validateForm() {
-        // Title
-        if (TextUtils.isEmpty(etTitle.getText().toString().trim())) {
-            etTitle.setError("Title is required");
-            etTitle.requestFocus();
-            return false;
+    private void updatePublishButton(String text, boolean enabled) {
+        if (btnPublish != null) {
+            btnPublish.setText(text);
+            btnPublish.setEnabled(enabled);
         }
-
-        // Description
-        if (TextUtils.isEmpty(etDescription.getText().toString().trim())) {
-            etDescription.setError("Description is required");
-            etDescription.requestFocus();
-            return false;
-        }
-
-        // Price
-        String priceStr = etPrice.getText().toString().trim();
-        if (TextUtils.isEmpty(priceStr)) {
-            etPrice.setError("Price is required");
-            etPrice.requestFocus();
-            return false;
-        }
-
-        try {
-            double price = Double.parseDouble(priceStr);
-            if (price < 0) {
-                etPrice.setError("Price cannot be negative");
-                etPrice.requestFocus();
-                return false;
-            }
-        } catch (NumberFormatException e) {
-            etPrice.setError("Invalid price format");
-            etPrice.requestFocus();
-            return false;
-        }
-
-        // Location
-        if (TextUtils.isEmpty(etLocation.getText().toString().trim())) {
-            etLocation.setError("Location is required");
-            etLocation.requestFocus();
-            return false;
-        }
-
-        // Category
-        if (spinnerCategory.getSelectedItemPosition() == 0) {
-            Toast.makeText(getContext(), "Please select a category", Toast.LENGTH_SHORT).show();
-            return false;
-        }
-
-        // Condition
-        if (spinnerCondition.getSelectedItemPosition() == 0) {
-            Toast.makeText(getContext(), "Please select condition", Toast.LENGTH_SHORT).show();
-            return false;
-        }
-
-        // Image validation - theo yêu cầu đề thi
-        if (uploadedImageUrl == null) {
-            Toast.makeText(getContext(), "Please select and upload an image first", Toast.LENGTH_SHORT).show();
-            return false;
-        }
-
-        return true;
     }
 
     private void clearForm() {
-        etTitle.setText("");
-        etDescription.setText("");
-        etPrice.setText("");
-        etLocation.setText("");
-        etTags.setText("");
-        spinnerCategory.setSelection(0);
-        spinnerCondition.setSelection(0);
-        cbNegotiable.setChecked(false);
-        ivProductImage.setImageResource(R.drawable.ic_add_photo_placeholder);
+        if (etTitle != null) etTitle.setText("");
+        if (etDescription != null) etDescription.setText("");
+        if (etPrice != null) etPrice.setText("");
+        if (etLocation != null) etLocation.setText("");
+        if (etTags != null) etTags.setText("");
+        if (spinnerCategory != null) spinnerCategory.setSelection(0);
+        if (spinnerCondition != null) spinnerCondition.setSelection(0);
+        if (cbNegotiable != null) cbNegotiable.setChecked(false);
+        if (ivProductImage != null) ivProductImage.setImageResource(R.drawable.ic_add_photo_placeholder);
+
         resetImageButton();
         selectedImageUri = null;
         uploadedImageUrl = null;

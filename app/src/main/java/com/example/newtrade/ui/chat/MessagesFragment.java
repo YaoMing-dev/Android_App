@@ -1,4 +1,3 @@
-// File: app/src/main/java/com/example/newtrade/ui/chat/MessagesFragment.java
 package com.example.newtrade.ui.chat;
 
 import android.content.Intent;
@@ -9,7 +8,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -21,11 +19,18 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.ConversationAdapter;
+import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Conversation;
+import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.SharedPrefsManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class MessagesFragment extends Fragment {
 
@@ -79,124 +84,147 @@ public class MessagesFragment extends Fragment {
 
     private void setupRecyclerView() {
         if (rvConversations != null) {
-            conversationAdapter = new ConversationAdapter(conversations, this::openConversation);
+            conversationAdapter = new ConversationAdapter(conversations, this::openChatActivity);
             rvConversations.setLayoutManager(new LinearLayoutManager(getContext()));
             rvConversations.setAdapter(conversationAdapter);
         }
     }
 
     private void setupListeners() {
-        try {
-            // Swipe to refresh
-            if (swipeRefresh != null) {
-                swipeRefresh.setOnRefreshListener(this::loadConversations);
-            }
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(this::loadConversations);
+        }
 
-            // 🔥 START SHOPPING BUTTON
-            if (btnStartShopping != null) {
-                btnStartShopping.setOnClickListener(v -> startShopping());
-            }
-
-            Log.d(TAG, "✅ MessagesFragment listeners setup");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error setting up listeners", e);
+        if (btnStartShopping != null) {
+            btnStartShopping.setOnClickListener(v -> {
+                Toast.makeText(getContext(), "Navigate to shop", Toast.LENGTH_SHORT).show();
+            });
         }
     }
 
     private void loadConversations() {
-        if (swipeRefresh != null) {
-            swipeRefresh.setRefreshing(true);
+        Long userId = getCurrentUserId();
+        if (userId == null) {
+            showEmptyState();
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            return;
         }
 
-        // For now, load sample conversations since we don't have conversation API yet
-        loadSampleConversations();
+        // Create mock conversations for testing
+        createMockConversations();
+
+        // TODO: Uncomment when API is ready
+        /*
+        ApiClient.getApiService().getUserConversations(userId).enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
+                                 @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    List<Map<String, Object>> conversationData = response.body().getData();
+                    updateConversationsFromData(conversationData);
+                    Log.d(TAG, "✅ Conversations loaded: " + conversationData.size());
+                } else {
+                    Log.e(TAG, "❌ Failed to load conversations");
+                    showEmptyState();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                Log.e(TAG, "❌ Conversations API error", t);
+                showEmptyState();
+            }
+        });
+        */
     }
 
-    private void loadSampleConversations() {
-        // Clear existing conversations
+    private void createMockConversations() {
         conversations.clear();
 
-        // Add sample conversations
-        conversations.add(new Conversation(
-                1L,
-                "John Doe",
-                "Hi, is the iPhone still available?",
-                "2 hours ago",
-                "https://example.com/avatar1.jpg",
-                true,
-                false
-        ));
+        Conversation mockConversation = new Conversation();
+        mockConversation.setId(1L);
+        mockConversation.setLastMessage("Hello, is this item still available?");
 
-        conversations.add(new Conversation(
-                2L,
-                "Jane Smith",
-                "Thanks for the quick delivery!",
-                "1 day ago",
-                "https://example.com/avatar2.jpg",
-                false,
-                false
-        ));
+        conversations.add(mockConversation);
+        updateUI();
+    }
 
-        conversations.add(new Conversation(
-                3L,
-                "Mike Johnson",
-                "Can you lower the price a bit?",
-                "3 days ago",
-                "https://example.com/avatar3.jpg",
-                false,
-                true
-        ));
+    private void updateConversationsFromData(@Nullable List<Map<String, Object>> conversationData) {
+        conversations.clear();
+        if (conversationData != null && !conversationData.isEmpty()) {
+            for (Map<String, Object> data : conversationData) {
+                Conversation conversation = new Conversation();
+                // Map data to conversation object
+                if (data.get("id") instanceof Number) {
+                    conversation.setId(((Number) data.get("id")).longValue());
+                }
+                conversation.setLastMessage((String) data.get("lastMessage"));
+                conversations.add(conversation);
+            }
+            showConversations();
+        } else {
+            showEmptyState();
+        }
+        updateUI();
+    }
 
-        // Update UI
+    private void updateUI() {
         if (conversationAdapter != null) {
             conversationAdapter.notifyDataSetChanged();
         }
-
-        updateEmptyState();
-
-        if (swipeRefresh != null) {
-            swipeRefresh.setRefreshing(false);
-        }
-
-        Log.d(TAG, "✅ Loaded " + conversations.size() + " sample conversations");
-    }
-
-    private void updateEmptyState() {
         if (conversations.isEmpty()) {
-            if (llEmptyState != null) llEmptyState.setVisibility(View.VISIBLE);
-            if (rvConversations != null) rvConversations.setVisibility(View.GONE);
+            showEmptyState();
         } else {
-            if (llEmptyState != null) llEmptyState.setVisibility(View.GONE);
-            if (rvConversations != null) rvConversations.setVisibility(View.VISIBLE);
+            showConversations();
         }
     }
 
-    // 🔥 START SHOPPING - Navigate to search
-    private void startShopping() {
+    private void showConversations() {
+        if (rvConversations != null) rvConversations.setVisibility(View.VISIBLE);
+        if (llEmptyState != null) llEmptyState.setVisibility(View.GONE);
+    }
+
+    private void showEmptyState() {
+        if (rvConversations != null) rvConversations.setVisibility(View.GONE);
+        if (llEmptyState != null) llEmptyState.setVisibility(View.VISIBLE);
+    }
+
+    private void openChatActivity(Conversation conversation) {
         try {
-            // Navigate to search/home to browse products
-            if (getActivity() != null) {
-                Toast.makeText(getContext(), "Let's start shopping! 🛍️", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(),
+                    "Opening chat for conversation: " + conversation.getId(),
+                    Toast.LENGTH_SHORT).show();
 
-                // Switch to home tab (index 0) in bottom navigation
-                // You can implement this in MainActivity later
-                Log.d(TAG, "Start shopping clicked - navigate to home/search");
-            }
+            // TODO: Implement ChatActivity later
+            /*
+            Intent intent = new Intent(getContext(), ChatActivity.class);
+            intent.putExtra("conversation_id", conversation.getId());
+            startActivity(intent);
+            */
+
+            Log.d(TAG, "✅ Opening chat for conversation: " + conversation.getId());
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error starting shopping", e);
+            Log.e(TAG, "❌ Failed to open chat", e);
+            Toast.makeText(getContext(), "Failed to open chat", Toast.LENGTH_SHORT).show();
         }
     }
 
-    // 🔥 SIMPLIFIED - NO CHATACTIVITY YET
-    private void openConversation(Conversation conversation) {
-        Toast.makeText(getContext(), "Chat with " + conversation.getOtherUserName() + " 💬", Toast.LENGTH_SHORT).show();
-        Log.d(TAG, "Open conversation with: " + conversation.getOtherUserName());
+    @Nullable
+    private Long getCurrentUserId() {
+        try {
+            return prefsManager.getCurrentUserId();
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to get current user ID", e);
+            return 1L; // Mock user ID for testing
+        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh conversations when returning to fragment
         loadConversations();
     }
 }

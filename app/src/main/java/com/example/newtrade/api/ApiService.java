@@ -1,4 +1,3 @@
-// File: app/src/main/java/com/example/newtrade/api/ApiService.java
 package com.example.newtrade.api;
 
 import com.example.newtrade.models.StandardResponse;
@@ -65,6 +64,16 @@ public interface ApiService {
 
     @GET("api/users/{id}/stats")
     Call<StandardResponse<Map<String, Object>>> getUserStats(@Path("id") Long userId);
+
+    // ===== CONVERSATIONS & MESSAGES =====
+    @GET("api/conversations/user/{userId}")
+    Call<StandardResponse<List<Map<String, Object>>>> getUserConversations(@Path("userId") Long userId);
+
+    @GET("api/conversations/{id}")
+    Call<StandardResponse<Map<String, Object>>> getConversation(@Path("id") Long conversationId);
+
+    @POST("api/conversations")
+    Call<StandardResponse<Map<String, Object>>> createConversation(@Body Map<String, Object> conversationData);
 
     // ===== FILE UPLOAD =====
     @Multipart
