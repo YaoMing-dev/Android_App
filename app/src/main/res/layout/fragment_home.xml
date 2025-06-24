@@ -4,7 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_light">
+    android:background="@color/background_light"
+    android:fitsSystemWindows="true">
 
     <!-- Main Content -->
     <androidx.core.widget.NestedScrollView
@@ -16,13 +17,15 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Header -->
+            <!-- Header với safe area -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@color/white"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:paddingTop="48dp"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
                 <TextView
                     android:layout_width="match_parent"
@@ -32,7 +35,7 @@
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"
                     android:gravity="center"
-                    android:layout_marginBottom="16dp" />
+                    android:layout_marginBottom="8dp" />
 
                 <TextView
                     android:layout_width="match_parent"
@@ -74,7 +77,9 @@
                         android:text="View All"
                         android:textColor="@color/primary_color"
                         android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        android:background="?attr/selectableItemBackground"
+                        android:padding="8dp" />
 
                 </LinearLayout>
 
@@ -85,13 +90,11 @@
                     android:layout_marginTop="12dp"
                     android:orientation="horizontal"
                     android:clipToPadding="false"
-                    android:paddingEnd="16dp"
-                    tools:itemCount="5"
-                    tools:listitem="@layout/item_category_horizontal" />
+                    android:paddingEnd="16dp" />
 
             </LinearLayout>
 
-            <!-- Featured Products Section -->
+            <!-- Products Section -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -109,107 +112,50 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Near You"
+                        android:text="Recent Products"
                         android:textSize="18sp"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary" />
 
                     <TextView
-                        android:id="@+id/tv_view_all_nearby"
+                        android:id="@+id/tv_view_all_products"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="View All"
                         android:textColor="@color/primary_color"
                         android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                </LinearLayout>
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rv_nearby_products"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:orientation="horizontal"
-                    android:clipToPadding="false"
-                    android:paddingEnd="16dp"
-                    tools:itemCount="3"
-                    tools:listitem="@layout/item_product_featured" />
-
-            </LinearLayout>
-
-            <!-- All Products Section -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="All Products"
-                        android:textSize="18sp"
                         android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_sort"
-                            app:tint="@color/primary_color" />
-
-                        <TextView
-                            android:id="@+id/tv_sort_by"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:text="Newest"
-                            android:textColor="@color/primary_color"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                    </LinearLayout>
+                        android:background="?attr/selectableItemBackground"
+                        android:padding="8dp" />
 
                 </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rv_all_products"
+                    android:id="@+id/rv_recent_products"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:nestedScrollingEnabled="false"
-                    tools:itemCount="6"
-                    tools:listitem="@layout/item_product_grid" />
+                    android:nestedScrollingEnabled="false" />
 
             </LinearLayout>
+
+            <!-- Bottom spacing để tránh FAB -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="100dp" />
 
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Floating Action Button for Quick Add -->
+    <!-- FAB với position cải thiện -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_quick_add"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="72dp"
+        android:layout_margin="20dp"
+        android:layout_marginBottom="100dp"
         android:src="@drawable/ic_add"
         app:tint="@color/white"
         app:backgroundTint="@color/primary_color" />

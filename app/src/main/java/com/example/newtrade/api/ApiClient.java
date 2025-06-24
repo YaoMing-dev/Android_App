@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/newtrade/api/ApiClient.java
 package com.example.newtrade.api;
 
 import android.content.Context;
@@ -30,6 +31,7 @@ public class ApiClient {
     private static AuthService authService;
     private static UserService userService;
     private static ProductService productService;
+    private static ApiService apiService; // ✅ THÊM CÁI NÀY
 
     public static void init(Context context) {
         if (retrofit == null) {
@@ -45,6 +47,7 @@ public class ApiClient {
             authService = retrofit.create(AuthService.class);
             userService = retrofit.create(UserService.class);
             productService = retrofit.create(ProductService.class);
+            apiService = retrofit.create(ApiService.class); // ✅ THÊM CÁI NÀY
 
             Log.d(TAG, "✅ ApiClient initialized with base URL: " + Constants.BASE_URL);
         }
@@ -171,6 +174,14 @@ public class ApiClient {
         return productService;
     }
 
+    // ✅ THÊM METHOD NÀY
+    public static ApiService getApiService() {
+        if (apiService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return apiService;
+    }
+
     // Utility methods
     public static boolean isInitialized() {
         return retrofit != null;
@@ -181,6 +192,7 @@ public class ApiClient {
         authService = null;
         userService = null;
         productService = null;
+        apiService = null; // ✅ THÊM CÁI NÀY
         Log.d(TAG, "ApiClient reset");
     }
 }
