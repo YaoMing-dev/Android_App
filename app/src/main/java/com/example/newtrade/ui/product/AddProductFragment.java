@@ -7,23 +7,31 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.Spinner;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.newtrade.R;
+import com.google.android.material.textfield.TextInputEditText;
 
 public class AddProductFragment extends Fragment {
 
     private static final String TAG = "AddProductFragment";
 
     // UI Components
-    private EditText etTitle;
-    private EditText etDescription;
-    private EditText etPrice;
-    private Button btnAddProduct;
+    private ImageView ivAddImage;
+    private TextInputEditText etTitle;
+    private TextInputEditText etDescription;
+    private TextInputEditText etPrice;
+    private TextInputEditText etLocation;
+    private Spinner spinnerCategory;
+    private Spinner spinnerCondition;
+    private Button btnSelectLocation;
+    private Button btnPreview;
+    private Button btnPublish;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -41,16 +49,40 @@ public class AddProductFragment extends Fragment {
     }
 
     private void initViews(View view) {
+        ivAddImage = view.findViewById(R.id.iv_add_image);
         etTitle = view.findViewById(R.id.et_title);
         etDescription = view.findViewById(R.id.et_description);
         etPrice = view.findViewById(R.id.et_price);
-        btnAddProduct = view.findViewById(R.id.btn_add_product);
+        etLocation = view.findViewById(R.id.et_location);
+        spinnerCategory = view.findViewById(R.id.spinner_category);
+        spinnerCondition = view.findViewById(R.id.spinner_condition);
+        btnSelectLocation = view.findViewById(R.id.btn_select_location);
+        btnPreview = view.findViewById(R.id.btn_preview);
+        btnPublish = view.findViewById(R.id.btn_publish);
     }
 
     private void setupListeners() {
-        if (btnAddProduct != null) {
-            btnAddProduct.setOnClickListener(v -> {
-                // TODO: Add product logic
+        if (ivAddImage != null) {
+            ivAddImage.setOnClickListener(v -> {
+                // TODO: Add image picker
+            });
+        }
+
+        if (btnSelectLocation != null) {
+            btnSelectLocation.setOnClickListener(v -> {
+                // TODO: Navigate to location picker
+            });
+        }
+
+        if (btnPreview != null) {
+            btnPreview.setOnClickListener(v -> {
+                // TODO: Navigate to product preview
+            });
+        }
+
+        if (btnPublish != null) {
+            btnPublish.setOnClickListener(v -> {
+                // TODO: Publish product
             });
         }
     }

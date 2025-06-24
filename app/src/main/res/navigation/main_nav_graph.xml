@@ -3,30 +3,34 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main_nav_graph"
-    app:startDestination="@id/homeFragment">
+    app:startDestination="@id/nav_home">
 
     <!-- ===== HOME FRAGMENT ===== -->
     <fragment
-        android:id="@+id/homeFragment"
+        android:id="@+id/nav_home"
         android:name="com.example.newtrade.ui.home.HomeFragment"
-        android:label="Home"
+        android:label="@string/nav_home"
         tools:layout="@layout/fragment_home">
 
         <action
             android:id="@+id/action_home_to_search"
-            app:destination="@id/searchFragment" />
+            app:destination="@id/nav_search" />
 
         <action
             android:id="@+id/action_home_to_productDetail"
             app:destination="@id/productDetailActivity" />
 
+        <action
+            android:id="@+id/action_home_to_categoryProducts"
+            app:destination="@id/categoryProductsFragment" />
+
     </fragment>
 
     <!-- ===== SEARCH FRAGMENT ===== -->
     <fragment
-        android:id="@+id/searchFragment"
+        android:id="@+id/nav_search"
         android:name="com.example.newtrade.ui.search.SearchFragment"
-        android:label="Search"
+        android:label="@string/nav_search"
         tools:layout="@layout/fragment_search">
 
         <action
@@ -39,11 +43,28 @@
 
     </fragment>
 
+    <!-- ===== ADD PRODUCT FRAGMENT ===== -->
+    <fragment
+        android:id="@+id/nav_add_product"
+        android:name="com.example.newtrade.ui.product.AddProductFragment"
+        android:label="@string/nav_sell"
+        tools:layout="@layout/fragment_add_product">
+
+        <action
+            android:id="@+id/action_addProduct_to_locationPicker"
+            app:destination="@id/locationPickerActivity" />
+
+        <action
+            android:id="@+id/action_addProduct_to_productPreview"
+            app:destination="@id/productPreviewFragment" />
+
+    </fragment>
+
     <!-- ===== MESSAGES FRAGMENT ===== -->
     <fragment
-        android:id="@+id/messagesFragment"
-        android:name="com.example.newtrade.ui.messages.MessagesFragment"
-        android:label="Messages"
+        android:id="@+id/nav_messages"
+        android:name="com.example.newtrade.ui.chat.MessagesFragment"
+        android:label="@string/nav_messages"
         tools:layout="@layout/fragment_messages">
 
         <action
@@ -54,9 +75,9 @@
 
     <!-- ===== PROFILE FRAGMENT ===== -->
     <fragment
-        android:id="@+id/profileFragment"
+        android:id="@+id/nav_profile"
         android:name="com.example.newtrade.ui.profile.ProfileFragment"
-        android:label="Profile"
+        android:label="@string/nav_profile"
         tools:layout="@layout/fragment_profile">
 
         <action
@@ -77,42 +98,17 @@
 
     </fragment>
 
-    <!-- ===== ADD PRODUCT FRAGMENT ===== -->
-    <fragment
-        android:id="@+id/addProductFragment"
-        android:name="com.example.newtrade.ui.product.AddProductFragment"
-        android:label="Sell Item"
-        tools:layout="@layout/fragment_add_product">
-
-        <action
-            android:id="@+id/action_addProduct_to_locationPicker"
-            app:destination="@id/locationPickerActivity" />
-
-        <action
-            android:id="@+id/action_addProduct_to_productPreview"
-            app:destination="@id/productPreviewFragment" />
-
-    </fragment>
-
-    <!-- ===== PRODUCT PREVIEW FRAGMENT ===== -->
+    <!-- ===== OTHER FRAGMENTS ===== -->
     <fragment
         android:id="@+id/productPreviewFragment"
         android:name="com.example.newtrade.ui.product.ProductPreviewFragment"
         android:label="Preview"
         tools:layout="@layout/fragment_product_preview" />
 
-    <!-- ===== FILTER BOTTOM SHEET ===== -->
-    <dialog
-        android:id="@+id/filterBottomSheet"
-        android:name="com.example.newtrade.ui.search.FilterBottomSheet"
-        android:label="Filter"
-        tools:layout="@layout/bottom_sheet_filter" />
-
-    <!-- ===== CATEGORY PRODUCTS FRAGMENT ===== -->
     <fragment
         android:id="@+id/categoryProductsFragment"
-        android:name="com.example.newtrade.ui.category.CategoryProductsFragment"
-        android:label="Category"
+        android:name="com.example.newtrade.ui.product.CategoryProductsFragment"
+        android:label="Category Products"
         tools:layout="@layout/fragment_category_products">
 
         <argument
@@ -125,76 +121,70 @@
             app:argType="string"
             android:defaultValue="" />
 
-        <action
-            android:id="@+id/action_category_to_productDetail"
-            app:destination="@id/productDetailActivity" />
-
     </fragment>
 
-    <!-- ===== ACTIVITIES (TERMINAL DESTINATIONS) ===== -->
+    <!-- ===== DIALOGS ===== -->
+    <dialog
+        android:id="@+id/filterBottomSheet"
+        android:name="com.example.newtrade.ui.search.FilterBottomSheetDialogFragment"
+        android:label="Filter"
+        tools:layout="@layout/bottom_sheet_filter" />
 
-    <!-- Product Detail Activity - TERMINAL -->
+    <dialog
+        android:id="@+id/makeOfferBottomSheet"
+        android:name="com.example.newtrade.ui.offer.MakeOfferBottomSheetDialogFragment"
+        android:label="Make Offer"
+        tools:layout="@layout/bottom_sheet_make_offer">
+
+        <argument
+            android:name="productId"
+            app:argType="long"
+            android:defaultValue="0L" />
+
+        <argument
+            android:name="currentPrice"
+            app:argType="string"
+            android:defaultValue="" />
+
+    </dialog>
+
+    <!-- ===== ACTIVITIES (TERMINAL DESTINATIONS) ===== -->
     <activity
         android:id="@+id/productDetailActivity"
         android:name="com.example.newtrade.ui.product.ProductDetailActivity"
         android:label="Product Details"
-        tools:layout="@layout/activity_product_detail">
+        tools:layout="@layout/activity_product_detail" />
 
-        <argument
-            android:name="productId"
-            app:argType="long"
-            android:defaultValue="0L" />
-
-    </activity>
-
-    <!-- Chat Activity - TERMINAL -->
     <activity
         android:id="@+id/chatActivity"
         android:name="com.example.newtrade.ui.chat.ChatActivity"
         android:label="Chat"
-        tools:layout="@layout/activity_chat">
+        tools:layout="@layout/activity_chat" />
 
-        <argument
-            android:name="conversationId"
-            app:argType="long"
-            android:defaultValue="0L" />
-
-        <argument
-            android:name="productId"
-            app:argType="long"
-            android:defaultValue="0L" />
-
-    </activity>
-
-    <!-- Settings Activity - TERMINAL -->
     <activity
         android:id="@+id/settingsActivity"
-        android:name="com.example.newtrade.ui.settings.SettingsActivity"
+        android:name="com.example.newtrade.ui.profile.SettingsActivity"
         android:label="Settings"
         tools:layout="@layout/activity_settings" />
 
-    <!-- Edit Profile Activity - TERMINAL -->
     <activity
         android:id="@+id/editProfileActivity"
         android:name="com.example.newtrade.ui.profile.EditProfileActivity"
         android:label="Edit Profile"
         tools:layout="@layout/activity_edit_profile" />
 
-    <!-- My Listings Activity - TERMINAL -->
     <activity
         android:id="@+id/myListingsActivity"
         android:name="com.example.newtrade.ui.profile.MyListingsActivity"
         android:label="My Listings"
         tools:layout="@layout/activity_my_listings" />
 
-    <!-- Saved Items Activity - TERMINAL -->
     <activity
         android:id="@+id/savedItemsActivity"
         android:name="com.example.newtrade.ui.profile.SavedItemsActivity"
         android:label="Saved Items"
         tools:layout="@layout/activity_saved_items" />
 
-    <!-- User Profile Activity - TERMINAL -->
     <activity
         android:id="@+id/userProfileActivity"
         android:name="com.example.newtrade.ui.profile.UserProfileActivity"
@@ -208,25 +198,10 @@
 
     </activity>
 
-    <!-- Location Picker Activity - TERMINAL -->
     <activity
         android:id="@+id/locationPickerActivity"
         android:name="com.example.newtrade.ui.location.LocationPickerActivity"
         android:label="Choose Location"
         tools:layout="@layout/activity_location_picker" />
-
-    <!-- Make Offer Bottom Sheet Activity - TERMINAL -->
-    <activity
-        android:id="@+id/makeOfferBottomSheet"
-        android:name="com.example.newtrade.ui.offer.MakeOfferBottomSheet"
-        android:label="Make Offer"
-        tools:layout="@layout/bottom_sheet_make_offer">
-
-        <argument
-            android:name="productId"
-            app:argType="long"
-            android:defaultValue="0L" />
-
-    </activity>
 
 </navigation>

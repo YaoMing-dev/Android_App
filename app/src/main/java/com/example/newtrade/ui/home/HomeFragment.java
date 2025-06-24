@@ -6,6 +6,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -13,21 +14,22 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.newtrade.R;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 public class HomeFragment extends Fragment {
 
     private static final String TAG = "HomeFragment";
 
     // UI Components
-    private SwipeRefreshLayout swipeRefreshLayout;
-    private RecyclerView rvRecentProducts;
     private RecyclerView rvCategories;
-
-    // Data & Adapters
-    // TODO: Add adapters when ready
+    private RecyclerView rvNearbyProducts;
+    private RecyclerView rvAllProducts;
+    private TextView tvViewAllCategories;
+    private TextView tvViewAllNearby;
+    private TextView tvSortBy;
+    private FloatingActionButton fabQuickAdd;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -46,26 +48,56 @@ public class HomeFragment extends Fragment {
     }
 
     private void initViews(View view) {
-        swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
-        rvRecentProducts = view.findViewById(R.id.rv_recent_products);
         rvCategories = view.findViewById(R.id.rv_categories);
+        rvNearbyProducts = view.findViewById(R.id.rv_nearby_products);
+        rvAllProducts = view.findViewById(R.id.rv_all_products);
+        tvViewAllCategories = view.findViewById(R.id.tv_view_all_categories);
+        tvViewAllNearby = view.findViewById(R.id.tv_view_all_nearby);
+        tvSortBy = view.findViewById(R.id.tv_sort_by);
+        fabQuickAdd = view.findViewById(R.id.fab_quick_add);
     }
 
     private void setupRecyclerViews() {
-        if (rvRecentProducts != null) {
-            rvRecentProducts.setLayoutManager(new LinearLayoutManager(getContext()));
-        }
-
         if (rvCategories != null) {
             rvCategories.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
+        }
+
+        if (rvNearbyProducts != null) {
+            rvNearbyProducts.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
+        }
+
+        if (rvAllProducts != null) {
+            rvAllProducts.setLayoutManager(new LinearLayoutManager(getContext()));
+            rvAllProducts.setNestedScrollingEnabled(false);
         }
     }
 
     private void setupListeners() {
-        if (swipeRefreshLayout != null) {
-            swipeRefreshLayout.setOnRefreshListener(() -> {
-                // TODO: Refresh data
-                swipeRefreshLayout.setRefreshing(false);
+        if (fabQuickAdd != null) {
+            fabQuickAdd.setOnClickListener(v -> {
+                try {
+                    Navigation.findNavController(v).navigate(R.id.nav_add_product);
+                } catch (Exception e) {
+                    Log.e(TAG, "Navigation failed", e);
+                }
+            });
+        }
+
+        if (tvViewAllCategories != null) {
+            tvViewAllCategories.setOnClickListener(v -> {
+                // TODO: Navigate to all categories
+            });
+        }
+
+        if (tvViewAllNearby != null) {
+            tvViewAllNearby.setOnClickListener(v -> {
+                // TODO: Navigate to nearby products
+            });
+        }
+
+        if (tvSortBy != null) {
+            tvSortBy.setOnClickListener(v -> {
+                // TODO: Show sort options
             });
         }
     }

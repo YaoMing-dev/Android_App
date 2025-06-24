@@ -12,7 +12,6 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.newtrade.R;
 
@@ -20,9 +19,8 @@ public class MessagesFragment extends Fragment {
 
     private static final String TAG = "MessagesFragment";
 
-    // UI Components
-    private SwipeRefreshLayout swipeRefreshLayout;
-    private RecyclerView rvMessages;
+    // UI Components - chỉ những cái cơ bản và an toàn
+    private RecyclerView rvConversations;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -35,28 +33,22 @@ public class MessagesFragment extends Fragment {
 
         initViews(view);
         setupRecyclerView();
-        setupListeners();
 
         Log.d(TAG, "MessagesFragment created successfully");
     }
 
     private void initViews(View view) {
-        swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
-        rvMessages = view.findViewById(R.id.rv_messages);
-    }
-
-    private void setupRecyclerView() {
-        if (rvMessages != null) {
-            rvMessages.setLayoutManager(new LinearLayoutManager(getContext()));
+        // Chỉ init RecyclerView cơ bản - tránh lỗi ID không tồn tại
+        try {
+            rvConversations = view.findViewById(R.id.rv_conversations);
+        } catch (Exception e) {
+            Log.w(TAG, "Some views not found: " + e.getMessage());
         }
     }
 
-    private void setupListeners() {
-        if (swipeRefreshLayout != null) {
-            swipeRefreshLayout.setOnRefreshListener(() -> {
-                // TODO: Refresh messages
-                swipeRefreshLayout.setRefreshing(false);
-            });
+    private void setupRecyclerView() {
+        if (rvConversations != null) {
+            rvConversations.setLayoutManager(new LinearLayoutManager(getContext()));
         }
     }
 }

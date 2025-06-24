@@ -3,6 +3,8 @@ package com.example.newtrade;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -50,7 +52,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         initViews();
-        setupNavigation();
+
+        // Delay navigation setup để đảm bảo Fragment container được khởi tạo
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            setupNavigation();
+        }, 100);
+
         setupFirebaseMessaging();
 
         Log.d(TAG, "MainActivity created successfully");
@@ -74,7 +81,18 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "✅ Navigation setup completed");
         } catch (Exception e) {
             Log.e(TAG, "❌ Navigation setup failed", e);
-            Toast.makeText(this, "Navigation setup error", Toast.LENGTH_LONG).show();
+
+            // Thử lại sau 200ms
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    navController = Navigation.findNavController(this, R.id.nav_host_fragment);
+                    NavigationUI.setupWithNavController(bottomNavigation, navController);
+                    Log.d(TAG, "✅ Navigation setup completed on retry");
+                } catch (Exception ex) {
+                    Log.e(TAG, "❌ Navigation setup failed on retry", ex);
+                    Toast.makeText(this, "Navigation error", Toast.LENGTH_SHORT).show();
+                }
+            }, 200);
         }
     }
 
@@ -92,15 +110,7 @@ public class MainActivity extends AppCompatActivity {
 
                     // Save token locally
                     prefsManager.saveFcmToken(token);
-
-                    // TODO: Send token to server when UserService is implemented
-                    // sendFcmTokenToServer(token);
                 });
-    }
-
-    private void sendFcmTokenToServer(String token) {
-        // TODO: Implement when ready
-        Log.d(TAG, "TODO: Send FCM token to server");
     }
 
     private void navigateToLogin() {
@@ -124,14 +134,19 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         // Handle back button based on current fragment
-        if (navController != null && navController.getCurrentDestination() != null &&
-                navController.getCurrentDestination().getId() == R.id.homeFragment) {
-            // If on home, exit app
-            super.onBackPressed();
-        } else if (bottomNavigation != null) {
-            // Otherwise navigate to home
-            bottomNavigation.setSelectedItemId(R.id.nav_home);
-        } else {
+        try {
+            if (navController != null && navController.getCurrentDestination() != null &&
+                    navController.getCurrentDestination().getId() == R.id.nav_home) {
+                // If on home, exit app
+                super.onBackPressed();
+            } else if (bottomNavigation != null) {
+                // Otherwise navigate to home
+                bottomNavigation.setSelectedItemId(R.id.nav_home);
+            } else {
+                super.onBackPressed();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Back button error", e);
             super.onBackPressed();
         }
     }

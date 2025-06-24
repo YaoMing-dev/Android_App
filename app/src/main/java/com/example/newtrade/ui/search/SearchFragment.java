@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/newtrade/ui/search/SearchFragment.java
 package com.example.newtrade.ui.search;
 
 import android.os.Bundle;
@@ -5,8 +6,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
@@ -16,18 +17,23 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.newtrade.R;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 
 public class SearchFragment extends Fragment {
 
     private static final String TAG = "SearchFragment";
 
-    // UI Components
-    private EditText etSearch;
+    // UI Components - chỉ declare những gì thực sự có trong layout
+    private TextInputLayout tilSearch;
+    private TextInputEditText etSearch;
+    private ImageView ivFilter;
+    private ChipGroup chipGroupFilters;
     private RecyclerView rvSearchResults;
     private LinearLayout llRecentSearches;
     private RecyclerView rvRecentSearches;
     private RecyclerView rvPopularCategories;
-    private FrameLayout flLoadingState;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -46,12 +52,19 @@ public class SearchFragment extends Fragment {
     }
 
     private void initViews(View view) {
-        etSearch = view.findViewById(R.id.et_search);
-        rvSearchResults = view.findViewById(R.id.rv_search_results);
-        llRecentSearches = view.findViewById(R.id.ll_recent_searches);
-        rvRecentSearches = view.findViewById(R.id.rv_recent_searches);
-        rvPopularCategories = view.findViewById(R.id.rv_popular_categories);
-        flLoadingState = view.findViewById(R.id.fl_loading_state);
+        // Chỉ init những view có thực
+        try {
+            tilSearch = view.findViewById(R.id.til_search);
+            etSearch = view.findViewById(R.id.et_search);
+           ;
+            chipGroupFilters = view.findViewById(R.id.chip_group_filters);
+            rvSearchResults = view.findViewById(R.id.rv_search_results);
+            llRecentSearches = view.findViewById(R.id.ll_recent_searches);
+            rvRecentSearches = view.findViewById(R.id.rv_recent_searches);
+            rvPopularCategories = view.findViewById(R.id.rv_popular_categories);
+        } catch (Exception e) {
+            Log.w(TAG, "Some views not found in layout: " + e.getMessage());
+        }
     }
 
     private void setupRecyclerViews() {
@@ -69,6 +82,12 @@ public class SearchFragment extends Fragment {
     }
 
     private void setupListeners() {
+        if (ivFilter != null) {
+            ivFilter.setOnClickListener(v -> {
+                // TODO: Show filter bottom sheet
+            });
+        }
+
         // TODO: Setup search functionality
     }
 }
