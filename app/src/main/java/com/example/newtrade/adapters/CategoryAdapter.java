@@ -49,22 +49,26 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
     }
 
     class CategoryViewHolder extends RecyclerView.ViewHolder {
-        TextView tvName;
-        ImageView ivIcon;
+        private ImageView ivCategoryIcon;
+        private TextView tvCategoryName;
 
-        CategoryViewHolder(@NonNull View itemView) {
+        public CategoryViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvName = itemView.findViewById(R.id.tv_category_name);
-            ivIcon = itemView.findViewById(R.id.iv_category_icon);
+            ivCategoryIcon = itemView.findViewById(R.id.iv_category_icon);
+            tvCategoryName = itemView.findViewById(R.id.tv_category_name);
         }
 
         void bind(Category category) {
-            tvName.setText(category.getName());
+            if (tvCategoryName != null) {
+                tvCategoryName.setText(category.getName());
+            }
 
-            // Set icon based on category name
-            int iconRes = getCategoryIcon(category.getName());
-            ivIcon.setImageResource(iconRes);
+            // Set category icon
+            if (ivCategoryIcon != null) {
+                ivCategoryIcon.setImageResource(getCategoryIcon(category.getName()));
+            }
 
+            // Set click listener
             itemView.setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onCategoryClick(category);
@@ -73,6 +77,8 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
         }
 
         private int getCategoryIcon(String categoryName) {
+            if (categoryName == null) return R.drawable.ic_category_default;
+
             switch (categoryName.toLowerCase()) {
                 case "electronics":
                     return R.drawable.ic_electronics;
@@ -85,7 +91,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
                 case "sports":
                     return R.drawable.ic_sports;
                 default:
-                    return R.drawable.ic_category_default;
+                    return R.drawable.ic_category_default; // Safe fallback
             }
         }
     }

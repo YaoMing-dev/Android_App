@@ -6,7 +6,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
@@ -52,42 +51,59 @@ public class SearchFragment extends Fragment {
     }
 
     private void initViews(View view) {
-        // Chỉ init những view có thực
+        // Chỉ init những view có thực với error handling
         try {
             tilSearch = view.findViewById(R.id.til_search);
             etSearch = view.findViewById(R.id.et_search);
-           ;
+
             chipGroupFilters = view.findViewById(R.id.chip_group_filters);
             rvSearchResults = view.findViewById(R.id.rv_search_results);
             llRecentSearches = view.findViewById(R.id.ll_recent_searches);
             rvRecentSearches = view.findViewById(R.id.rv_recent_searches);
             rvPopularCategories = view.findViewById(R.id.rv_popular_categories);
+
+            Log.d(TAG, "✅ SearchFragment views initialized");
         } catch (Exception e) {
-            Log.w(TAG, "Some views not found in layout: " + e.getMessage());
+            Log.w(TAG, "Some SearchFragment views not found: " + e.getMessage());
         }
     }
 
     private void setupRecyclerViews() {
-        if (rvSearchResults != null) {
-            rvSearchResults.setLayoutManager(new LinearLayoutManager(getContext()));
-        }
+        try {
+            if (rvSearchResults != null) {
+                rvSearchResults.setLayoutManager(new LinearLayoutManager(getContext()));
+            }
 
-        if (rvRecentSearches != null) {
-            rvRecentSearches.setLayoutManager(new LinearLayoutManager(getContext()));
-        }
+            if (rvRecentSearches != null) {
+                rvRecentSearches.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
+            }
 
-        if (rvPopularCategories != null) {
-            rvPopularCategories.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
+            if (rvPopularCategories != null) {
+                rvPopularCategories.setLayoutManager(new LinearLayoutManager(getContext()));
+            }
+
+            Log.d(TAG, "✅ SearchFragment RecyclerViews setup");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error setting up RecyclerViews", e);
         }
     }
 
     private void setupListeners() {
-        if (ivFilter != null) {
-            ivFilter.setOnClickListener(v -> {
-                // TODO: Show filter bottom sheet
-            });
-        }
+        try {
+            if (ivFilter != null) {
+                ivFilter.setOnClickListener(v -> {
+                    // TODO: Show filter dialog
+                    Log.d(TAG, "Filter clicked");
+                });
+            }
 
-        // TODO: Setup search functionality
+            if (etSearch != null) {
+                // TODO: Add text change listener for search
+            }
+
+            Log.d(TAG, "✅ SearchFragment listeners setup");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error setting up listeners", e);
+        }
     }
 }

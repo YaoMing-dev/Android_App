@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Spinner;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -49,41 +50,53 @@ public class AddProductFragment extends Fragment {
     }
 
     private void initViews(View view) {
-        ivAddImage = view.findViewById(R.id.iv_add_image);
-        etTitle = view.findViewById(R.id.et_title);
-        etDescription = view.findViewById(R.id.et_description);
-        etPrice = view.findViewById(R.id.et_price);
-        etLocation = view.findViewById(R.id.et_location);
-        spinnerCategory = view.findViewById(R.id.spinner_category);
-        spinnerCondition = view.findViewById(R.id.spinner_condition);
-        btnSelectLocation = view.findViewById(R.id.btn_select_location);
-        btnPreview = view.findViewById(R.id.btn_preview);
-        btnPublish = view.findViewById(R.id.btn_publish);
+        try {
+            ivAddImage = view.findViewById(R.id.iv_add_image);
+            etTitle = view.findViewById(R.id.et_title);
+            etDescription = view.findViewById(R.id.et_description);
+            etPrice = view.findViewById(R.id.et_price);
+            etLocation = view.findViewById(R.id.et_location);
+            spinnerCategory = view.findViewById(R.id.spinner_category);
+            spinnerCondition = view.findViewById(R.id.spinner_condition);
+            btnSelectLocation = view.findViewById(R.id.btn_select_location);
+            btnPreview = view.findViewById(R.id.btn_preview);
+            btnPublish = view.findViewById(R.id.btn_publish);
+
+            Log.d(TAG, "✅ AddProductFragment views initialized");
+        } catch (Exception e) {
+            Log.w(TAG, "Some AddProductFragment views not found: " + e.getMessage());
+        }
     }
 
     private void setupListeners() {
-        if (ivAddImage != null) {
-            ivAddImage.setOnClickListener(v -> {
-                // TODO: Add image picker
-            });
-        }
+        try {
+            if (ivAddImage != null) {
+                ivAddImage.setOnClickListener(v -> {
+                    Toast.makeText(getContext(), "Image picker coming soon", Toast.LENGTH_SHORT).show();
+                });
+            }
 
-        if (btnSelectLocation != null) {
-            btnSelectLocation.setOnClickListener(v -> {
-                // TODO: Navigate to location picker
-            });
-        }
+            if (btnSelectLocation != null) {
+                btnSelectLocation.setOnClickListener(v -> {
+                    Toast.makeText(getContext(), "Location picker coming soon", Toast.LENGTH_SHORT).show();
+                });
+            }
 
-        if (btnPreview != null) {
-            btnPreview.setOnClickListener(v -> {
-                // TODO: Navigate to product preview
-            });
-        }
+            if (btnPreview != null) {
+                btnPreview.setOnClickListener(v -> {
+                    Toast.makeText(getContext(), "Product preview coming soon", Toast.LENGTH_SHORT).show();
+                });
+            }
 
-        if (btnPublish != null) {
-            btnPublish.setOnClickListener(v -> {
-                // TODO: Publish product
-            });
+            if (btnPublish != null) {
+                btnPublish.setOnClickListener(v -> {
+                    Toast.makeText(getContext(), "Product publish coming soon", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            Log.d(TAG, "✅ AddProductFragment listeners setup");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error setting up listeners", e);
         }
     }
 }

@@ -6,6 +6,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -19,8 +21,10 @@ public class MessagesFragment extends Fragment {
 
     private static final String TAG = "MessagesFragment";
 
-    // UI Components - chỉ những cái cơ bản và an toàn
+    // UI Components
     private RecyclerView rvConversations;
+    private LinearLayout llEmptyState;
+    private TextView tvEmptyTitle;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -33,22 +37,52 @@ public class MessagesFragment extends Fragment {
 
         initViews(view);
         setupRecyclerView();
+        showEmptyState();
 
         Log.d(TAG, "MessagesFragment created successfully");
     }
 
     private void initViews(View view) {
-        // Chỉ init RecyclerView cơ bản - tránh lỗi ID không tồn tại
         try {
             rvConversations = view.findViewById(R.id.rv_conversations);
+            llEmptyState = view.findViewById(R.id.ll_empty_state);
+
+
+            Log.d(TAG, "✅ MessagesFragment views initialized");
         } catch (Exception e) {
-            Log.w(TAG, "Some views not found: " + e.getMessage());
+            Log.w(TAG, "Some MessagesFragment views not found: " + e.getMessage());
         }
     }
 
     private void setupRecyclerView() {
-        if (rvConversations != null) {
-            rvConversations.setLayoutManager(new LinearLayoutManager(getContext()));
+        try {
+            if (rvConversations != null) {
+                rvConversations.setLayoutManager(new LinearLayoutManager(getContext()));
+            }
+
+            Log.d(TAG, "✅ MessagesFragment RecyclerView setup");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error setting up RecyclerView", e);
+        }
+    }
+
+    private void showEmptyState() {
+        try {
+            if (rvConversations != null) {
+                rvConversations.setVisibility(View.GONE);
+            }
+
+            if (llEmptyState != null) {
+                llEmptyState.setVisibility(View.VISIBLE);
+            }
+
+            if (tvEmptyTitle != null) {
+                tvEmptyTitle.setText("No messages yet");
+            }
+
+            Log.d(TAG, "✅ Empty state shown");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error showing empty state", e);
         }
     }
 }
