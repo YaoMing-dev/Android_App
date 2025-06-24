@@ -4,14 +4,15 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:padding="24dp"
+    android:background="@color/white">
 
     <!-- Handle Bar -->
     <View
         android:layout_width="40dp"
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
-        android:background="@drawable/bg_handle_bar"
+        android:background="@color/text_secondary"
         android:layout_marginBottom="16dp" />
 
     <!-- Title -->
@@ -22,14 +23,15 @@
         android:textSize="20sp"
         android:textStyle="bold"
         android:textColor="@color/text_primary"
-        android:layout_marginBottom="16dp" />
+        android:gravity="center"
+        android:layout_marginBottom="20dp" />
 
     <!-- Current Price -->
     <TextView
         android:id="@+id/tv_current_price"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Current Price: 25,000,000 ₫"
+        android:text="Current Price: 25,000,000 VNĐ"
         android:textSize="14sp"
         android:textColor="@color/text_secondary"
         android:layout_marginBottom="16dp" />
@@ -38,41 +40,59 @@
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:hint="Your Offer Amount (VNĐ)"
         android:layout_marginBottom="16dp"
-        android:hint="Your Offer (VNĐ) *"
-        app:prefixText="₫ ">
+        app:startIconDrawable="@drawable/ic_attach_money">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/et_offer_amount"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="numberDecimal" />
+            android:inputType="numberDecimal"
+            android:maxLines="1" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Message -->
+    <!-- Optional Message - 🔥 SỬA ID TỪ et_message THÀNH et_offer_message -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="20dp"
-        android:hint="Message (Optional)">
+        android:hint="Message (Optional)"
+        android:layout_marginBottom="24dp"
+        app:startIconDrawable="@drawable/ic_message">
 
         <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/et_message"
+            android:id="@+id/et_offer_message"
             android:layout_width="match_parent"
-            android:layout_height="80dp"
+            android:layout_height="wrap_content"
             android:inputType="textMultiLine"
-            android:gravity="top" />
+            android:maxLines="3"
+            android:minLines="2" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Submit Button -->
-    <Button
-        android:id="@+id/btn_submit_offer"
+    <!-- Buttons - 🔥 THÊM CANCEL BUTTON -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="Submit Offer"
-        android:textSize="16sp"
-        style="@style/Widget.Material3.Button" />
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end">
+
+        <Button
+            android:id="@+id/btn_cancel"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cancel"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/btn_submit_offer"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Submit Offer" />
+
+    </LinearLayout>
 
 </LinearLayout>

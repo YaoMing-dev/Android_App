@@ -21,6 +21,7 @@ import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +42,7 @@ public class CategoryProductsActivity extends AppCompatActivity {
 
     // Data
     private ProductAdapter productAdapter;
-    private List<Product> products = new ArrayList<>();
+    private final List<Product> products = new ArrayList<>();
     private Long categoryId;
     private String categoryName;
 
@@ -150,6 +151,7 @@ public class CategoryProductsActivity extends AppCompatActivity {
                 });
     }
 
+    // 🔥 SỬA PARSE PRODUCT METHOD
     private Product parseProductFromBackend(Map<String, Object> productData) {
         try {
             Product product = new Product();
@@ -157,32 +159,67 @@ public class CategoryProductsActivity extends AppCompatActivity {
             product.setTitle((String) productData.get("title"));
             product.setDescription((String) productData.get("description"));
 
+            // Handle price conversion
             Object priceObj = productData.get("price");
             if (priceObj instanceof Number) {
-                product.setPrice(((Number) priceObj).doubleValue());
+                product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
             }
 
-            product.setCondition((String) productData.get("condition"));
             product.setLocation((String) productData.get("location"));
-            product.setStatus((String) productData.get("status"));
 
-            // Parse images
-            Object imagesObj = productData.get("images");
-            if (imagesObj instanceof List) {
-                List<Map<String, Object>> imagesList = (List<Map<String, Object>>) imagesObj;
-                List<String> imageUrls = new ArrayList<>();
-                for (Map<String, Object> imageData : imagesList) {
-                    String imageUrl = (String) imageData.get("imageUrl");
-                    if (imageUrl != null) {
-                        imageUrls.add(imageUrl);
-                    }
-                }
-                product.setImageUrls(imageUrls);
+            // Handle imageUrls
+            Object imageUrlsObj = productData.get("imageUrls");
+            if (imageUrlsObj instanceof List) {
+                product.setImageUrls((List<String>) imageUrlsObj);
+            } else if (imageUrlsObj instanceof String) {
+                product.setImageUrl((String) imageUrlsObj);
             }
+
+            // Handle condition
+            String condition = (String) productData.get("condition");
+            if (condition != null) {
+                try {
+                    product.setCondition(Product.ProductCondition.valueOf(condition));
+                } catch (IllegalArgumentException e) {
+                    product.setCondition(Product.ProductCondition.GOOD);
+                }
+            }
+
+            // Handle status
+            String status = (String) productData.get("status");
+            if (status != null) {
+                try {
+                    product.setStatus(Product.ProductStatus.valueOf(status));
+                } catch (IllegalArgumentException e) {
+                    product.setStatus(Product.ProductStatus.AVAILABLE);
+                }
+            }
+
+            // Handle category name
+            Object categoryObj = productData.get("category");
+            if (categoryObj instanceof Map) {
+                Map<String, Object> categoryData = (Map<String, Object>) categoryObj;
+                product.setCategoryName((String) categoryData.get("name"));
+            }
+
+            // Handle seller name
+            Object sellerObj = productData.get("seller");
+            if (sellerObj instanceof Map) {
+                Map<String, Object> sellerData = (Map<String, Object>) sellerObj;
+                product.setUserDisplayName((String) sellerData.get("displayName"));
+            }
+
+            // Handle other fields
+            Object viewCountObj = productData.get("viewCount");
+            if (viewCountObj instanceof Number) {
+                product.setViewCount(((Number) viewCountObj).intValue());
+            }
+
+            product.setCreatedAt((String) productData.get("createdAt"));
 
             return product;
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing product", e);
+            Log.e(TAG, "❌ Error parsing product data", e);
             return null;
         }
     }
@@ -190,8 +227,8 @@ public class CategoryProductsActivity extends AppCompatActivity {
     private void updateEmptyState() {
         if (products.isEmpty()) {
             tvEmptyState.setVisibility(View.VISIBLE);
-            rvProducts.setVisibility(View.GONE);
             tvEmptyState.setText("No products found in " + categoryName);
+            rvProducts.setVisibility(View.GONE);
         } else {
             tvEmptyState.setVisibility(View.GONE);
             rvProducts.setVisibility(View.VISIBLE);

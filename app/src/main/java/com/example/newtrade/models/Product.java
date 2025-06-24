@@ -1,28 +1,70 @@
 // File: app/src/main/java/com/example/newtrade/models/Product.java
 package com.example.newtrade.models;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.util.List;
+import java.util.Locale;
 
 public class Product {
     private Long id;
     private String title;
     private String description;
-    private Double price;
-    private String condition;
+    private BigDecimal price;
+    private ProductCondition condition;
+    private ProductStatus status;
     private String location;
-    private String status;
     private String categoryName;
     private String userDisplayName;
     private Integer viewCount;
     private List<String> imageUrls;
     private String createdAt;
 
+    // Enums để khớp với backend
+    public enum ProductCondition {
+        NEW("New"),
+        LIKE_NEW("Like New"),
+        GOOD("Good"),
+        FAIR("Fair"),
+        POOR("Poor");
+
+        private final String displayName;
+
+        ProductCondition(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+    }
+
+    public enum ProductStatus {
+        AVAILABLE("Available"),
+        SOLD("Sold"),
+        PENDING("Pending"),
+        PAUSED("Paused"),
+        EXPIRED("Expired"),
+        RESERVED("Reserved"),
+        DELETED("Deleted"),
+        ARCHIVED("Archived");
+
+        private final String displayName;
+
+        ProductStatus(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+    }
+
     // Constructors
     public Product() {}
 
-    public Product(Long id, String title, String description, Double price,
-                   String condition, String location, String status) {
+    public Product(Long id, String title, String description, BigDecimal price,
+                   ProductCondition condition, String location, ProductStatus status) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -42,17 +84,17 @@ public class Product {
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
-    public Double getPrice() { return price; }
-    public void setPrice(Double price) { this.price = price; }
+    public BigDecimal getPrice() { return price; }
+    public void setPrice(BigDecimal price) { this.price = price; }
 
-    public String getCondition() { return condition; }
-    public void setCondition(String condition) { this.condition = condition; }
+    public ProductCondition getCondition() { return condition; }
+    public void setCondition(ProductCondition condition) { this.condition = condition; }
+
+    public ProductStatus getStatus() { return status; }
+    public void setStatus(ProductStatus status) { this.status = status; }
 
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
 
     public String getCategoryName() { return categoryName; }
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
@@ -66,13 +108,21 @@ public class Product {
     public List<String> getImageUrls() { return imageUrls; }
     public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }
 
+    // Thêm method setImageUrl cho compatibility
+    public void setImageUrl(String imageUrl) {
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            this.imageUrls = List.of(imageUrl);
+        }
+    }
+
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 
     // Helper methods
     public String getFormattedPrice() {
         if (price == null) return "Free";
-        return String.format("%,.0f VNĐ", price);
+        NumberFormat formatter = NumberFormat.getNumberInstance(new Locale("vi", "VN"));
+        return formatter.format(price) + " VNĐ";
     }
 
     public String getPrimaryImageUrl() {
@@ -80,5 +130,13 @@ public class Product {
             return imageUrls.get(0);
         }
         return null;
+    }
+
+    public String getConditionDisplayName() {
+        return condition != null ? condition.getDisplayName() : "";
+    }
+
+    public String getStatusDisplayName() {
+        return status != null ? status.getDisplayName() : "";
     }
 }

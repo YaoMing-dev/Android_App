@@ -1,137 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
     android:orientation="horizontal"
-    android:padding="@dimen/padding_lg">
+    android:padding="16dp"
+    android:background="?attr/selectableItemBackground">
 
-    <!-- Product Image -->
-    <com.google.android.material.card.MaterialCardView
-        android:layout_width="@dimen/avatar_size_xl"
-        android:layout_height="@dimen/avatar_size_xl"
-        app:cardCornerRadius="@dimen/radius_md"
-        app:cardElevation="@dimen/elevation_sm">
+    <!-- Avatar with online indicator -->
+    <RelativeLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp">
 
-        <ImageView
-            android:id="@+id/iv_product_image"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            tools:src="@tools:sample/backgrounds/scenic" />
+        <de.hdodenhof.circleimageview.CircleImageView
+            android:id="@+id/iv_avatar"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_person"
+            app:civ_border_width="1dp"
+            app:civ_border_color="@color/primary_color" />
 
-    </com.google.android.material.card.MaterialCardView>
+        <!-- Online indicator -->
+        <View
+            android:id="@+id/v_online_indicator"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_alignEnd="@id/iv_avatar"
+            android:layout_alignBottom="@id/iv_avatar"
+            android:background="@drawable/bg_online_indicator"
+            android:visibility="gone" />
 
-    <!-- Conversation Info -->
+    </RelativeLayout>
+
+    <!-- Content -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/margin_md"
         android:layout_weight="1"
         android:orientation="vertical">
 
-        <!-- Header Row -->
+        <!-- User name and time -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
-                android:id="@+id/tv_other_user_name"
+                android:id="@+id/tv_user_name"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_size_md"
+                android:text="User Name"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                tools:text="John Doe" />
+                android:textColor="@color/text_primary"
+                android:maxLines="1"
+                android:ellipsize="end" />
 
             <TextView
-                android:id="@+id/tv_timestamp"
+                android:id="@+id/tv_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text_secondary"
-                android:textSize="@dimen/text_size_sm"
-                tools:text="2h ago" />
+                android:text="2h"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary" />
 
         </LinearLayout>
 
-        <!-- Product Title -->
-        <TextView
-            android:id="@+id/tv_product_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/margin_xs"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_size_sm"
-            tools:text="iPhone 13 Pro Max 256GB" />
-
-        <!-- Last Message Row -->
+        <!-- Last message with unread indicator -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/margin_sm"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_marginTop="4dp">
 
-            <!-- Message Status Icon -->
-            <ImageView
-                android:id="@+id/iv_message_status"
-                android:layout_width="@dimen/icon_size_sm"
-                android:layout_height="@dimen/icon_size_sm"
-                android:layout_marginEnd="@dimen/margin_xs"
-                android:src="@drawable/ic_done"
-                android:visibility="gone"
-                app:tint="@color/primary_color"
-                tools:visibility="visible" />
-
-            <!-- Last Message Text -->
             <TextView
                 android:id="@+id/tv_last_message"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
+                android:text="Last message content..."
+                android:textSize="14sp"
                 android:textColor="@color/text_secondary"
-                android:textSize="@dimen/text_size_sm"
-                tools:text="Is this still available?" />
+                android:maxLines="1"
+                android:ellipsize="end" />
 
-            <!-- Unread Count Badge -->
-            <TextView
-                android:id="@+id/tv_unread_count"
-                android:layout_width="@dimen/badge_size_lg"
-                android:layout_height="@dimen/badge_size_lg"
-                android:background="@drawable/circle_background_primary"
-                android:gravity="center"
-                android:textColor="@color/white"
-                android:textSize="@dimen/badge_text_size"
-                android:textStyle="bold"
-                android:visibility="gone"
-                tools:text="2"
-                tools:visibility="visible" />
+            <!-- Unread indicator -->
+            <View
+                android:id="@+id/v_unread_indicator"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_unread_indicator"
+                android:visibility="gone" />
 
         </LinearLayout>
 
     </LinearLayout>
-
-    <!-- Online Indicator -->
-    <View
-        android:id="@+id/view_online_indicator"
-        android:layout_width="8dp"
-        android:layout_height="8dp"
-        android:layout_gravity="top"
-        android:layout_marginStart="@dimen/margin_sm"
-        android:layout_marginTop="@dimen/margin_md"
-        android:background="@drawable/circle_background_online"
-        android:visibility="gone"
-        tools:visibility="visible" />
 
 </LinearLayout>

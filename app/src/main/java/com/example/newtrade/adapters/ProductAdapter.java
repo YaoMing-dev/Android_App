@@ -16,9 +16,7 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
 
-import java.text.NumberFormat;
 import java.util.List;
-import java.util.Locale;
 
 public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductViewHolder> {
 
@@ -85,11 +83,11 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                 tvLocation.setText(product.getLocation());
             }
 
-            // Set condition
+            // Set condition - SỬA LỖI TẠI ĐÂY
             if (tvCondition != null) {
-                String condition = product.getCondition();
-                if (condition != null && !condition.isEmpty()) {
-                    tvCondition.setText(formatCondition(condition));
+                Product.ProductCondition condition = product.getCondition();
+                if (condition != null) {
+                    tvCondition.setText(condition.getDisplayName());
                     tvCondition.setVisibility(View.VISIBLE);
                 } else {
                     tvCondition.setVisibility(View.GONE);
@@ -110,17 +108,12 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                                 .centerCrop()
                                 .into(ivProduct);
                     } else {
-                        // No image URL - set placeholder directly
+                        // Show placeholder if no image
                         ivProduct.setImageResource(R.drawable.ic_placeholder_image);
                     }
                 } catch (Exception e) {
-                    // Fallback in case of any error
-                    try {
-                        ivProduct.setImageResource(R.drawable.ic_placeholder_image);
-                    } catch (Exception ex) {
-                        // Last resort - set a background color
-                        ivProduct.setBackgroundColor(0xFFF5F5F5);
-                    }
+                    // Fallback to placeholder on any error
+                    ivProduct.setImageResource(R.drawable.ic_placeholder_image);
                 }
             }
 
@@ -130,27 +123,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                     listener.onProductClick(product);
                 }
             });
-        }
-
-        private String formatCondition(String condition) {
-            if (condition == null || condition.isEmpty()) {
-                return "";
-            }
-
-            switch (condition.toUpperCase()) {
-                case "NEW":
-                    return "New";
-                case "LIKE_NEW":
-                    return "Like New";
-                case "GOOD":
-                    return "Good";
-                case "FAIR":
-                    return "Fair";
-                case "POOR":
-                    return "Poor";
-                default:
-                    return condition.substring(0, 1).toUpperCase() + condition.substring(1).toLowerCase();
-            }
         }
     }
 }

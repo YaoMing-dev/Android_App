@@ -1,11 +1,13 @@
 // File: app/src/main/java/com/example/newtrade/ui/chat/MessagesFragment.java
 package com.example.newtrade.ui.chat;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -13,22 +15,32 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.newtrade.R;
-import com.google.android.material.button.MaterialButton;
+import com.example.newtrade.adapters.ConversationAdapter;
+import com.example.newtrade.models.Conversation;
+import com.example.newtrade.utils.SharedPrefsManager;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MessagesFragment extends Fragment {
 
     private static final String TAG = "MessagesFragment";
 
     // UI Components
+    private SwipeRefreshLayout swipeRefresh;
     private RecyclerView rvConversations;
-    private LinearLayout llEmptyState, llLoading;
-    private MaterialButton btnStartShopping;
+    private LinearLayout llEmptyState;
+    private Button btnStartShopping;
+
+    // Data
+    private ConversationAdapter conversationAdapter;
+    private final List<Conversation> conversations = new ArrayList<>();
+    private SharedPrefsManager prefsManager;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -40,18 +52,19 @@ public class MessagesFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         initViews(view);
+        initUtils();
         setupRecyclerView();
         setupListeners();
-        showEmptyState();
+        loadConversations();
 
         Log.d(TAG, "MessagesFragment created successfully");
     }
 
     private void initViews(View view) {
         try {
+            swipeRefresh = view.findViewById(R.id.swipe_refresh);
             rvConversations = view.findViewById(R.id.rv_conversations);
             llEmptyState = view.findViewById(R.id.ll_empty_state);
-            llLoading = view.findViewById(R.id.ll_loading);
             btnStartShopping = view.findViewById(R.id.btn_start_shopping);
 
             Log.d(TAG, "✅ MessagesFragment views initialized");
@@ -60,27 +73,28 @@ public class MessagesFragment extends Fragment {
         }
     }
 
-    private void setupRecyclerView() {
-        try {
-            if (rvConversations != null) {
-                rvConversations.setLayoutManager(new LinearLayoutManager(getContext()));
-                // TODO: Set adapter when conversation feature is implemented
-            }
+    private void initUtils() {
+        prefsManager = SharedPrefsManager.getInstance(requireContext());
+    }
 
-            Log.d(TAG, "✅ MessagesFragment RecyclerView setup");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error setting up RecyclerView", e);
+    private void setupRecyclerView() {
+        if (rvConversations != null) {
+            conversationAdapter = new ConversationAdapter(conversations, this::openConversation);
+            rvConversations.setLayoutManager(new LinearLayoutManager(getContext()));
+            rvConversations.setAdapter(conversationAdapter);
         }
     }
 
     private void setupListeners() {
         try {
-            // 🔥 START SHOPPING BUTTON HOẠT ĐỘNG
+            // Swipe to refresh
+            if (swipeRefresh != null) {
+                swipeRefresh.setOnRefreshListener(this::loadConversations);
+            }
+
+            // 🔥 START SHOPPING BUTTON
             if (btnStartShopping != null) {
-                btnStartShopping.setOnClickListener(v -> {
-                    Log.d(TAG, "Start Shopping button clicked");
-                    navigateToHome();
-                });
+                btnStartShopping.setOnClickListener(v -> startShopping());
             }
 
             Log.d(TAG, "✅ MessagesFragment listeners setup");
@@ -89,76 +103,100 @@ public class MessagesFragment extends Fragment {
         }
     }
 
-    private void navigateToHome() {
-        try {
-            if (getActivity() != null) {
-                NavController navController = Navigation.findNavController(getActivity(), R.id.nav_host_fragment);
-                navController.navigate(R.id.nav_home);
-                Toast.makeText(getContext(), "🛍️ Happy shopping!", Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Navigation error", e);
-            Toast.makeText(getContext(), "🛍️ Let's start shopping!", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void showEmptyState() {
-        try {
-            if (rvConversations != null) {
-                rvConversations.setVisibility(View.GONE);
-            }
-
-            if (llLoading != null) {
-                llLoading.setVisibility(View.GONE);
-            }
-
-            if (llEmptyState != null) {
-                llEmptyState.setVisibility(View.VISIBLE);
-            }
-
-            Log.d(TAG, "✅ Empty state shown");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error showing empty state", e);
-        }
-    }
-
-    private void showLoadingState() {
-        if (llLoading != null) {
-            llLoading.setVisibility(View.VISIBLE);
-        }
-        if (rvConversations != null) {
-            rvConversations.setVisibility(View.GONE);
-        }
-        if (llEmptyState != null) {
-            llEmptyState.setVisibility(View.GONE);
-        }
-    }
-
-    private void showConversations() {
-        if (rvConversations != null) {
-            rvConversations.setVisibility(View.VISIBLE);
-        }
-        if (llLoading != null) {
-            llLoading.setVisibility(View.GONE);
-        }
-        if (llEmptyState != null) {
-            llEmptyState.setVisibility(View.GONE);
-        }
-    }
-
-    // TODO: Load conversations from backend
     private void loadConversations() {
-        showLoadingState();
+        if (swipeRefresh != null) {
+            swipeRefresh.setRefreshing(true);
+        }
 
-        // For now, just show empty state
-        // In the future, load from ConversationService
-        showEmptyState();
+        // For now, load sample conversations since we don't have conversation API yet
+        loadSampleConversations();
+    }
+
+    private void loadSampleConversations() {
+        // Clear existing conversations
+        conversations.clear();
+
+        // Add sample conversations
+        conversations.add(new Conversation(
+                1L,
+                "John Doe",
+                "Hi, is the iPhone still available?",
+                "2 hours ago",
+                "https://example.com/avatar1.jpg",
+                true,
+                false
+        ));
+
+        conversations.add(new Conversation(
+                2L,
+                "Jane Smith",
+                "Thanks for the quick delivery!",
+                "1 day ago",
+                "https://example.com/avatar2.jpg",
+                false,
+                false
+        ));
+
+        conversations.add(new Conversation(
+                3L,
+                "Mike Johnson",
+                "Can you lower the price a bit?",
+                "3 days ago",
+                "https://example.com/avatar3.jpg",
+                false,
+                true
+        ));
+
+        // Update UI
+        if (conversationAdapter != null) {
+            conversationAdapter.notifyDataSetChanged();
+        }
+
+        updateEmptyState();
+
+        if (swipeRefresh != null) {
+            swipeRefresh.setRefreshing(false);
+        }
+
+        Log.d(TAG, "✅ Loaded " + conversations.size() + " sample conversations");
+    }
+
+    private void updateEmptyState() {
+        if (conversations.isEmpty()) {
+            if (llEmptyState != null) llEmptyState.setVisibility(View.VISIBLE);
+            if (rvConversations != null) rvConversations.setVisibility(View.GONE);
+        } else {
+            if (llEmptyState != null) llEmptyState.setVisibility(View.GONE);
+            if (rvConversations != null) rvConversations.setVisibility(View.VISIBLE);
+        }
+    }
+
+    // 🔥 START SHOPPING - Navigate to search
+    private void startShopping() {
+        try {
+            // Navigate to search/home to browse products
+            if (getActivity() != null) {
+                Toast.makeText(getContext(), "Let's start shopping! 🛍️", Toast.LENGTH_SHORT).show();
+
+                // Switch to home tab (index 0) in bottom navigation
+                // You can implement this in MainActivity later
+                Log.d(TAG, "Start shopping clicked - navigate to home/search");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error starting shopping", e);
+        }
+    }
+
+    // 🔥 SIMPLIFIED - NO CHATACTIVITY YET
+    private void openConversation(Conversation conversation) {
+        Toast.makeText(getContext(), "Chat with " + conversation.getOtherUserName() + " 💬", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "Open conversation with: " + conversation.getOtherUserName());
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh conversations when fragment becomes visible
+        // Refresh conversations when returning to fragment
         loadConversations();
     }
 }
