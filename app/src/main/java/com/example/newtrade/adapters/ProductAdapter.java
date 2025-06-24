@@ -1,6 +1,7 @@
 // app/src/main/java/com/example/newtrade/adapters/ProductAdapter.java
 package com.example.newtrade.adapters;
 
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,8 +21,8 @@ import java.util.Locale;
 
 public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductViewHolder> {
 
-    private List<Product> products;
-    private OnProductClickListener listener;
+    private final List<Product> products;
+    private final OnProductClickListener listener;
 
     public interface OnProductClickListener {
         void onProductClick(Product product);
@@ -36,7 +37,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
     @Override
     public ProductViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_product_grid, parent, false);
+                .inflate(R.layout.item_product, parent, false);
         return new ProductViewHolder(view);
     }
 
@@ -51,14 +52,14 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         return products.size();
     }
 
-    class ProductViewHolder extends RecyclerView.ViewHolder {
-        ImageView ivProduct;
-        TextView tvTitle;
-        TextView tvPrice;
-        TextView tvLocation;
-        TextView tvCondition;
+    public class ProductViewHolder extends RecyclerView.ViewHolder {
+        private final ImageView ivProduct;
+        private final TextView tvTitle;
+        private final TextView tvPrice;
+        private final TextView tvLocation;
+        private final TextView tvCondition;
 
-        ProductViewHolder(@NonNull View itemView) {
+        public ProductViewHolder(@NonNull View itemView) {
             super(itemView);
             ivProduct = itemView.findViewById(R.id.iv_product);
             tvTitle = itemView.findViewById(R.id.tv_title);
@@ -68,23 +69,37 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         }
 
         void bind(Product product) {
-            tvTitle.setText(product.getTitle());
-
-            // Format price
-            NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
-            tvPrice.setText(formatter.format(product.getPrice()));
-
-            tvLocation.setText(product.getLocation());
-            tvCondition.setText(product.getCondition());
-
-            // Load image
-            if (product.getImageUrls() != null && !product.getImageUrls().isEmpty()) {
-                Glide.with(itemView.getContext())
-                        .load(product.getImageUrls().get(0))
-                        .placeholder(R.drawable.placeholder_product)
-                        .into(ivProduct);
+            if (tvTitle != null) {
+                tvTitle.setText(product.getTitle());
             }
 
+            // Format price
+            if (tvPrice != null) {
+                NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+                tvPrice.setText(formatter.format(product.getPrice()));
+            }
+
+            if (tvLocation != null) {
+                tvLocation.setText(product.getLocation());
+            }
+
+            if (tvCondition != null) {
+                tvCondition.setText(product.getCondition());
+            }
+
+            // Load image
+            if (ivProduct != null) {
+                if (product.getImageUrls() != null && !product.getImageUrls().isEmpty()) {
+                    Glide.with(itemView.getContext())
+                            .load(product.getImageUrls().get(0))
+                            .placeholder(R.drawable.placeholder_product)
+                            .into(ivProduct);
+                } else {
+                    ivProduct.setImageResource(R.drawable.placeholder_product);
+                }
+            }
+
+            // Set click listener
             itemView.setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onProductClick(product);

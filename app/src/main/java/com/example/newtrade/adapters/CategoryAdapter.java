@@ -17,8 +17,8 @@ import java.util.List;
 
 public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.CategoryViewHolder> {
 
-    private List<Category> categories;
-    private OnCategoryClickListener listener;
+    private final List<Category> categories;
+    private final OnCategoryClickListener listener;
 
     public interface OnCategoryClickListener {
         void onCategoryClick(Category category);
@@ -48,9 +48,9 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
         return categories.size();
     }
 
-    class CategoryViewHolder extends RecyclerView.ViewHolder {
-        private ImageView ivCategoryIcon;
-        private TextView tvCategoryName;
+    public static class CategoryViewHolder extends RecyclerView.ViewHolder {
+        private final ImageView ivCategoryIcon;
+        private final TextView tvCategoryName;
 
         public CategoryViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -67,13 +67,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
             if (ivCategoryIcon != null) {
                 ivCategoryIcon.setImageResource(getCategoryIcon(category.getName()));
             }
-
-            // Set click listener
-            itemView.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onCategoryClick(category);
-                }
-            });
         }
 
         private int getCategoryIcon(String categoryName) {
@@ -91,7 +84,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
                 case "sports":
                     return R.drawable.ic_sports;
                 default:
-                    return R.drawable.ic_category_default; // Safe fallback
+                    return R.drawable.ic_category_default;
             }
         }
     }

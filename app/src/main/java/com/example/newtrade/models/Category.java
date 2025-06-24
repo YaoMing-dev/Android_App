@@ -8,6 +8,18 @@ public class Category {
     private String icon;
     private boolean isActive;
 
+    // Default constructor
+    public Category() {}
+
+    // Constructor để sử dụng trong HomeFragment
+    public Category(Long id, String name, String description, String icon, boolean isActive) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.icon = icon;
+        this.isActive = isActive;
+    }
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -23,4 +35,8 @@ public class Category {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
+
+    // Alias for backward compatibility
+    public boolean getIsActive() { return isActive; }
+    public void setIsActive(boolean active) { this.isActive = active; }
 }

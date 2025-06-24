@@ -122,4 +122,14 @@ public class SharedPrefsManager {
         sharedPreferences.edit().clear().apply();
         Log.d(TAG, "All preferences cleared");
     }
+
+    public void clearUserData() {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.clear(); // Xóa tất cả data
+        editor.apply();
+        Log.d(TAG, "✅ All user data cleared");
+    }
+
+    // Hoặc nếu muốn chỉ xóa user session:
+
 }
