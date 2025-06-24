@@ -7,26 +7,31 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- Location permissions for future features -->
+    <!-- ✅ LOCATION PERMISSIONS FOR GPS -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Camera permission for future image upload -->
+    <!-- ✅ CAMERA & STORAGE PERMISSIONS FOR IMAGE -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+
+    <!-- ✅ FEATURES -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- Storage permissions for image handling -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false" />
 
-    <!-- Android 14+ Selected Photos Access -->
-    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
 
-    <!-- Notification permission -->
+    <!-- ✅ NOTIFICATION PERMISSION -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -72,14 +77,6 @@
             android:parentActivityName=".ui.auth.LoginActivity" />
 
         <activity
-            android:name=".ui.auth.OtpVerificationActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Newtrade"
-            android:screenOrientation="portrait"
-            android:windowSoftInputMode="adjustResize"
-            android:parentActivityName=".ui.auth.LoginActivity" />
-
-        <activity
             android:name=".ui.auth.ForgotPasswordActivity"
             android:exported="false"
             android:theme="@style/Theme.Newtrade"
@@ -95,19 +92,6 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-
-        <!-- ===== FIREBASE METADATA ===== -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_notification" />
-
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/primary_color" />
-
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="default_channel" />
 
     </application>
 

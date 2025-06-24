@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/newtrade/adapters/CategoryAdapter.java
+// File: app/src/main/java/com/example/newtrade/adapters/CategoryAdapter.java
 package com.example.newtrade.adapters;
 
 import android.view.LayoutInflater;
@@ -40,7 +40,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
     @Override
     public void onBindViewHolder(@NonNull CategoryViewHolder holder, int position) {
         Category category = categories.get(position);
-        holder.bind(category);
+        holder.bind(category, listener);
     }
 
     @Override
@@ -58,7 +58,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
             tvCategoryName = itemView.findViewById(R.id.tv_category_name);
         }
 
-        void bind(Category category) {
+        void bind(Category category, OnCategoryClickListener listener) {
             if (tvCategoryName != null) {
                 tvCategoryName.setText(category.getName());
             }
@@ -67,6 +67,13 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
             if (ivCategoryIcon != null) {
                 ivCategoryIcon.setImageResource(getCategoryIcon(category.getName()));
             }
+
+            // Set click listener
+            itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onCategoryClick(category);
+                }
+            });
         }
 
         private int getCategoryIcon(String categoryName) {
@@ -77,12 +84,22 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
                     return R.drawable.ic_electronics;
                 case "fashion":
                     return R.drawable.ic_fashion;
+                case "home & garden":
                 case "home":
                     return R.drawable.ic_home_category;
+                case "books & education":
                 case "books":
                     return R.drawable.ic_books;
                 case "sports":
                     return R.drawable.ic_sports;
+                case "beauty & health":
+                case "beauty":
+                    return R.drawable.ic_beauty;
+                case "vehicles":
+                    return R.drawable.ic_vehicles;
+                case "toys & kids":
+                case "toys":
+                    return R.drawable.ic_toys;
                 default:
                     return R.drawable.ic_category_default;
             }

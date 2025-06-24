@@ -1,10 +1,13 @@
 // File: app/src/main/java/com/example/newtrade/ui/product/AddProductFragment.java
-// THAY THẾ TOÀN BỘ:
-
 package com.example.newtrade.ui.product;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
+import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -21,6 +24,8 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.newtrade.R;
@@ -28,11 +33,17 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Category;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.SharedPrefsManager;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.textfield.TextInputEditText;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import retrofit2.Call;
@@ -43,17 +54,20 @@ public class AddProductFragment extends Fragment {
 
     private static final String TAG = "AddProductFragment";
     private static final int REQUEST_IMAGE_PICK = 1001;
+    private static final int REQUEST_LOCATION_PERMISSION = 1002;
 
     // UI Components
     private ImageView ivProductImage;
-    private TextInputEditText etTitle, etDescription, etPrice, etLocation;
+    private TextInputEditText etTitle, etDescription, etPrice, etLocation, etTags;
     private Spinner spinnerCategory, spinnerCondition;
-    private Button btnSelectImage, btnPublish;
+    private MaterialCheckBox cbNegotiable;
+    private Button btnSelectImage, btnGetLocation, btnPublish;
 
     // Data
     private List<Category> categories = new ArrayList<>();
     private Uri selectedImageUri;
     private SharedPrefsManager prefsManager;
+    private FusedLocationProviderClient fusedLocationClient;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -66,6 +80,7 @@ public class AddProductFragment extends Fragment {
 
         initViews(view);
         initUtils();
+        initLocationServices();
         loadCategories();
         setupConditionSpinner();
         setupListeners();
@@ -74,19 +89,32 @@ public class AddProductFragment extends Fragment {
     }
 
     private void initViews(View view) {
-        ivProductImage = view.findViewById(R.id.iv_product_image);
-        etTitle = view.findViewById(R.id.et_title);
-        etDescription = view.findViewById(R.id.et_description);
-        etPrice = view.findViewById(R.id.et_price);
-        etLocation = view.findViewById(R.id.et_location);
-        spinnerCategory = view.findViewById(R.id.spinner_category);
-        spinnerCondition = view.findViewById(R.id.spinner_condition);
-        btnSelectImage = view.findViewById(R.id.btn_select_image);
-        btnPublish = view.findViewById(R.id.btn_publish);
+        try {
+            ivProductImage = view.findViewById(R.id.iv_product_image);
+            etTitle = view.findViewById(R.id.et_title);
+            etDescription = view.findViewById(R.id.et_description);
+            etPrice = view.findViewById(R.id.et_price);
+            etLocation = view.findViewById(R.id.et_location);
+            etTags = view.findViewById(R.id.et_tags);
+            spinnerCategory = view.findViewById(R.id.spinner_category);
+            spinnerCondition = view.findViewById(R.id.spinner_condition);
+            cbNegotiable = view.findViewById(R.id.cb_negotiable);
+            btnSelectImage = view.findViewById(R.id.btn_select_image);
+            btnGetLocation = view.findViewById(R.id.btn_get_location);
+            btnPublish = view.findViewById(R.id.btn_publish);
+
+            Log.d(TAG, "✅ AddProductFragment views initialized");
+        } catch (Exception e) {
+            Log.w(TAG, "Some AddProductFragment views not found: " + e.getMessage());
+        }
     }
 
     private void initUtils() {
         prefsManager = SharedPrefsManager.getInstance(requireContext());
+    }
+
+    private void initLocationServices() {
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
     }
 
     private void loadCategories() {
@@ -109,12 +137,16 @@ public class AddProductFragment extends Fragment {
 
                             setupCategorySpinner();
                             Log.d(TAG, "✅ Loaded " + categories.size() + " categories");
+                        } else {
+                            Log.e(TAG, "❌ Failed to load categories");
+                            Toast.makeText(getContext(), "Failed to load categories", Toast.LENGTH_SHORT).show();
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
                         Log.e(TAG, "❌ Failed to load categories", t);
+                        Toast.makeText(getContext(), "Failed to load categories: " + t.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 });
     }
@@ -138,11 +170,12 @@ public class AddProductFragment extends Fragment {
 
     private void setupConditionSpinner() {
         String[] conditions = {"Select Condition", "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
+        String[] conditionDisplay = {"Select Condition", "New", "Like New", "Good", "Fair", "Poor"};
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 requireContext(),
                 android.R.layout.simple_spinner_item,
-                conditions
+                conditionDisplay
         );
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCondition.setAdapter(adapter);
@@ -150,12 +183,90 @@ public class AddProductFragment extends Fragment {
 
     private void setupListeners() {
         btnSelectImage.setOnClickListener(v -> selectImage());
+        btnGetLocation.setOnClickListener(v -> getCurrentLocation());
         btnPublish.setOnClickListener(v -> publishProduct());
     }
 
     private void selectImage() {
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         startActivityForResult(intent, REQUEST_IMAGE_PICK);
+    }
+
+    private void getCurrentLocation() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    REQUEST_LOCATION_PERMISSION);
+            return;
+        }
+
+        btnGetLocation.setEnabled(false);
+        btnGetLocation.setText("Getting location...");
+
+        fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(requireActivity(), new OnSuccessListener<Location>() {
+                    @Override
+                    public void onSuccess(Location location) {
+                        btnGetLocation.setEnabled(true);
+                        btnGetLocation.setText("📍 Use My Current Location");
+
+                        if (location != null) {
+                            getAddressFromLocation(location.getLatitude(), location.getLongitude());
+                        } else {
+                            Toast.makeText(getContext(), "Unable to get current location", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    btnGetLocation.setEnabled(true);
+                    btnGetLocation.setText("📍 Use My Current Location");
+                    Toast.makeText(getContext(), "Failed to get location: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void getAddressFromLocation(double latitude, double longitude) {
+        try {
+            Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
+            List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+
+            if (addresses != null && !addresses.isEmpty()) {
+                Address address = addresses.get(0);
+
+                StringBuilder addressBuilder = new StringBuilder();
+
+                if (address.getSubThoroughfare() != null) {
+                    addressBuilder.append(address.getSubThoroughfare()).append(" ");
+                }
+                if (address.getThoroughfare() != null) {
+                    addressBuilder.append(address.getThoroughfare()).append(", ");
+                }
+                if (address.getSubLocality() != null) {
+                    addressBuilder.append(address.getSubLocality()).append(", ");
+                }
+                if (address.getLocality() != null) {
+                    addressBuilder.append(address.getLocality()).append(", ");
+                }
+                if (address.getAdminArea() != null) {
+                    addressBuilder.append(address.getAdminArea());
+                }
+
+                String fullAddress = addressBuilder.toString();
+                if (fullAddress.endsWith(", ")) {
+                    fullAddress = fullAddress.substring(0, fullAddress.length() - 2);
+                }
+
+                etLocation.setText(fullAddress);
+                Toast.makeText(getContext(), "Location detected!", Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "✅ Location detected: " + fullAddress);
+            } else {
+                Toast.makeText(getContext(), "Unable to determine address", Toast.LENGTH_SHORT).show();
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "❌ Geocoder error", e);
+            Toast.makeText(getContext(), "Geocoder service unavailable", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
@@ -166,18 +277,29 @@ public class AddProductFragment extends Fragment {
             selectedImageUri = data.getData();
             if (selectedImageUri != null) {
                 ivProductImage.setImageURI(selectedImageUri);
-                btnSelectImage.setText("Image Selected");
+                btnSelectImage.setText("✅ Photo Selected");
+            }
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_LOCATION_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                getCurrentLocation();
+            } else {
+                Toast.makeText(getContext(), "Location permission denied", Toast.LENGTH_SHORT).show();
             }
         }
     }
 
     private void publishProduct() {
-        // Validate required fields
         if (!validateInputs()) {
             return;
         }
 
-        // Disable button to prevent double submission
         btnPublish.setEnabled(false);
         btnPublish.setText("Publishing...");
 
@@ -185,20 +307,37 @@ public class AddProductFragment extends Fragment {
         Map<String, Object> productData = new HashMap<>();
         productData.put("title", etTitle.getText().toString().trim());
         productData.put("description", etDescription.getText().toString().trim());
-        productData.put("price", Double.parseDouble(etPrice.getText().toString().trim()));
+
+        // Price
+        String priceText = etPrice.getText().toString().trim();
+        productData.put("price", Double.parseDouble(priceText));
+
         productData.put("location", etLocation.getText().toString().trim());
 
         // Category
-        int categoryIndex = spinnerCategory.getSelectedItemPosition() - 1; // -1 vì có "Select Category"
+        int categoryIndex = spinnerCategory.getSelectedItemPosition() - 1;
         if (categoryIndex >= 0 && categoryIndex < categories.size()) {
             productData.put("categoryId", categories.get(categoryIndex).getId());
         }
 
-        // Condition
-        String condition = (String) spinnerCondition.getSelectedItem();
-        if (!"Select Condition".equals(condition)) {
-            productData.put("conditionType", condition);
+        // Condition - đúng field name
+        String[] conditions = {"", "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
+        int conditionIndex = spinnerCondition.getSelectedItemPosition();
+        if (conditionIndex > 0 && conditionIndex < conditions.length) {
+            productData.put("condition", conditions[conditionIndex]);
         }
+
+        // Optional fields
+        if (cbNegotiable.isChecked()) {
+            productData.put("isNegotiable", true);
+        }
+
+        String tags = etTags.getText().toString().trim();
+        if (!TextUtils.isEmpty(tags)) {
+            productData.put("tags", tags);
+        }
+
+        Log.d(TAG, "Product data: " + productData.toString());
 
         // Call API
         ApiClient.getApiService().createProduct(productData)
@@ -208,10 +347,10 @@ public class AddProductFragment extends Fragment {
                                            Response<StandardResponse<Map<String, Object>>> response) {
 
                         btnPublish.setEnabled(true);
-                        btnPublish.setText("Publish Product");
+                        btnPublish.setText("🚀 Publish Listing");
 
                         if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            Toast.makeText(getContext(), "Product published successfully!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "Product published successfully! 🎉", Toast.LENGTH_LONG).show();
                             clearForm();
 
                             // Navigate back to home
@@ -221,13 +360,14 @@ public class AddProductFragment extends Fragment {
                         } else {
                             String errorMsg = response.body() != null ? response.body().getMessage() : "Unknown error";
                             Toast.makeText(getContext(), "Failed to publish: " + errorMsg, Toast.LENGTH_LONG).show();
+                            Log.e(TAG, "❌ Publish failed: " + errorMsg);
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                         btnPublish.setEnabled(true);
-                        btnPublish.setText("Publish Product");
+                        btnPublish.setText("🚀 Publish Listing");
 
                         Log.e(TAG, "❌ Failed to publish product", t);
                         Toast.makeText(getContext(), "Network error: " + t.getMessage(), Toast.LENGTH_LONG).show();
@@ -289,7 +429,7 @@ public class AddProductFragment extends Fragment {
             return false;
         }
 
-        // Image (required theo đề thi: "at least 1 photo")
+        // Image (required theo đề thi)
         if (selectedImageUri == null) {
             Toast.makeText(getContext(), "Please select at least one image", Toast.LENGTH_SHORT).show();
             return false;
@@ -303,10 +443,12 @@ public class AddProductFragment extends Fragment {
         etDescription.setText("");
         etPrice.setText("");
         etLocation.setText("");
+        etTags.setText("");
         spinnerCategory.setSelection(0);
         spinnerCondition.setSelection(0);
-        ivProductImage.setImageResource(R.drawable.ic_add_photo);
-        btnSelectImage.setText("Select Image");
+        cbNegotiable.setChecked(false);
+        ivProductImage.setImageResource(R.drawable.ic_add_photo_placeholder);
+        btnSelectImage.setText("📷 Select Photo");
         selectedImageUri = null;
     }
 }

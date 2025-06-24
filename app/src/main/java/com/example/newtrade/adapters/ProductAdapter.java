@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/newtrade/adapters/ProductAdapter.java
+// File: app/src/main/java/com/example/newtrade/adapters/ProductAdapter.java
 package com.example.newtrade.adapters;
 
 import android.text.TextUtils;
@@ -44,7 +44,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
     @Override
     public void onBindViewHolder(@NonNull ProductViewHolder holder, int position) {
         Product product = products.get(position);
-        holder.bind(product);
+        holder.bind(product, listener);
     }
 
     @Override
@@ -52,7 +52,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         return products.size();
     }
 
-    public class ProductViewHolder extends RecyclerView.ViewHolder {
+    public static class ProductViewHolder extends RecyclerView.ViewHolder {
         private final ImageView ivProduct;
         private final TextView tvTitle;
         private final TextView tvPrice;
@@ -68,15 +68,13 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
             tvCondition = itemView.findViewById(R.id.tv_condition);
         }
 
-        void bind(Product product) {
+        void bind(Product product, OnProductClickListener listener) {
             if (tvTitle != null) {
                 tvTitle.setText(product.getTitle());
             }
 
-            // Format price
             if (tvPrice != null) {
-                NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
-                tvPrice.setText(formatter.format(product.getPrice()));
+                tvPrice.setText(product.getFormattedPrice());
             }
 
             if (tvLocation != null) {
@@ -84,18 +82,26 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
             }
 
             if (tvCondition != null) {
-                tvCondition.setText(product.getCondition());
+                String condition = product.getCondition();
+                if (condition != null) {
+                    tvCondition.setText(formatCondition(condition));
+                    tvCondition.setVisibility(View.VISIBLE);
+                } else {
+                    tvCondition.setVisibility(View.GONE);
+                }
             }
 
-            // Load image
+            // Load product image
             if (ivProduct != null) {
-                if (product.getImageUrls() != null && !product.getImageUrls().isEmpty()) {
+                String imageUrl = product.getPrimaryImageUrl();
+                if (!TextUtils.isEmpty(imageUrl)) {
                     Glide.with(itemView.getContext())
-                            .load(product.getImageUrls().get(0))
-                            .placeholder(R.drawable.placeholder_product)
+                            .load(imageUrl)
+                            .placeholder(R.drawable.ic_placeholder_image)
+                            .error(R.drawable.ic_placeholder_image)
                             .into(ivProduct);
                 } else {
-                    ivProduct.setImageResource(R.drawable.placeholder_product);
+                    ivProduct.setImageResource(R.drawable.ic_placeholder_image);
                 }
             }
 
@@ -105,6 +111,23 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                     listener.onProductClick(product);
                 }
             });
+        }
+
+        private String formatCondition(String condition) {
+            switch (condition.toUpperCase()) {
+                case "NEW":
+                    return "New";
+                case "LIKE_NEW":
+                    return "Like New";
+                case "GOOD":
+                    return "Good";
+                case "FAIR":
+                    return "Fair";
+                case "POOR":
+                    return "Poor";
+                default:
+                    return condition;
+            }
         }
     }
 }

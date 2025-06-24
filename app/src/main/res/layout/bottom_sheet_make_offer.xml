@@ -1,108 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="@dimen/padding_lg">
+    android:padding="20dp">
 
     <!-- Handle Bar -->
     <View
-        android:layout_width="@dimen/bottom_sheet_handle_width"
-        android:layout_height="@dimen/bottom_sheet_handle_height"
+        android:layout_width="40dp"
+        android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="@dimen/bottom_sheet_handle_margin"
-        android:background="@drawable/bottom_sheet_handle" />
+        android:background="@drawable/bg_handle_bar"
+        android:layout_marginBottom="16dp" />
 
-    <!-- Header -->
-    <LinearLayout
+    <!-- Title -->
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:layout_marginBottom="@dimen/margin_lg">
+        android:text="Make an Offer"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:layout_marginBottom="16dp" />
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/make_offer"
-            android:textSize="@dimen/text_size_xl"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
-
-        <ImageView
-            android:id="@+id/iv_close"
-            android:layout_width="@dimen/icon_size_lg"
-            android:layout_height="@dimen/icon_size_lg"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="@dimen/padding_sm"
-            android:src="@drawable/ic_close"
-            app:tint="@color/text_secondary" />
-
-    </LinearLayout>
-
-    <!-- Product Info -->
-    <LinearLayout
+    <!-- Current Price -->
+    <TextView
+        android:id="@+id/tv_current_price"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/rounded_background_gray"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="@dimen/padding_md"
-        android:layout_marginBottom="@dimen/margin_lg">
-
-        <ImageView
-            android:id="@+id/iv_product_image"
-            android:layout_width="@dimen/avatar_size_xl"
-            android:layout_height="@dimen/avatar_size_xl"
-            android:background="@drawable/rounded_background_gray"
-            android:scaleType="centerCrop"
-            tools:src="@tools:sample/backgrounds/scenic" />
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/margin_md"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/tv_product_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_size_md"
-                android:textStyle="bold"
-                tools:text="iPhone 13 Pro Max 256GB" />
-
-            <TextView
-                android:id="@+id/tv_asking_price"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/margin_xs"
-                android:textColor="@color/primary_color"
-                android:textSize="@dimen/text_size_lg"
-                android:textStyle="bold"
-                tools:text="₫18,500,000" />
-
-        </LinearLayout>
-
-    </LinearLayout>
+        android:text="Current Price: 25,000,000 ₫"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
+        android:layout_marginBottom="16dp" />
 
     <!-- Offer Amount -->
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/til_offer_amount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/margin_lg"
-        android:hint="@string/offer_amount"
-        app:boxStrokeColor="@color/primary_color"
-        app:errorEnabled="true"
-        app:startIconDrawable="@drawable/ic_currency">
+        android:layout_marginBottom="16dp"
+        android:hint="Your Offer (VNĐ) *"
+        app:prefixText="₫ ">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/et_offer_amount"
@@ -112,114 +50,29 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Offer Message -->
+    <!-- Message -->
     <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/til_offer_message"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/margin_lg"
-        android:hint="@string/offer_message"
-        app:boxStrokeColor="@color/primary_color">
+        android:layout_marginBottom="20dp"
+        android:hint="Message (Optional)">
 
         <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/et_offer_message"
+            android:id="@+id/et_message"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="textMultiLine|textCapSentences"
-            android:minLines="3"
-            android:maxLines="5"
+            android:layout_height="80dp"
+            android:inputType="textMultiLine"
             android:gravity="top" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- Quick Offer Amounts -->
-    <LinearLayout
+    <!-- Submit Button -->
+    <Button
+        android:id="@+id/btn_submit_offer"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/margin_lg"
-        android:orientation="vertical">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/margin_md"
-            android:text="Quick offers"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_size_sm" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_offer_80"
-                style="@style/Widget.Material3.Chip.Suggestion"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/margin_sm"
-                android:text="80%" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_offer_85"
-                style="@style/Widget.Material3.Chip.Suggestion"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/margin_sm"
-                android:text="85%" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_offer_90"
-                style="@style/Widget.Material3.Chip.Suggestion"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/margin_sm"
-                android:text="90%" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_offer_95"
-                style="@style/Widget.Material3.Chip.Suggestion"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="95%" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-
-    <!-- Offer Note -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/rounded_background_info"
-        android:orientation="horizontal"
-        android:padding="@dimen/padding_md"
-        android:layout_marginBottom="@dimen/margin_lg">
-
-        <ImageView
-            android:layout_width="@dimen/icon_size_md"
-            android:layout_height="@dimen/icon_size_md"
-            android:src="@drawable/ic_info"
-            app:tint="@color/info_color" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/margin_md"
-            android:layout_weight="1"
-            android:text="Your offer will be sent to the seller. They can accept, reject, or make a counter offer."
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_size_sm" />
-
-    </LinearLayout>
-
-    <!-- Send Offer Button -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_send_offer"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/button_height_lg"
-        android:text="@string/send_offer"
-        android:enabled="false"
-        app:icon="@drawable/ic_send" />
+        android:layout_height="48dp"
+        android:text="Submit Offer"
+        android:textSize="16sp"
+        style="@style/Widget.Material3.Button" />
 
 </LinearLayout>
