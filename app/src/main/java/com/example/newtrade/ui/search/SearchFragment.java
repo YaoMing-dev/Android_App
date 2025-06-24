@@ -9,7 +9,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
@@ -17,7 +16,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.newtrade.R;
@@ -26,6 +24,7 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
@@ -44,7 +43,10 @@ public class SearchFragment extends Fragment {
 
     // UI Components
     private TextInputEditText etSearch;
-    private ImageView ivFilter;
+    private MaterialButton btnCategoryFilter;
+    private MaterialButton btnPriceFilter;
+    private MaterialButton btnLocationFilter;
+    private MaterialButton btnConditionFilter;
     private ChipGroup chipGroupFilters;
     private RecyclerView rvSearchResults;
     private LinearLayout llEmptyState;
@@ -84,7 +86,10 @@ public class SearchFragment extends Fragment {
     private void initViews(View view) {
         try {
             etSearch = view.findViewById(R.id.et_search);
-            ivFilter = view.findViewById(R.id.iv_filter);
+            btnCategoryFilter = view.findViewById(R.id.btn_category_filter);
+            btnPriceFilter = view.findViewById(R.id.btn_price_filter);
+            btnLocationFilter = view.findViewById(R.id.btn_location_filter);
+            btnConditionFilter = view.findViewById(R.id.btn_condition_filter);
             chipGroupFilters = view.findViewById(R.id.chip_group_filters);
             rvSearchResults = view.findViewById(R.id.rv_search_results);
             llEmptyState = view.findViewById(R.id.ll_empty_state);
@@ -114,6 +119,7 @@ public class SearchFragment extends Fragment {
 
     private void setupListeners() {
         try {
+            // Search input listener
             if (etSearch != null) {
                 etSearch.addTextChangedListener(new TextWatcher() {
                     @Override
@@ -132,8 +138,21 @@ public class SearchFragment extends Fragment {
                 });
             }
 
-            if (ivFilter != null) {
-                ivFilter.setOnClickListener(v -> showFilterDialog());
+            // Filter button listeners
+            if (btnCategoryFilter != null) {
+                btnCategoryFilter.setOnClickListener(v -> showCategoryFilter());
+            }
+
+            if (btnPriceFilter != null) {
+                btnPriceFilter.setOnClickListener(v -> showPriceFilter());
+            }
+
+            if (btnLocationFilter != null) {
+                btnLocationFilter.setOnClickListener(v -> showLocationFilter());
+            }
+
+            if (btnConditionFilter != null) {
+                btnConditionFilter.setOnClickListener(v -> showConditionFilter());
             }
 
             Log.d(TAG, "✅ SearchFragment listeners setup");
@@ -145,7 +164,7 @@ public class SearchFragment extends Fragment {
     private void setupFilterChips() {
         if (chipGroupFilters != null) {
             // Add category filter chips
-            String[] categories = {"All", "Electronics", "Fashion", "Home", "Books", "Sports"};
+            String[] categories = {"All", "Electronics", "Fashion", "Home & Garden", "Books", "Sports"};
 
             for (String category : categories) {
                 Chip chip = new Chip(getContext());
@@ -174,36 +193,38 @@ public class SearchFragment extends Fragment {
     }
 
     private void performSearch(String query) {
-        Log.d(TAG, "Performing search: '" + query + "' in category: '" + selectedCategory + "'");
+        Log.d(TAG, "🔍 Performing search: " + query + ", category: " + selectedCategory);
 
-        // Call backend search API
-        ApiClient.getApiService().getProducts(0, 50, query, selectedCategory)
+        ApiClient.getApiService().getProducts(0, 20, query, selectedCategory)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                            Response<StandardResponse<Map<String, Object>>> response) {
 
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            Map<String, Object> data = response.body().getData();
-                            List<Map<String, Object>> productsList = (List<Map<String, Object>>) data.get("content");
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
 
-                            searchResults.clear();
-                            if (productsList != null) {
-                                for (Map<String, Object> productData : productsList) {
-                                    Product product = parseProductFromMap(productData);
-                                    searchResults.add(product);
+                            if (apiResponse.isSuccess() && apiResponse.hasData()) {
+                                Map<String, Object> data = apiResponse.getData();
+                                List<Map<String, Object>> content = (List<Map<String, Object>>) data.get("content");
+
+                                searchResults.clear();
+                                if (content != null) {
+                                    for (Map<String, Object> productData : content) {
+                                        searchResults.add(parseProductFromMap(productData));
+                                    }
                                 }
-                            }
 
-                            if (searchAdapter != null) {
-                                searchAdapter.notifyDataSetChanged();
-                            }
+                                if (searchAdapter != null) {
+                                    searchAdapter.notifyDataSetChanged();
+                                }
 
-                            updateEmptyState();
-                            Log.d(TAG, "✅ Search completed: " + searchResults.size() + " results");
-                        } else {
-                            Log.w(TAG, "❌ Search API failed");
-                            showEmptyState();
+                                updateEmptyState();
+                                Log.d(TAG, "✅ Search completed: " + searchResults.size() + " results");
+                            } else {
+                                Log.w(TAG, "❌ Search API failed");
+                                showEmptyState();
+                            }
                         }
                     }
 
@@ -264,9 +285,25 @@ public class SearchFragment extends Fragment {
         }
     }
 
-    private void showFilterDialog() {
-        Toast.makeText(getContext(), "Filter dialog coming soon", Toast.LENGTH_SHORT).show();
-        // TODO: Implement filter bottom sheet dialog
+    // Filter dialog methods
+    private void showCategoryFilter() {
+        Toast.makeText(getContext(), "Category filter dialog coming soon", Toast.LENGTH_SHORT).show();
+        // TODO: Implement category filter bottom sheet
+    }
+
+    private void showPriceFilter() {
+        Toast.makeText(getContext(), "Price filter dialog coming soon", Toast.LENGTH_SHORT).show();
+        // TODO: Implement price filter bottom sheet
+    }
+
+    private void showLocationFilter() {
+        Toast.makeText(getContext(), "Location filter dialog coming soon", Toast.LENGTH_SHORT).show();
+        // TODO: Implement location filter bottom sheet
+    }
+
+    private void showConditionFilter() {
+        Toast.makeText(getContext(), "Condition filter dialog coming soon", Toast.LENGTH_SHORT).show();
+        // TODO: Implement condition filter bottom sheet
     }
 
     private void navigateToProductDetail(Product product) {

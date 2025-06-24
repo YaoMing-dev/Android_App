@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/newtrade/MainActivity.java
+// File: app/src/main/java/com/example/newtrade/MainActivity.java
 package com.example.newtrade;
 
 import android.content.Intent;
@@ -54,8 +54,11 @@ public class MainActivity extends AppCompatActivity {
         initViews();
 
         // Delay navigation setup để đảm bảo Fragment container được khởi tạo
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            setupNavigation();
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                setupNavigation();
+            }
         }, 100);
 
         setupFirebaseMessaging();
@@ -83,14 +86,17 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "❌ Navigation setup failed", e);
 
             // Thử lại sau 200ms
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                try {
-                    navController = Navigation.findNavController(this, R.id.nav_host_fragment);
-                    NavigationUI.setupWithNavController(bottomNavigation, navController);
-                    Log.d(TAG, "✅ Navigation setup completed on retry");
-                } catch (Exception ex) {
-                    Log.e(TAG, "❌ Navigation setup failed on retry", ex);
-                    Toast.makeText(this, "Navigation error", Toast.LENGTH_SHORT).show();
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        navController = Navigation.findNavController(MainActivity.this, R.id.nav_host_fragment);
+                        NavigationUI.setupWithNavController(bottomNavigation, navController);
+                        Log.d(TAG, "✅ Navigation setup completed on retry");
+                    } catch (Exception ex) {
+                        Log.e(TAG, "❌ Navigation setup failed on retry", ex);
+                        Toast.makeText(MainActivity.this, "Navigation error", Toast.LENGTH_SHORT).show();
+                    }
                 }
             }, 200);
         }

@@ -118,37 +118,41 @@ public class AddProductFragment extends Fragment {
     }
 
     private void loadCategories() {
-        ApiClient.getApiService().getCategories()
-                .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
-                                           Response<StandardResponse<List<Map<String, Object>>>> response) {
+        Log.d(TAG, "Loading categories from API...");
 
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            List<Map<String, Object>> categoryData = response.body().getData();
+        ApiClient.getApiService().getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
+                                   Response<StandardResponse<List<Map<String, Object>>>> response) {
 
-                            categories.clear();
-                            for (Map<String, Object> data : categoryData) {
-                                Category category = new Category();
-                                category.setId(((Number) data.get("id")).longValue());
-                                category.setName((String) data.get("name"));
-                                categories.add(category);
-                            }
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    List<Map<String, Object>> categoryData = response.body().getData();
 
-                            setupCategorySpinner();
-                            Log.d(TAG, "✅ Loaded " + categories.size() + " categories");
-                        } else {
-                            Log.e(TAG, "❌ Failed to load categories");
-                            Toast.makeText(getContext(), "Failed to load categories", Toast.LENGTH_SHORT).show();
+                    categories.clear();
+                    if (categoryData != null) {
+                        for (Map<String, Object> data : categoryData) {
+                            Category category = new Category();
+                            category.setId(((Number) data.get("id")).longValue());
+                            category.setName((String) data.get("name"));
+                            category.setDescription((String) data.get("description"));
+                            categories.add(category);
                         }
                     }
 
-                    @Override
-                    public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
-                        Log.e(TAG, "❌ Failed to load categories", t);
-                        Toast.makeText(getContext(), "Failed to load categories: " + t.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                });
+                    setupCategorySpinner();
+                    Log.d(TAG, "✅ Loaded " + categories.size() + " categories");
+                } else {
+                    Log.e(TAG, "❌ Failed to load categories");
+                    Toast.makeText(getContext(), "Failed to load categories", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
+                Log.e(TAG, "❌ Categories API call failed", t);
+                Toast.makeText(getContext(), "Network error loading categories", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void setupCategorySpinner() {
@@ -192,6 +196,7 @@ public class AddProductFragment extends Fragment {
         startActivityForResult(intent, REQUEST_IMAGE_PICK);
     }
 
+    // ✅ LOCATION METHOD - CHỈ SỬA CÁI NÀY THÔI
     private void getCurrentLocation() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -210,7 +215,7 @@ public class AddProductFragment extends Fragment {
                     @Override
                     public void onSuccess(Location location) {
                         btnGetLocation.setEnabled(true);
-                        btnGetLocation.setText("📍 Use My Current Location");
+                        btnGetLocation.setText("📍 Use My Location");
 
                         if (location != null) {
                             getAddressFromLocation(location.getLatitude(), location.getLongitude());
@@ -221,14 +226,17 @@ public class AddProductFragment extends Fragment {
                 })
                 .addOnFailureListener(e -> {
                     btnGetLocation.setEnabled(true);
-                    btnGetLocation.setText("📍 Use My Current Location");
+                    btnGetLocation.setText("📍 Use My Location");
                     Toast.makeText(getContext(), "Failed to get location: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
+    // ✅ ADDRESS METHOD - SỬA ĐỂ TƯƠNG THÍCH API LEVEL
     private void getAddressFromLocation(double latitude, double longitude) {
         try {
             Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
+
+            // ✅ SỬA: Dùng method sync cho API level thấp hơn
             List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
 
             if (addresses != null && !addresses.isEmpty()) {

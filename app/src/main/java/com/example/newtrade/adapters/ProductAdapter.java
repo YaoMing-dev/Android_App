@@ -12,6 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
 
@@ -69,21 +70,25 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         }
 
         void bind(Product product, OnProductClickListener listener) {
+            // Set title
             if (tvTitle != null) {
                 tvTitle.setText(product.getTitle());
             }
 
+            // Set price
             if (tvPrice != null) {
                 tvPrice.setText(product.getFormattedPrice());
             }
 
+            // Set location
             if (tvLocation != null) {
                 tvLocation.setText(product.getLocation());
             }
 
+            // Set condition
             if (tvCondition != null) {
                 String condition = product.getCondition();
-                if (condition != null) {
+                if (condition != null && !condition.isEmpty()) {
                     tvCondition.setText(formatCondition(condition));
                     tvCondition.setVisibility(View.VISIBLE);
                 } else {
@@ -91,17 +96,31 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                 }
             }
 
-            // Load product image
+            // Load product image with better error handling
             if (ivProduct != null) {
                 String imageUrl = product.getPrimaryImageUrl();
-                if (!TextUtils.isEmpty(imageUrl)) {
-                    Glide.with(itemView.getContext())
-                            .load(imageUrl)
-                            .placeholder(R.drawable.ic_placeholder_image)
-                            .error(R.drawable.ic_placeholder_image)
-                            .into(ivProduct);
-                } else {
-                    ivProduct.setImageResource(R.drawable.ic_placeholder_image);
+
+                try {
+                    if (!TextUtils.isEmpty(imageUrl)) {
+                        Glide.with(itemView.getContext())
+                                .load(imageUrl)
+                                .placeholder(R.drawable.ic_placeholder_image)
+                                .error(R.drawable.ic_placeholder_image)
+                                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                .centerCrop()
+                                .into(ivProduct);
+                    } else {
+                        // No image URL - set placeholder directly
+                        ivProduct.setImageResource(R.drawable.ic_placeholder_image);
+                    }
+                } catch (Exception e) {
+                    // Fallback in case of any error
+                    try {
+                        ivProduct.setImageResource(R.drawable.ic_placeholder_image);
+                    } catch (Exception ex) {
+                        // Last resort - set a background color
+                        ivProduct.setBackgroundColor(0xFFF5F5F5);
+                    }
                 }
             }
 
@@ -114,6 +133,10 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         }
 
         private String formatCondition(String condition) {
+            if (condition == null || condition.isEmpty()) {
+                return "";
+            }
+
             switch (condition.toUpperCase()) {
                 case "NEW":
                     return "New";
@@ -126,7 +149,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                 case "POOR":
                     return "Poor";
                 default:
-                    return condition;
+                    return condition.substring(0, 1).toUpperCase() + condition.substring(1).toLowerCase();
             }
         }
     }
