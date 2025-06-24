@@ -2,6 +2,9 @@
 package com.example.newtrade.ui.auth;
 
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -29,6 +32,7 @@ import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
 import com.google.gson.Gson;
 
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -101,15 +105,50 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void initGoogleSignIn() {
-        Log.d(TAG, "Initializing Google Sign-In...");
+        Log.d(TAG, "=== GOOGLE SIGN-IN DEBUG INFO ===");
 
-        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(Constants.GOOGLE_CLIENT_ID)
-                .requestEmail()
-                .build();
+        // ✅ DEBUG THÔNG TIN QUAN TRỌNG
+        Log.d(TAG, "🔍 App Package: " + getPackageName());
+        Log.d(TAG, "🔍 Client ID: " + Constants.GOOGLE_CLIENT_ID);
+        Log.d(TAG, "🔍 Backend URL: " + Constants.BASE_URL);
 
-        googleSignInClient = GoogleSignIn.getClient(this, gso);
-        Log.d(TAG, "✅ Google Sign-In client created successfully");
+        // ✅ KIỂM TRA SHA-1 HIỆN TẠI
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_SIGNATURES);
+            for (Signature signature : info.signatures) {
+                MessageDigest md = MessageDigest.getInstance("SHA1");
+                md.update(signature.toByteArray());
+                byte[] digest = md.digest();
+                StringBuilder sha1 = new StringBuilder();
+                for (byte b : digest) {
+                    sha1.append(String.format("%02X:", b & 0xFF));
+                }
+                if (sha1.length() > 0) {
+                    sha1.deleteCharAt(sha1.length() - 1); // Remove last ':'
+                }
+                Log.d(TAG, "🔍 Current SHA-1: " + sha1.toString());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error getting SHA-1", e);
+        }
+
+        Log.d(TAG, "=== END DEBUG INFO ===");
+
+        // ✅ CLEAR PREVIOUS SIGN-IN STATE
+        googleSignInClient = GoogleSignIn.getClient(this, GoogleSignInOptions.DEFAULT_SIGN_IN);
+        googleSignInClient.signOut().addOnCompleteListener(this, task -> {
+            Log.d(TAG, "✅ Previous Google sign-in state cleared");
+
+            // Create new GoogleSignInOptions after clearing
+            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken(Constants.GOOGLE_CLIENT_ID)
+                    .requestEmail()
+                    .requestProfile()
+                    .build();
+
+            googleSignInClient = GoogleSignIn.getClient(this, gso);
+            Log.d(TAG, "✅ Google Sign-In client created successfully");
+        });
     }
 
     private void initUtils() {
@@ -227,7 +266,10 @@ public class LoginActivity extends AppCompatActivity {
     private void signInWithGoogle() {
         if (isLoading) return;
 
-        Log.d(TAG, "🔍 Starting Google Sign-In");
+        Log.d(TAG, "🔍 Starting Google Sign-In...");
+        Log.d(TAG, "🔍 App Package: " + getPackageName());
+        Log.d(TAG, "🔍 Using Client ID: " + Constants.GOOGLE_CLIENT_ID);
+
         Intent signInIntent = googleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, Constants.RC_GOOGLE_SIGN_IN);
     }
@@ -236,17 +278,39 @@ public class LoginActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
+        Log.d(TAG, "🔍 onActivityResult - requestCode: " + requestCode + ", resultCode: " + resultCode);
+
         if (requestCode == Constants.RC_GOOGLE_SIGN_IN) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
-                Log.d(TAG, "✅ Google sign-in successful: " + account.getEmail());
-                Log.d(TAG, "🔍 Google ID Token length: " + (account.getIdToken() != null ? account.getIdToken().length() : 0));
-                performGoogleSignIn(account.getIdToken());
+                Log.d(TAG, "✅ Google sign-in successful!");
+                Log.d(TAG, "🔍 Email: " + account.getEmail());
+                Log.d(TAG, "🔍 Name: " + account.getDisplayName());
+                Log.d(TAG, "🔍 ID Token length: " + (account.getIdToken() != null ? account.getIdToken().length() : 0));
+
+                if (account.getIdToken() != null) {
+                    performGoogleSignIn(account.getIdToken());
+                } else {
+                    Log.e(TAG, "❌ ID Token is null!");
+                    showError("Google đăng nhập thất bại - không nhận được ID token");
+                }
             } catch (ApiException e) {
                 Log.e(TAG, "❌ Google sign-in failed with code: " + e.getStatusCode(), e);
-                showError("Google đăng nhập thất bại: " + e.getMessage());
+                Log.e(TAG, "❌ Status message: " + e.getStatus());
+                Log.e(TAG, "❌ Status code meaning: " + getStatusCodeMeaning(e.getStatusCode()));
+                showError("Google đăng nhập thất bại: " + getStatusCodeMeaning(e.getStatusCode()));
             }
+        }
+    }
+
+    private String getStatusCodeMeaning(int statusCode) {
+        switch (statusCode) {
+            case 10: return "DEVELOPER_ERROR - Cấu hình OAuth không đúng";
+            case 12: return "CANCELLED - Người dùng hủy đăng nhập";
+            case 7: return "NETWORK_ERROR - Lỗi mạng";
+            case 8: return "INTERNAL_ERROR - Lỗi nội bộ";
+            default: return "Error code: " + statusCode;
         }
     }
 
@@ -260,6 +324,7 @@ public class LoginActivity extends AppCompatActivity {
         Log.d(TAG, "🔍 Sending Google Sign-In request to backend");
         Log.d(TAG, "🔍 Backend URL: " + Constants.BASE_URL + "api/auth/google-signin");
         Log.d(TAG, "🔍 ID Token length: " + idToken.length());
+        Log.d(TAG, "🔍 ID Token preview: " + idToken.substring(0, Math.min(50, idToken.length())) + "...");
 
         showLoading(true);
 
@@ -287,7 +352,7 @@ public class LoginActivity extends AppCompatActivity {
                 } else {
                     Log.e(TAG, "❌ Google Sign-In failed - Response code: " + response.code());
                     handleErrorResponse(response);
-                    showError("Google đăng nhập thất bại");
+                    showError("Google đăng nhập thất bại - Server error");
                 }
             }
 
@@ -347,6 +412,7 @@ public class LoginActivity extends AppCompatActivity {
                     }
                 } else {
                     Log.e(TAG, "❌ Incomplete user data received");
+                    Log.e(TAG, "❌ UserID: " + userId + ", Email: " + email + ", DisplayName: " + displayName);
                     showError("Dữ liệu người dùng không đầy đủ");
                 }
             } else {

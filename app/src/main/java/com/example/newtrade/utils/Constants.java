@@ -23,8 +23,8 @@ public class Constants {
     public static final String PREF_IS_EMAIL_VERIFIED = "is_email_verified";
 
     // ===== GOOGLE OAUTH =====
-    public static final String GOOGLE_CLIENT_ID = "638175281882-hb8iu5pi2cjpd0g7vfkttck4140lo3mn.apps.googleusercontent.com";
-
+    // Thay thế Android Client ID bằng Web Client ID
+    public static final String GOOGLE_CLIENT_ID = "638175281882-lqsdj0iur1i079l0vlqni71gelshrdgj.apps.googleusercontent.com";
     // ===== REQUEST CODES =====
     public static final int RC_GOOGLE_SIGN_IN = 1001;
     public static final int RC_PICK_IMAGE = 1002;
