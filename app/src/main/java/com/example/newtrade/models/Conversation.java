@@ -1,3 +1,4 @@
+// ✅ FIXED: Thêm missing methods
 package com.example.newtrade.models;
 
 public class Conversation {
@@ -7,9 +8,14 @@ public class Conversation {
     private Long buyerId;
     private Long sellerId;
 
+    // ✅ Thêm các field mới cần thiết
+    private String otherUserName;
+    private String lastMessageTime;
+    private String productTitle;
+
     public Conversation() {}
 
-    // Getters and setters
+    // Getters and setters hiện tại
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -24,4 +30,14 @@ public class Conversation {
 
     public Long getSellerId() { return sellerId; }
     public void setSellerId(Long sellerId) { this.sellerId = sellerId; }
+
+    // ✅ Thêm các method mới bị thiếu
+    public String getOtherUserName() { return otherUserName; }
+    public void setOtherUserName(String otherUserName) { this.otherUserName = otherUserName; }
+
+    public String getLastMessageTime() { return lastMessageTime; }
+    public void setLastMessageTime(String lastMessageTime) { this.lastMessageTime = lastMessageTime; }
+
+    public String getProductTitle() { return productTitle; }
+    public void setProductTitle(String productTitle) { this.productTitle = productTitle; }
 }

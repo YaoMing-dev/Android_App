@@ -222,8 +222,8 @@ public class ProfileFragment extends Fragment {
                 if (profilePicture != null && !profilePicture.isEmpty() && ivProfilePicture != null) {
                     Glide.with(this)
                             .load(profilePicture)
-                            .placeholder(R.drawable.ic_person_placeholder)
-                            .error(R.drawable.ic_person_placeholder)
+                            .placeholder(R.drawable.ic_person)
+                            .error(R.drawable.ic_person)
                             .into(ivProfilePicture);
                 }
             }

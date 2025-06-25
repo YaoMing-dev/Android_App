@@ -1,4 +1,5 @@
-// app/src/main/java/com/example/newtrade/ui/product/AddProductFragment.java - TOÀN BỘ
+// app/src/main/java/com/example/newtrade/ui/product/AddProductFragment.java
+// ✅ FIXED: Added displaySelectedImage + Fixed callback types + Updated publishProduct
 package com.example.newtrade.ui.product;
 
 import android.Manifest;
@@ -128,28 +129,57 @@ public class AddProductFragment extends Fragment {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
     }
 
+    // ✅ FIXED: Use correct callback type for Map instead of Category
     private void loadCategories() {
         Log.d(TAG, "Loading categories from backend...");
 
-        ApiClient.getApiService().getCategories().enqueue(new Callback<StandardResponse<List<Category>>>() {
+        ApiClient.getApiService().getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
             @Override
-            public void onResponse(@NonNull Call<StandardResponse<List<Category>>> call, @NonNull Response<StandardResponse<List<Category>>> response) {
+            public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
+                                   @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    List<Category> loadedCategories = response.body().getData();
-                    if (loadedCategories != null) {
+                    List<Map<String, Object>> categoriesData = response.body().getData();
+                    if (categoriesData != null) {
                         categories.clear();
-                        categories.addAll(loadedCategories);
+
+                        // Convert Map to Category objects
+                        for (Map<String, Object> categoryData : categoriesData) {
+                            try {
+                                Category category = new Category();
+
+                                // Parse ID safely
+                                if (categoryData.get("id") instanceof Number) {
+                                    category.setId(((Number) categoryData.get("id")).longValue());
+                                }
+
+                                category.setName((String) categoryData.get("name"));
+                                category.setDescription((String) categoryData.get("description"));
+                                category.setIcon((String) categoryData.get("icon"));
+
+                                // Parse isActive safely
+                                Boolean isActive = (Boolean) categoryData.get("isActive");
+                                category.setActive(isActive != null ? isActive : true);
+
+                                categories.add(category);
+                            } catch (Exception e) {
+                                Log.w(TAG, "Error parsing category: " + categoryData, e);
+                            }
+                        }
+
                         setupCategorySpinner();
                         Log.d(TAG, "✅ Categories loaded: " + categories.size());
+                    } else {
+                        Log.e(TAG, "❌ Categories data is null");
+                        loadSampleCategories();
                     }
                 } else {
-                    Log.e(TAG, "❌ Failed to load categories");
+                    Log.e(TAG, "❌ Failed to load categories - Response not successful");
                     loadSampleCategories();
                 }
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<List<Category>>> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
                 Log.e(TAG, "❌ Categories API error", t);
                 loadSampleCategories();
             }
@@ -159,16 +189,22 @@ public class AddProductFragment extends Fragment {
     private void loadSampleCategories() {
         categories.clear();
         categories.add(new Category(1L, "Electronics", "Phones, laptops, gadgets", "smartphone", true));
-        categories.add(new Category(2L, "Fashion", "Clothes, shoes, accessories", "shirt", true));
-        categories.add(new Category(3L, "Home & Garden", "Furniture, appliances", "home", true));
-        categories.add(new Category(4L, "Sports", "Sports equipment", "football", true));
-        categories.add(new Category(5L, "Books", "Books and education", "book", true));
+        categories.add(new Category(2L, "Fashion", "Clothing and accessories", "fashion", true));
+        categories.add(new Category(3L, "Home & Garden", "Home decor and garden", "home", true));
+        categories.add(new Category(4L, "Books", "Books and educational materials", "books", true));
+        categories.add(new Category(5L, "Sports", "Sports and outdoor equipment", "sports", true));
+        categories.add(new Category(6L, "Beauty", "Beauty and health products", "beauty", true));
+        categories.add(new Category(7L, "Vehicles", "Cars and motorbikes", "vehicles", true));
+        categories.add(new Category(8L, "Toys", "Toys and kids items", "toys", true));
+
         setupCategorySpinner();
+        Log.d(TAG, "✅ Sample categories loaded");
     }
 
     private void setupCategorySpinner() {
         List<String> categoryNames = new ArrayList<>();
-        categoryNames.add("Select Category"); // Placeholder
+        categoryNames.add("Select Category");
+
         for (Category category : categories) {
             categoryNames.add(category.getName());
         }
@@ -176,15 +212,21 @@ public class AddProductFragment extends Fragment {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, categoryNames);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerCategory.setAdapter(adapter);
+
+        if (spinnerCategory != null) {
+            spinnerCategory.setAdapter(adapter);
+        }
     }
 
     private void setupConditionSpinner() {
         String[] conditions = {"Select Condition", "New", "Like New", "Good", "Fair", "Poor"};
-        ArrayAdapter<String> conditionAdapter = new ArrayAdapter<>(requireContext(),
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, conditions);
-        conditionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerCondition.setAdapter(conditionAdapter);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        if (spinnerCondition != null) {
+            spinnerCondition.setAdapter(adapter);
+        }
     }
 
     private void setupListeners() {
@@ -197,147 +239,11 @@ public class AddProductFragment extends Fragment {
         }
 
         if (btnPublish != null) {
-            btnPublish.setOnClickListener(v -> validateAndPublish());
-        }
-    }
-
-    // 🔥 FIX: Validate and check user login first
-    private void validateAndPublish() {
-        // Check if user is logged in first
-        Long userId = prefsManager.getUserId();
-        if (userId == null || userId <= 0) {
-            Log.e(TAG, "❌ User not logged in, cannot publish product");
-            showError("Vui lòng đăng nhập để đăng sản phẩm");
-
-            // Navigate to login
-            Intent loginIntent = new Intent(getActivity(), LoginActivity.class);
-            startActivity(loginIntent);
-            return;
-        }
-
-        Log.d(TAG, "✅ User logged in: " + userId + ", proceeding with validation");
-
-        if (!validateForm()) {
-            return;
-        }
-
-        publishProduct();
-    }
-
-    private boolean validateForm() {
-        // Title validation
-        String title = getTextFromEditText(etTitle);
-        if (TextUtils.isEmpty(title)) {
-            setErrorAndFocus(etTitle, "Title is required");
-            return false;
-        }
-
-        // Description validation
-        String description = getTextFromEditText(etDescription);
-        if (TextUtils.isEmpty(description)) {
-            setErrorAndFocus(etDescription, "Description is required");
-            return false;
-        }
-
-        // Price validation
-        String priceStr = getTextFromEditText(etPrice);
-        if (TextUtils.isEmpty(priceStr)) {
-            setErrorAndFocus(etPrice, "Price is required");
-            return false;
-        }
-
-        try {
-            BigDecimal price = new BigDecimal(priceStr);
-            if (price.compareTo(BigDecimal.ZERO) <= 0) {
-                setErrorAndFocus(etPrice, "Price must be greater than 0");
-                return false;
-            }
-        } catch (NumberFormatException e) {
-            setErrorAndFocus(etPrice, "Invalid price format");
-            return false;
-        }
-
-        // Location validation
-        String location = getTextFromEditText(etLocation);
-        if (TextUtils.isEmpty(location)) {
-            setErrorAndFocus(etLocation, "Location is required");
-            return false;
-        }
-
-        // Category validation
-        if (spinnerCategory.getSelectedItemPosition() <= 0) {
-            showError("Please select a category");
-            return false;
-        }
-
-        // Condition validation
-        if (spinnerCondition.getSelectedItemPosition() <= 0) {
-            showError("Please select condition");
-            return false;
-        }
-
-        // Image validation
-        if (uploadedImageUrl == null) {
-            showError("Please select and upload an image first");
-            return false;
-        }
-
-        return true;
-    }
-
-    private void publishProduct() {
-        updatePublishButton("Publishing...", false);
-
-        try {
-            Map<String, Object> productData = new HashMap<>();
-            productData.put("title", getTextFromEditText(etTitle));
-            productData.put("description", getTextFromEditText(etDescription));
-
-            String priceStr = getTextFromEditText(etPrice);
-            BigDecimal price = new BigDecimal(priceStr);
-            productData.put("price", price);
-
-            int categoryIndex = spinnerCategory.getSelectedItemPosition();
-            if (categoryIndex > 0 && categoryIndex <= categories.size()) {
-                productData.put("categoryId", categories.get(categoryIndex - 1).getId());
-            }
-
-            String condition = spinnerCondition.getSelectedItem().toString().toUpperCase().replace(" ", "_");
-            productData.put("condition", condition);
-            productData.put("location", getTextFromEditText(etLocation));
-            productData.put("negotiable", cbNegotiable.isChecked());
-            productData.put("imageUrl", uploadedImageUrl);
-
-            Log.d(TAG, "Publishing product: " + productData);
-
-            ApiClient.getApiService().createProduct(productData).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                @Override
-                public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                    updatePublishButton("Publish Product", true);
-
-                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                        Toast.makeText(getContext(), "🎉 Product published successfully! 🎉", Toast.LENGTH_LONG).show();
-                        clearForm();
-                        Log.d(TAG, "✅ Product published successfully");
-                    } else {
-                        String errorMsg = response.body() != null ? response.body().getMessage() : "Unknown error";
-                        showError("Publish failed: " + errorMsg);
-                        Log.e(TAG, "❌ Publish failed: " + errorMsg);
-                    }
-                }
-
-                @Override
-                public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                    updatePublishButton("Publish Product", true);
-                    showError("Network error: " + t.getMessage());
-                    Log.e(TAG, "❌ Publish network error", t);
+            btnPublish.setOnClickListener(v -> {
+                if (validateForm()) {
+                    publishProduct();
                 }
             });
-
-        } catch (Exception e) {
-            updatePublishButton("Publish Product", true);
-            showError("Error: " + e.getMessage());
-            Log.e(TAG, "❌ Publish error", e);
         }
     }
 
@@ -356,16 +262,19 @@ public class AddProductFragment extends Fragment {
             if (selectedImageUri != null) {
                 Log.d(TAG, "✅ Image selected: " + selectedImageUri);
 
-                // 🔥 FIX: Show selected image immediately
+                // ✅ FIXED: Display selected image immediately
                 displaySelectedImage();
 
-                // Then upload to backend
+                // Update button status
+                updateImageButton("📷 Image Selected", true);
+
+                // Upload to backend
                 uploadImageToBackend();
             }
         }
     }
 
-    // 🔥 FIX: Display selected image immediately
+    // ✅ FIXED: Method to display selected image immediately
     private void displaySelectedImage() {
         if (selectedImageUri != null && ivProductImage != null) {
             try {
@@ -379,6 +288,9 @@ public class AddProductFragment extends Fragment {
                 Log.d(TAG, "✅ Selected image displayed");
             } catch (Exception e) {
                 Log.e(TAG, "❌ Error displaying image", e);
+                if (ivProductImage != null) {
+                    ivProductImage.setImageResource(R.drawable.ic_placeholder_image);
+                }
             }
         }
     }
@@ -402,7 +314,8 @@ public class AddProductFragment extends Fragment {
 
             ApiClient.getApiService().uploadProductImage(imagePart).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
                 @Override
-                public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Response<StandardResponse<Map<String, String>>> response) {
+                public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                       @NonNull Response<StandardResponse<Map<String, String>>> response) {
                     isUploading = false;
 
                     if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
@@ -435,6 +348,230 @@ public class AddProductFragment extends Fragment {
             showError("Error preparing image: " + e.getMessage());
             Log.e(TAG, "❌ Image preparation error", e);
         }
+    }
+
+    private void getCurrentLocation() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
+            return;
+        }
+
+        updateLocationButton("⏳ Getting Location...", false);
+
+        try {
+            fusedLocationClient.getLastLocation().addOnCompleteListener(task -> {
+                updateLocationButton("📍 Get Location", true);
+
+                if (task.isSuccessful() && task.getResult() != null) {
+                    Location location = task.getResult();
+                    getAddressFromLocation(location.getLatitude(), location.getLongitude());
+                } else {
+                    showError("Unable to get current location");
+                }
+            });
+        } catch (SecurityException e) {
+            updateLocationButton("📍 Get Location", true);
+            showError("Location permission denied");
+        }
+    }
+
+    private void getAddressFromLocation(double latitude, double longitude) {
+        try {
+            Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
+            List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+
+            if (addresses != null && !addresses.isEmpty()) {
+                Address address = addresses.get(0);
+                String locationText = address.getLocality() + ", " + address.getCountryName();
+                if (etLocation != null) {
+                    etLocation.setText(locationText);
+                }
+                Toast.makeText(getContext(), "Location updated: " + locationText, Toast.LENGTH_SHORT).show();
+            } else {
+                showError("Unable to get address from location");
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "❌ Error getting address", e);
+            showError("Error getting address: " + e.getMessage());
+        }
+    }
+
+    private boolean validateForm() {
+        // Title validation
+        String title = getTextFromEditText(etTitle);
+        if (TextUtils.isEmpty(title)) {
+            showError("Please enter product title");
+            return false;
+        }
+
+        // Price validation
+        String priceStr = getTextFromEditText(etPrice);
+        if (TextUtils.isEmpty(priceStr)) {
+            showError("Please enter price");
+            return false;
+        }
+
+        try {
+            BigDecimal price = new BigDecimal(priceStr);
+            if (price.compareTo(BigDecimal.ZERO) <= 0) {
+                showError("Price must be greater than 0");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            showError("Please enter valid price");
+            return false;
+        }
+
+        // Category validation
+        if (spinnerCategory.getSelectedItemPosition() <= 0) {
+            showError("Please select category");
+            return false;
+        }
+
+        // Condition validation
+        if (spinnerCondition.getSelectedItemPosition() <= 0) {
+            showError("Please select condition");
+            return false;
+        }
+
+        // Image validation
+        if (uploadedImageUrl == null) {
+            showError("Please select and upload an image first");
+            return false;
+        }
+
+        return true;
+    }
+
+    // ✅ FIXED: Updated publishProduct with proper data format
+    private void publishProduct() {
+        updatePublishButton("Publishing...", false);
+
+        try {
+            // Check if user is logged in
+            Long userId = prefsManager.getUserId();
+            if (userId == null || userId <= 0) {
+                showError("Please login to publish products");
+                updatePublishButton("Publish Product", true);
+                return;
+            }
+
+            // Create proper ProductRequest matching backend
+            Map<String, Object> productRequest = new HashMap<>();
+            productRequest.put("title", getTextFromEditText(etTitle));
+            productRequest.put("description", getTextFromEditText(etDescription));
+
+            String priceStr = getTextFromEditText(etPrice);
+            BigDecimal price = new BigDecimal(priceStr);
+            productRequest.put("price", price);
+
+            int categoryIndex = spinnerCategory.getSelectedItemPosition();
+            if (categoryIndex > 0 && categoryIndex <= categories.size()) {
+                productRequest.put("categoryId", categories.get(categoryIndex - 1).getId());
+            }
+
+            // Fix condition format - backend expects enum
+            String conditionText = spinnerCondition.getSelectedItem().toString();
+            String condition = conditionText.toUpperCase().replace(" ", "_");
+            productRequest.put("condition", condition);
+
+            productRequest.put("location", getTextFromEditText(etLocation));
+
+            // ImageUrls as List, not single imageUrl
+            List<String> imageUrls = new ArrayList<>();
+            if (uploadedImageUrl != null) {
+                imageUrls.add(uploadedImageUrl);
+            }
+            productRequest.put("imageUrls", imageUrls);
+
+            Log.d(TAG, "Publishing product with User-ID: " + userId);
+            Log.d(TAG, "Product data: " + productRequest);
+
+            ApiClient.getApiService().createProduct(productRequest).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                @Override
+                public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                       @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                    updatePublishButton("Publish Product", true);
+
+                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                        Toast.makeText(getContext(), "🎉 Product published successfully! 🎉", Toast.LENGTH_LONG).show();
+                        clearForm();
+                        Log.d(TAG, "✅ Product published successfully");
+                    } else {
+                        String errorMsg = "Failed to publish product";
+                        if (response.body() != null && response.body().getMessage() != null) {
+                            errorMsg = response.body().getMessage();
+                        }
+                        showError(errorMsg);
+                        Log.e(TAG, "❌ Publish failed: " + errorMsg);
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                    updatePublishButton("Publish Product", true);
+                    Log.e(TAG, "❌ Publish failed", t);
+                    showError("Network error: " + t.getMessage());
+                }
+            });
+
+        } catch (Exception e) {
+            updatePublishButton("Publish Product", true);
+            Log.e(TAG, "❌ Error preparing product data", e);
+            showError("Error: " + e.getMessage());
+        }
+    }
+
+    // Helper Methods
+    private String getTextFromEditText(TextInputEditText editText) {
+        return editText != null ? editText.getText().toString().trim() : "";
+    }
+
+    private void updateImageButton(String text, boolean enabled) {
+        if (btnSelectImage != null) {
+            btnSelectImage.setText(text);
+            btnSelectImage.setEnabled(enabled);
+        }
+    }
+
+    private void resetImageButton() {
+        updateImageButton("📷 Select Image", true);
+    }
+
+    private void updateLocationButton(String text, boolean enabled) {
+        if (btnGetLocation != null) {
+            btnGetLocation.setText(text);
+            btnGetLocation.setEnabled(enabled);
+        }
+    }
+
+    private void updatePublishButton(String text, boolean enabled) {
+        if (btnPublish != null) {
+            btnPublish.setText(text);
+            btnPublish.setEnabled(enabled);
+        }
+    }
+
+    private void showError(String message) {
+        Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
+        Log.e(TAG, "Error: " + message);
+    }
+
+    private void clearForm() {
+        if (etTitle != null) etTitle.setText("");
+        if (etDescription != null) etDescription.setText("");
+        if (etPrice != null) etPrice.setText("");
+        if (etLocation != null) etLocation.setText("");
+        if (spinnerCategory != null) spinnerCategory.setSelection(0);
+        if (spinnerCondition != null) spinnerCondition.setSelection(0);
+        if (cbNegotiable != null) cbNegotiable.setChecked(false);
+        if (ivProductImage != null) ivProductImage.setImageResource(R.drawable.ic_placeholder_image);
+
+        selectedImageUri = null;
+        uploadedImageUrl = null;
+        resetImageButton();
     }
 
     @Nullable
@@ -485,126 +622,6 @@ public class AddProductFragment extends Fragment {
             }
         }
         return result != null ? result : "image_" + System.currentTimeMillis() + ".jpg";
-    }
-
-    private void getCurrentLocation() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(requireActivity(),
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
-            return;
-        }
-
-        if (btnGetLocation != null) {
-            btnGetLocation.setText("📍 Getting location...");
-            btnGetLocation.setEnabled(false);
-        }
-
-        try {
-            fusedLocationClient.getLastLocation()
-                    .addOnSuccessListener(location -> {
-                        resetLocationButton();
-                        if (location != null) {
-                            getAddressFromLocation(location.getLatitude(), location.getLongitude());
-                        } else {
-                            showError("Unable to get current location. Please enter manually.");
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        resetLocationButton();
-                        showError("Failed to get location: " + e.getMessage());
-                        Log.e(TAG, "❌ Location error", e);
-                    });
-        } catch (SecurityException e) {
-            resetLocationButton();
-            Log.e(TAG, "❌ Location permission error", e);
-        }
-    }
-
-    private void getAddressFromLocation(double latitude, double longitude) {
-        try {
-            Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
-            List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
-
-            if (addresses != null && !addresses.isEmpty()) {
-                Address address = addresses.get(0);
-                String fullAddress = address.getAddressLine(0);
-                if (fullAddress != null && etLocation != null) {
-                    etLocation.setText(fullAddress);
-                    Toast.makeText(getContext(), "📍 Location detected", Toast.LENGTH_SHORT).show();
-                    Log.d(TAG, "✅ Location detected: " + fullAddress);
-                }
-            } else {
-                showError("Unable to determine address");
-            }
-        } catch (IOException e) {
-            Log.e(TAG, "❌ Geocoder error", e);
-            showError("Geocoder service unavailable");
-        }
-    }
-
-    // Helper methods
-    @NonNull
-    private String getTextFromEditText(@Nullable TextInputEditText editText) {
-        if (editText != null && editText.getText() != null) {
-            return editText.getText().toString().trim();
-        }
-        return "";
-    }
-
-    private void setErrorAndFocus(@Nullable TextInputEditText editText, String error) {
-        if (editText != null) {
-            editText.setError(error);
-            editText.requestFocus();
-        }
-    }
-
-    private void showError(String message) {
-        if (getContext() != null) {
-            Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
-        }
-        Log.e(TAG, "Error: " + message);
-    }
-
-    private void updateImageButton(String text, boolean enabled) {
-        if (btnSelectImage != null) {
-            btnSelectImage.setText(text);
-            btnSelectImage.setEnabled(enabled);
-        }
-    }
-
-    private void resetImageButton() {
-        updateImageButton("📷 Select Image", true);
-        isUploading = false;
-    }
-
-    private void updatePublishButton(String text, boolean enabled) {
-        if (btnPublish != null) {
-            btnPublish.setText(text);
-            btnPublish.setEnabled(enabled);
-        }
-    }
-
-    private void resetLocationButton() {
-        if (btnGetLocation != null) {
-            btnGetLocation.setText("📍 Get Location");
-            btnGetLocation.setEnabled(true);
-        }
-    }
-
-    private void clearForm() {
-        if (etTitle != null) etTitle.setText("");
-        if (etDescription != null) etDescription.setText("");
-        if (etPrice != null) etPrice.setText("");
-        if (etLocation != null) etLocation.setText("");
-        if (spinnerCategory != null) spinnerCategory.setSelection(0);
-        if (spinnerCondition != null) spinnerCondition.setSelection(0);
-        if (cbNegotiable != null) cbNegotiable.setChecked(false);
-        if (ivProductImage != null) ivProductImage.setImageResource(R.drawable.ic_placeholder_image);
-
-        resetImageButton();
-        selectedImageUri = null;
-        uploadedImageUrl = null;
     }
 
     @Override

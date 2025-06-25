@@ -1,22 +1,26 @@
-// File: app/src/main/java/com/example/newtrade/ui/product/ProductDetailActivity.java
+// app/src/main/java/com/example/newtrade/ui/product/ProductDetailActivity.java
+// ✅ FIXED: Added back button + Contact seller + Make offer functionality
 package com.example.newtrade.ui.product;
 
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.ui.chat.ChatActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -92,6 +96,16 @@ public class ProductDetailActivity extends AppCompatActivity {
         }
     }
 
+    // ✅ FIXED: Added back button handling
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
     private void getProductData() {
         productId = getIntent().getLongExtra("product_id", -1);
         productTitle = getIntent().getStringExtra("product_title");
@@ -107,18 +121,17 @@ public class ProductDetailActivity extends AppCompatActivity {
             return;
         }
 
-        // 🔥 LOAD FROM BACKEND
         ApiClient.getApiService().getProductDetail(productId).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
                 try {
                     if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                         productData = response.body().getData();
-                        displayBackendData();
+                        displayProductData();
                         Log.d(TAG, "✅ Product loaded from backend");
                     } else {
-                        Log.w(TAG, "❌ Backend response failed, showing sample data");
+                        Log.e(TAG, "❌ Failed to load product from backend");
                         displaySampleData();
                     }
                 } catch (Exception e) {
@@ -128,153 +141,72 @@ public class ProductDetailActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 Log.e(TAG, "❌ Product API call failed", t);
                 displaySampleData();
             }
         });
     }
 
-    private void displayBackendData() {
+    private void displayProductData() {
         try {
-            // Basic product info
-            String title = (String) productData.get("title");
-            if (title != null) {
-                tvTitle.setText(title);
-                if (getSupportActionBar() != null) {
-                    getSupportActionBar().setTitle(title);
-                }
-            }
+            if (productData != null) {
+                // Product Info
+                if (tvTitle != null) tvTitle.setText(productData.get("title").toString());
+                if (tvPrice != null) tvPrice.setText(formatPrice(productData.get("price")));
+                if (tvDescription != null) tvDescription.setText(productData.get("description").toString());
+                if (tvLocation != null) tvLocation.setText(productData.get("location").toString());
+                if (tvCondition != null) tvCondition.setText(productData.get("condition").toString());
 
-            tvDescription.setText((String) productData.get("description"));
-            tvLocation.setText("📍 " + (String) productData.get("location"));
-
-            // Handle condition
-            String condition = (String) productData.get("condition");
-            if (condition != null) {
-                tvCondition.setText("Condition: " + formatCondition(condition));
-            }
-
-            // Handle price
-            Object priceObj = productData.get("price");
-            if (priceObj instanceof Number) {
-                double price = ((Number) priceObj).doubleValue();
-                tvPrice.setText(String.format("%,.0f VNĐ", price));
-            }
-
-            // Seller info
-            Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
-            if (sellerData != null) {
-                String sellerName = (String) sellerData.get("displayName");
-                if (sellerName != null) {
-                    tvSellerName.setText(sellerName);
-                }
-
-                Object ratingObj = sellerData.get("rating");
-                if (ratingObj instanceof Number) {
-                    double rating = ((Number) ratingObj).doubleValue();
-                    tvSellerRating.setText(String.format("⭐ %.1f", rating));
-                }
-
-                String createdAt = (String) sellerData.get("createdAt");
-                if (createdAt != null) {
-                    tvMemberSince.setText("Member since " + createdAt.substring(0, 7)); // YYYY-MM
-                }
-            }
-
-            // Load images
-            List<Map<String, Object>> images = (List<Map<String, Object>>) productData.get("images");
-            if (images != null && !images.isEmpty()) {
-                String imageUrl = (String) images.get(0).get("imageUrl");
-                if (imageUrl != null && !imageUrl.isEmpty()) {
+                // Product Image
+                String imageUrl = (String) productData.get("primaryImageUrl");
+                if (imageUrl != null && ivProductImage != null) {
                     Glide.with(this)
                             .load(imageUrl)
                             .placeholder(R.drawable.ic_placeholder_image)
                             .error(R.drawable.ic_placeholder_image)
-                            .centerCrop()
                             .into(ivProductImage);
                 }
-            } else {
-                // Check for single imageUrl
-                String imageUrl = (String) productData.get("imageUrl");
-                if (imageUrl != null && !imageUrl.isEmpty()) {
-                    Glide.with(this)
-                            .load(imageUrl)
-                            .placeholder(R.drawable.ic_placeholder_image)
-                            .error(R.drawable.ic_placeholder_image)
-                            .centerCrop()
-                            .into(ivProductImage);
+
+                // Seller Info
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
+                if (sellerData != null) {
+                    if (tvSellerName != null) tvSellerName.setText(sellerData.get("displayName").toString());
+                    if (tvSellerRating != null) tvSellerRating.setText("★ " + sellerData.get("rating"));
+                    if (tvMemberSince != null) tvMemberSince.setText("Member since " + sellerData.get("memberSince"));
                 }
+
+                Log.d(TAG, "✅ Product data displayed");
             }
-
-            // Check if user owns this product
-            checkOwnership();
-
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error displaying backend data", e);
+            Log.e(TAG, "❌ Error displaying product data", e);
             displaySampleData();
         }
     }
 
     private void displaySampleData() {
-        if (productTitle != null) {
-            tvTitle.setText(productTitle);
-        }
-        if (productPrice != null) {
-            tvPrice.setText(productPrice);
-        }
+        // Sample data for preview
+        if (tvTitle != null) tvTitle.setText(productTitle != null ? productTitle : "Sample Product");
+        if (tvPrice != null) tvPrice.setText(productPrice != null ? productPrice : "250,000 VNĐ");
+        if (tvDescription != null) tvDescription.setText("This is a sample product description. Perfect condition, barely used.");
+        if (tvLocation != null) tvLocation.setText("Ho Chi Minh City, Vietnam");
+        if (tvCondition != null) tvCondition.setText("Like New");
+        if (tvSellerName != null) tvSellerName.setText("John Doe");
+        if (tvSellerRating != null) tvSellerRating.setText("★ 4.8");
+        if (tvMemberSince != null) tvMemberSince.setText("Member since 2023");
 
-        tvDescription.setText("Premium product in excellent condition. Well maintained and comes with original packaging. Perfect for anyone looking for quality at an affordable price.");
-        tvLocation.setText("📍 Ho Chi Minh City, Vietnam");
-        tvCondition.setText("Condition: Like New");
-        tvSellerName.setText("Seller Name");
-        tvSellerRating.setText("⭐ 4.8 (124 reviews)");
-        tvMemberSince.setText("Member since 2023");
-
-        // Default placeholder image
-        ivProductImage.setImageResource(R.drawable.ic_placeholder_image);
-    }
-
-    private String formatCondition(String condition) {
-        if (condition == null) return "Unknown";
-
-        switch (condition.toUpperCase()) {
-            case "NEW": return "New";
-            case "LIKE_NEW": return "Like New";
-            case "GOOD": return "Good";
-            case "FAIR": return "Fair";
-            case "POOR": return "Poor";
-            default: return condition.replace("_", " ");
-        }
-    }
-
-    private void checkOwnership() {
-        try {
-            if (productData == null) return;
-
-            Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
-            if (sellerData != null) {
-                Long sellerId = ((Number) sellerData.get("id")).longValue();
-                Long currentUserId = prefsManager.getUserId();
-
-                if (sellerId.equals(currentUserId)) {
-                    // User owns this product - change button text
-                    btnMakeOffer.setText("🛠️ Edit Listing");
-                    btnContact.setText("📊 View Analytics");
-                } else {
-                    // Show normal actions for other users
-                    btnMakeOffer.setText("💰 Make Offer");
-                    btnContact.setText("💬 Contact Seller");
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error checking ownership", e);
-        }
+        Log.d(TAG, "✅ Sample data displayed");
     }
 
     private void setupListeners() {
-        btnContact.setOnClickListener(v -> contactSeller());
-        btnMakeOffer.setOnClickListener(v -> makeOffer());
+        if (btnContact != null) {
+            btnContact.setOnClickListener(v -> contactSeller());
+        }
+
+        if (btnMakeOffer != null) {
+            btnMakeOffer.setOnClickListener(v -> makeOffer());
+        }
 
         if (btnViewProfile != null) {
             btnViewProfile.setOnClickListener(v -> viewSellerProfile());
@@ -289,18 +221,19 @@ public class ProductDetailActivity extends AppCompatActivity {
         }
     }
 
-    // 🔥 CONTACT SELLER
+    // ✅ FIXED: Complete contact seller functionality
     private void contactSeller() {
         try {
             if (productData != null) {
+                @SuppressWarnings("unchecked")
                 Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
                 if (sellerData != null) {
                     Long sellerId = ((Number) sellerData.get("id")).longValue();
                     Long currentUserId = prefsManager.getUserId();
 
                     if (sellerId.equals(currentUserId)) {
-                        // User owns product - show analytics
-                        Toast.makeText(this, "Analytics feature coming soon! 📊", Toast.LENGTH_SHORT).show();
+                        // User owns product - show edit option
+                        Toast.makeText(this, "This is your product! Edit listing feature coming soon 📊", Toast.LENGTH_SHORT).show();
                     } else {
                         // Contact seller - start conversation
                         startConversationWithSeller(sellerId);
@@ -316,10 +249,60 @@ public class ProductDetailActivity extends AppCompatActivity {
         }
     }
 
-    // 🔥 MAKE OFFER
+    // ✅ NEW: Start conversation with seller
+    private void startConversationWithSeller(Long sellerId) {
+        Long currentUserId = prefsManager.getUserId();
+        if (currentUserId == null || currentUserId <= 0) {
+            Toast.makeText(this, "Please login to chat with seller", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (sellerId.equals(currentUserId)) {
+            Toast.makeText(this, "You cannot chat with yourself", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Create conversation via API
+        Map<String, Object> conversationData = new HashMap<>();
+        conversationData.put("productId", productId);
+        conversationData.put("buyerId", currentUserId);
+
+        ApiClient.getApiService().createConversation(conversationData).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    Map<String, Object> conversation = response.body().getData();
+                    Long conversationId = ((Number) conversation.get("id")).longValue();
+
+                    // Open ChatActivity
+                    Intent intent = new Intent(ProductDetailActivity.this, ChatActivity.class);
+                    intent.putExtra("conversation_id", conversationId);
+                    intent.putExtra("product_id", productId);
+                    intent.putExtra("product_title", productTitle);
+                    intent.putExtra("seller_id", sellerId);
+                    startActivity(intent);
+
+                    Log.d(TAG, "✅ Conversation created: " + conversationId);
+                } else {
+                    Toast.makeText(ProductDetailActivity.this, "Failed to start conversation", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "❌ Failed to create conversation");
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                Toast.makeText(ProductDetailActivity.this, "Network error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "❌ Conversation API error", t);
+            }
+        });
+    }
+
+    // ✅ FIXED: Complete make offer functionality
     private void makeOffer() {
         try {
             if (productData != null) {
+                @SuppressWarnings("unchecked")
                 Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
                 if (sellerData != null) {
                     Long sellerId = ((Number) sellerData.get("id")).longValue();
@@ -342,74 +325,18 @@ public class ProductDetailActivity extends AppCompatActivity {
         }
     }
 
-    private void startConversationWithSeller(Long sellerId) {
-        // TODO: Implement conversation with specific seller
-        Toast.makeText(this, "Starting conversation with seller... 💬", Toast.LENGTH_SHORT).show();
-
-        // For now, just show a dialog with contact info
-        if (productData != null) {
-            Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
-            if (sellerData != null) {
-                String contactInfo = (String) sellerData.get("contactInfo");
-                if (contactInfo != null && !contactInfo.isEmpty()) {
-                    showContactInfoDialog(contactInfo);
-                } else {
-                    Toast.makeText(this, "Contact info not available", Toast.LENGTH_SHORT).show();
-                }
-            }
-        }
-    }
-
-    private void showContactInfoDialog(String contactInfo) {
-        androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
-        builder.setTitle("Contact Seller");
-        builder.setMessage("Contact information:\n" + contactInfo);
-
-        builder.setPositiveButton("Call", (dialog, which) -> {
-            try {
-                Intent intent = new Intent(Intent.ACTION_DIAL);
-                intent.setData(Uri.parse("tel:" + contactInfo));
-                startActivity(intent);
-            } catch (Exception e) {
-                Toast.makeText(this, "Unable to make call", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        builder.setNeutralButton("Message", (dialog, which) -> {
-            try {
-                Intent intent = new Intent(Intent.ACTION_SENDTO);
-                intent.setData(Uri.parse("smsto:" + contactInfo));
-                intent.putExtra("sms_body", "Hi, I'm interested in your product: " + tvTitle.getText());
-                startActivity(intent);
-            } catch (Exception e) {
-                Toast.makeText(this, "Unable to send message", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
-    }
-
-    // 🔥 MAKE OFFER DIALOG
     private void showMakeOfferDialog() {
         BottomSheetDialog dialog = new BottomSheetDialog(this);
-        View view = getLayoutInflater().inflate(R.layout.bottom_sheet_make_offer, null);
+        View view = getLayoutInflater().inflate(R.layout.dialog_make_offer, null);
 
-        TextView tvCurrentPrice = view.findViewById(R.id.tv_current_price);
         TextInputEditText etOfferAmount = view.findViewById(R.id.et_offer_amount);
         TextInputEditText etOfferMessage = view.findViewById(R.id.et_offer_message);
+        TextView tvCurrentPrice = view.findViewById(R.id.tv_current_price);
         Button btnSubmitOffer = view.findViewById(R.id.btn_submit_offer);
         Button btnCancel = view.findViewById(R.id.btn_cancel);
 
-        // Set current price as hint
-        if (productData != null) {
-            Object priceObj = productData.get("price");
-            if (priceObj instanceof Number) {
-                double currentPrice = ((Number) priceObj).doubleValue();
-                tvCurrentPrice.setText("Current Price: " + String.format("%,.0f VNĐ", currentPrice));
-                etOfferAmount.setHint("Enter your offer...");
-            }
-        } else {
+        // Set current price
+        if (tvCurrentPrice != null) {
             tvCurrentPrice.setText("Current Price: " + (productPrice != null ? productPrice : "N/A"));
         }
 
@@ -444,7 +371,6 @@ public class ProductDetailActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    // 🔥 SUBMIT OFFER TO BACKEND
     private void submitOffer(BigDecimal offerAmount, String message) {
         Map<String, Object> offerData = new HashMap<>();
         offerData.put("productId", productId);
@@ -462,6 +388,7 @@ public class ProductDetailActivity extends AppCompatActivity {
 
     private void viewSellerProfile() {
         if (productData != null) {
+            @SuppressWarnings("unchecked")
             Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
             if (sellerData != null) {
                 Long sellerId = ((Number) sellerData.get("id")).longValue();
@@ -501,6 +428,17 @@ public class ProductDetailActivity extends AppCompatActivity {
 
         // TODO: Implement save/unsave API call
         Log.d(TAG, "Product save status: " + isProductSaved);
+    }
+
+    private String formatPrice(Object price) {
+        try {
+            if (price instanceof Number) {
+                return String.format("%,.0f VNĐ", ((Number) price).doubleValue());
+            }
+            return price.toString();
+        } catch (Exception e) {
+            return "N/A";
+        }
     }
 
     @Override

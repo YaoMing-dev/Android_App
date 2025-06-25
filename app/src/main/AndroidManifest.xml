@@ -49,8 +49,7 @@
         <activity
             android:name=".ui.search.CategoryProductsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <!-- 🔥 ADD: AllProductsActivity -->
         <activity

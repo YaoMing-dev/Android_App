@@ -146,17 +146,33 @@ public class MessagesFragment extends Fragment implements ChatWebSocketClient.We
     }
 
     private void connectWebSocket() {
-        if (webSocketClient != null && !webSocketClient.isOpen()) {
-            try {
-                Log.d(TAG, "🔌 Connecting WebSocket...");
-                webSocketClient.connect();
-            } catch (IllegalStateException e) {
-                Log.e(TAG, "❌ Failed to connect WebSocket", e);
-                // Create new WebSocket client if the old one is not reusable
-                initWebSocketIfNeeded();
-            } catch (Exception e) {
-                Log.e(TAG, "❌ Failed to connect WebSocket", e);
+        try {
+            if (currentUserId == null || currentUserId <= 0) {
+                Log.w(TAG, "❌ Cannot connect WebSocket - invalid user ID");
+                return;
             }
+
+            // ✅ FIX: Đóng WebSocket cũ trước khi tạo mới
+            if (webSocketClient != null) {
+                try {
+                    webSocketClient.close();
+                } catch (Exception e) {
+                    Log.w(TAG, "Error closing old WebSocket", e);
+                }
+                webSocketClient = null;
+            }
+
+            String wsUrl = "ws://10.0.2.2:8080/ws/chat/" + currentUserId;
+            URI serverUri = URI.create(wsUrl);
+
+            // ✅ Tạo WebSocket mới mỗi lần
+            webSocketClient = new ChatWebSocketClient(serverUri, this);
+            webSocketClient.connect();
+
+            Log.d(TAG, "✅ WebSocket initialized for user: " + currentUserId);
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to connect WebSocket", e);
         }
     }
 
