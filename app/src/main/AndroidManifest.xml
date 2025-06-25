@@ -8,9 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-
-    <!-- Remove camera permission for now -->
-    <!-- <uses-permission android:name="android.permission.CAMERA" /> -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -41,17 +39,24 @@
             android:exported="true"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
-        <!-- Product Activities -->
+        <!-- 🔥 FIX: Product Activities - Change to NoActionBar -->
         <activity
             android:name=".ui.product.ProductDetailActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
-        <!-- Category Products Activity -->
+        <!-- 🔥 FIX: Search Activities - Change to NoActionBar -->
         <activity
             android:name=".ui.search.CategoryProductsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- 🔥 ADD: AllProductsActivity -->
+        <activity
+            android:name=".ui.search.AllProductsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
     </application>

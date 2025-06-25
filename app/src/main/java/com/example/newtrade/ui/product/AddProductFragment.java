@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/newtrade/ui/product/AddProductFragment.java - TOÀN BỘ
 package com.example.newtrade.ui.product;
 
 import android.Manifest;
@@ -34,6 +35,7 @@ import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Category;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.ui.auth.LoginActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
@@ -45,7 +47,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,13 +66,9 @@ public class AddProductFragment extends Fragment {
     private static final int REQUEST_IMAGE_PICK = 1001;
     private static final int REQUEST_LOCATION_PERMISSION = 1002;
 
-    // Price limits according to database DECIMAL(12,2)
-    private static final BigDecimal MAX_PRICE = new BigDecimal("9999999999.99");
-    private static final BigDecimal MIN_PRICE = new BigDecimal("0");
-
     // UI Components
     private ImageView ivProductImage;
-    private TextInputEditText etTitle, etDescription, etPrice, etLocation, etTags;
+    private TextInputEditText etTitle, etDescription, etPrice, etLocation;
     private Spinner spinnerCategory, spinnerCondition;
     private MaterialCheckBox cbNegotiable;
     private Button btnSelectImage, btnGetLocation, btnPublish;
@@ -110,7 +107,6 @@ public class AddProductFragment extends Fragment {
             etDescription = view.findViewById(R.id.et_description);
             etPrice = view.findViewById(R.id.et_price);
             etLocation = view.findViewById(R.id.et_location);
-            etTags = view.findViewById(R.id.et_tags);
             spinnerCategory = view.findViewById(R.id.spinner_category);
             spinnerCondition = view.findViewById(R.id.spinner_condition);
             cbNegotiable = view.findViewById(R.id.cb_negotiable);
@@ -163,22 +159,16 @@ public class AddProductFragment extends Fragment {
     private void loadSampleCategories() {
         categories.clear();
         categories.add(new Category(1L, "Electronics", "Phones, laptops, gadgets", "smartphone", true));
-        categories.add(new Category(2L, "Fashion", "Clothing, shoes, accessories", "shirt", true));
+        categories.add(new Category(2L, "Fashion", "Clothes, shoes, accessories", "shirt", true));
         categories.add(new Category(3L, "Home & Garden", "Furniture, appliances", "home", true));
-        categories.add(new Category(4L, "Sports", "Exercise equipment, outdoor gear", "dumbbell", true));
-        categories.add(new Category(5L, "Books", "Books and educational materials", "book", true));
-        categories.add(new Category(6L, "Vehicles", "Cars, motorcycles, parts", "car", true));
-        categories.add(new Category(7L, "Beauty", "Cosmetics, health products", "heart", true));
-        categories.add(new Category(8L, "Toys", "Toys and kids items", "toys", true));
-
+        categories.add(new Category(4L, "Sports", "Sports equipment", "football", true));
+        categories.add(new Category(5L, "Books", "Books and education", "book", true));
         setupCategorySpinner();
-        Log.d(TAG, "✅ Loaded sample categories");
     }
 
     private void setupCategorySpinner() {
         List<String> categoryNames = new ArrayList<>();
-        categoryNames.add("Select Category");
-
+        categoryNames.add("Select Category"); // Placeholder
         for (Category category : categories) {
             categoryNames.add(category.getName());
         }
@@ -190,11 +180,11 @@ public class AddProductFragment extends Fragment {
     }
 
     private void setupConditionSpinner() {
-        String[] conditions = {"Select Condition", "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+        String[] conditions = {"Select Condition", "New", "Like New", "Good", "Fair", "Poor"};
+        ArrayAdapter<String> conditionAdapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, conditions);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerCondition.setAdapter(adapter);
+        conditionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerCondition.setAdapter(conditionAdapter);
     }
 
     private void setupListeners() {
@@ -207,19 +197,44 @@ public class AddProductFragment extends Fragment {
         }
 
         if (btnPublish != null) {
-            btnPublish.setOnClickListener(v -> publishProduct());
+            btnPublish.setOnClickListener(v -> validateAndPublish());
         }
+    }
+
+    // 🔥 FIX: Validate and check user login first
+    private void validateAndPublish() {
+        // Check if user is logged in first
+        Long userId = prefsManager.getUserId();
+        if (userId == null || userId <= 0) {
+            Log.e(TAG, "❌ User not logged in, cannot publish product");
+            showError("Vui lòng đăng nhập để đăng sản phẩm");
+
+            // Navigate to login
+            Intent loginIntent = new Intent(getActivity(), LoginActivity.class);
+            startActivity(loginIntent);
+            return;
+        }
+
+        Log.d(TAG, "✅ User logged in: " + userId + ", proceeding with validation");
+
+        if (!validateForm()) {
+            return;
+        }
+
+        publishProduct();
     }
 
     private boolean validateForm() {
         // Title validation
-        if (TextUtils.isEmpty(getTextFromEditText(etTitle))) {
+        String title = getTextFromEditText(etTitle);
+        if (TextUtils.isEmpty(title)) {
             setErrorAndFocus(etTitle, "Title is required");
             return false;
         }
 
         // Description validation
-        if (TextUtils.isEmpty(getTextFromEditText(etDescription))) {
+        String description = getTextFromEditText(etDescription);
+        if (TextUtils.isEmpty(description)) {
             setErrorAndFocus(etDescription, "Description is required");
             return false;
         }
@@ -233,71 +248,96 @@ public class AddProductFragment extends Fragment {
 
         try {
             BigDecimal price = new BigDecimal(priceStr);
-
-            if (price.compareTo(MIN_PRICE) < 0) {
-                setErrorAndFocus(etPrice, "Price cannot be negative");
+            if (price.compareTo(BigDecimal.ZERO) <= 0) {
+                setErrorAndFocus(etPrice, "Price must be greater than 0");
                 return false;
             }
-
-            if (price.compareTo(MAX_PRICE) > 0) {
-                NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
-                String maxPriceFormatted = formatter.format(MAX_PRICE);
-                setErrorAndFocus(etPrice, "Price cannot exceed " + maxPriceFormatted);
-                Toast.makeText(getContext(),
-                        "Maximum price allowed is " + maxPriceFormatted,
-                        Toast.LENGTH_LONG).show();
-                return false;
-            }
-
-            if (price.scale() > 2) {
-                setErrorAndFocus(etPrice, "Price can have maximum 2 decimal places");
-                return false;
-            }
-
         } catch (NumberFormatException e) {
             setErrorAndFocus(etPrice, "Invalid price format");
             return false;
         }
 
         // Location validation
-        if (TextUtils.isEmpty(getTextFromEditText(etLocation))) {
+        String location = getTextFromEditText(etLocation);
+        if (TextUtils.isEmpty(location)) {
             setErrorAndFocus(etLocation, "Location is required");
             return false;
         }
 
         // Category validation
-        if (spinnerCategory.getSelectedItemPosition() == 0) {
-            Toast.makeText(getContext(), "Please select a category", Toast.LENGTH_SHORT).show();
+        if (spinnerCategory.getSelectedItemPosition() <= 0) {
+            showError("Please select a category");
             return false;
         }
 
         // Condition validation
-        if (spinnerCondition.getSelectedItemPosition() == 0) {
-            Toast.makeText(getContext(), "Please select condition", Toast.LENGTH_SHORT).show();
+        if (spinnerCondition.getSelectedItemPosition() <= 0) {
+            showError("Please select condition");
             return false;
         }
 
         // Image validation
         if (uploadedImageUrl == null) {
-            Toast.makeText(getContext(), "Please select and upload an image first", Toast.LENGTH_SHORT).show();
+            showError("Please select and upload an image first");
             return false;
         }
 
         return true;
     }
 
-    @NonNull
-    private String getTextFromEditText(@Nullable TextInputEditText editText) {
-        if (editText != null && editText.getText() != null) {
-            return editText.getText().toString().trim();
-        }
-        return "";
-    }
+    private void publishProduct() {
+        updatePublishButton("Publishing...", false);
 
-    private void setErrorAndFocus(@Nullable TextInputEditText editText, String error) {
-        if (editText != null) {
-            editText.setError(error);
-            editText.requestFocus();
+        try {
+            Map<String, Object> productData = new HashMap<>();
+            productData.put("title", getTextFromEditText(etTitle));
+            productData.put("description", getTextFromEditText(etDescription));
+
+            String priceStr = getTextFromEditText(etPrice);
+            BigDecimal price = new BigDecimal(priceStr);
+            productData.put("price", price);
+
+            int categoryIndex = spinnerCategory.getSelectedItemPosition();
+            if (categoryIndex > 0 && categoryIndex <= categories.size()) {
+                productData.put("categoryId", categories.get(categoryIndex - 1).getId());
+            }
+
+            String condition = spinnerCondition.getSelectedItem().toString().toUpperCase().replace(" ", "_");
+            productData.put("condition", condition);
+            productData.put("location", getTextFromEditText(etLocation));
+            productData.put("negotiable", cbNegotiable.isChecked());
+            productData.put("imageUrl", uploadedImageUrl);
+
+            Log.d(TAG, "Publishing product: " + productData);
+
+            ApiClient.getApiService().createProduct(productData).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                @Override
+                public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                    updatePublishButton("Publish Product", true);
+
+                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                        Toast.makeText(getContext(), "🎉 Product published successfully! 🎉", Toast.LENGTH_LONG).show();
+                        clearForm();
+                        Log.d(TAG, "✅ Product published successfully");
+                    } else {
+                        String errorMsg = response.body() != null ? response.body().getMessage() : "Unknown error";
+                        showError("Publish failed: " + errorMsg);
+                        Log.e(TAG, "❌ Publish failed: " + errorMsg);
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                    updatePublishButton("Publish Product", true);
+                    showError("Network error: " + t.getMessage());
+                    Log.e(TAG, "❌ Publish network error", t);
+                }
+            });
+
+        } catch (Exception e) {
+            updatePublishButton("Publish Product", true);
+            showError("Error: " + e.getMessage());
+            Log.e(TAG, "❌ Publish error", e);
         }
     }
 
@@ -307,69 +347,6 @@ public class AddProductFragment extends Fragment {
         startActivityForResult(intent, REQUEST_IMAGE_PICK);
     }
 
-    private void getCurrentLocation() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            ActivityCompat.requestPermissions(requireActivity(),
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
-            return;
-        }
-
-        if (btnGetLocation != null) {
-            btnGetLocation.setText("📍 Getting location...");
-            btnGetLocation.setEnabled(false);
-        }
-
-        try {
-            fusedLocationClient.getLastLocation().addOnSuccessListener(location -> {
-                resetLocationButton();
-
-                if (location != null) {
-                    getAddressFromLocation(location.getLatitude(), location.getLongitude());
-                } else {
-                    Toast.makeText(getContext(), "Unable to get current location. Please enter manually.", Toast.LENGTH_LONG).show();
-                }
-            }).addOnFailureListener(e -> {
-                resetLocationButton();
-                Toast.makeText(getContext(), "Failed to get location: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                Log.e(TAG, "❌ Location error", e);
-            });
-        } catch (SecurityException e) {
-            resetLocationButton();
-            Log.e(TAG, "❌ Location permission error", e);
-        }
-    }
-
-    private void resetLocationButton() {
-        if (btnGetLocation != null) {
-            btnGetLocation.setText("📍 Get Location");
-            btnGetLocation.setEnabled(true);
-        }
-    }
-
-    private void getAddressFromLocation(double latitude, double longitude) {
-        try {
-            Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
-            List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
-
-            if (addresses != null && !addresses.isEmpty()) {
-                Address address = addresses.get(0);
-                String fullAddress = address.getAddressLine(0);
-                if (fullAddress != null && etLocation != null) {
-                    etLocation.setText(fullAddress);
-                    Toast.makeText(getContext(), "📍 Location detected", Toast.LENGTH_SHORT).show();
-                    Log.d(TAG, "✅ Location detected: " + fullAddress);
-                }
-            } else {
-                Toast.makeText(getContext(), "Unable to determine address", Toast.LENGTH_SHORT).show();
-            }
-        } catch (IOException e) {
-            Log.e(TAG, "❌ Geocoder error", e);
-            Toast.makeText(getContext(), "Geocoder service unavailable", Toast.LENGTH_SHORT).show();
-        }
-    }
-
     @Override
     public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -377,16 +354,31 @@ public class AddProductFragment extends Fragment {
         if (requestCode == REQUEST_IMAGE_PICK && resultCode == Activity.RESULT_OK && data != null) {
             selectedImageUri = data.getData();
             if (selectedImageUri != null) {
-                // Show selected image immediately
-                if (ivProductImage != null) {
-                    Glide.with(this)
-                            .load(selectedImageUri)
-                            .centerCrop()
-                            .into(ivProductImage);
-                }
+                Log.d(TAG, "✅ Image selected: " + selectedImageUri);
 
-                // Upload image to backend
+                // 🔥 FIX: Show selected image immediately
+                displaySelectedImage();
+
+                // Then upload to backend
                 uploadImageToBackend();
+            }
+        }
+    }
+
+    // 🔥 FIX: Display selected image immediately
+    private void displaySelectedImage() {
+        if (selectedImageUri != null && ivProductImage != null) {
+            try {
+                Glide.with(this)
+                        .load(selectedImageUri)
+                        .centerCrop()
+                        .placeholder(R.drawable.ic_placeholder_image)
+                        .error(R.drawable.ic_placeholder_image)
+                        .into(ivProductImage);
+
+                Log.d(TAG, "✅ Selected image displayed");
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error displaying image", e);
             }
         }
     }
@@ -395,73 +387,54 @@ public class AddProductFragment extends Fragment {
         if (selectedImageUri == null || isUploading) return;
 
         isUploading = true;
-        updateImageButton("Uploading...", false);
+        updateImageButton("⏳ Uploading...", false);
 
         try {
-            File file = createFileFromUri(selectedImageUri);
-            if (file == null) {
+            File imageFile = createFileFromUri(selectedImageUri);
+            if (imageFile == null) {
                 resetImageButton();
-                Toast.makeText(getContext(), "Failed to process selected image", Toast.LENGTH_SHORT).show();
+                showError("Failed to prepare image file");
                 return;
             }
 
-            RequestBody requestFile = RequestBody.create(MediaType.parse("image/*"), file);
-            MultipartBody.Part body = MultipartBody.Part.createFormData("file", file.getName(), requestFile);
+            RequestBody requestFile = RequestBody.create(MediaType.parse("image/*"), imageFile);
+            MultipartBody.Part imagePart = MultipartBody.Part.createFormData("file", imageFile.getName(), requestFile);
 
-            ApiClient.getApiService().uploadProductImage(body).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+            ApiClient.getApiService().uploadProductImage(imagePart).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
                 @Override
                 public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Response<StandardResponse<Map<String, String>>> response) {
-                    resetImageButton();
+                    isUploading = false;
 
                     if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                         Map<String, String> data = response.body().getData();
-                        if (data != null) {
+                        if (data != null && data.containsKey("imageUrl")) {
                             uploadedImageUrl = data.get("imageUrl");
-                            updateImageButton("✅ Image Uploaded", true);
+                            updateImageButton("✅ Image Ready", true);
                             Toast.makeText(getContext(), "Image uploaded successfully!", Toast.LENGTH_SHORT).show();
-                            Log.d(TAG, "✅ Image uploaded: " + uploadedImageUrl);
+                            Log.d(TAG, "✅ Image uploaded successfully: " + uploadedImageUrl);
                         }
                     } else {
-                        Toast.makeText(getContext(), "Failed to upload image", Toast.LENGTH_SHORT).show();
-                        Log.e(TAG, "❌ Image upload failed");
-                    }
-
-                    if (file.exists()) {
-                        boolean deleted = file.delete();
-                        Log.d(TAG, "Temp file deleted: " + deleted);
+                        resetImageButton();
+                        showError("Image upload failed: " + response.code());
+                        Log.e(TAG, "❌ Image upload failed: " + response.code());
                     }
                 }
 
                 @Override
                 public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
+                    isUploading = false;
                     resetImageButton();
-                    Toast.makeText(getContext(), "Upload error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                    showError("Upload error: " + t.getMessage());
                     Log.e(TAG, "❌ Image upload error", t);
-
-                    if (file.exists()) {
-                        boolean deleted = file.delete();
-                        Log.d(TAG, "Temp file deleted: " + deleted);
-                    }
                 }
             });
 
         } catch (Exception e) {
+            isUploading = false;
             resetImageButton();
-            Toast.makeText(getContext(), "Error preparing image: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            showError("Error preparing image: " + e.getMessage());
             Log.e(TAG, "❌ Image preparation error", e);
         }
-    }
-
-    private void updateImageButton(String text, boolean enabled) {
-        if (btnSelectImage != null) {
-            btnSelectImage.setText(text);
-            btnSelectImage.setEnabled(enabled);
-        }
-    }
-
-    private void resetImageButton() {
-        updateImageButton("📷 Select Image", true);
-        isUploading = false;
     }
 
     @Nullable
@@ -511,73 +484,98 @@ public class AddProductFragment extends Fragment {
                 }
             }
         }
-        return result != null ? result : "image.jpg";
+        return result != null ? result : "image_" + System.currentTimeMillis() + ".jpg";
     }
 
-    private void publishProduct() {
-        if (!validateForm()) {
+    private void getCurrentLocation() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
             return;
         }
 
-        updatePublishButton("Publishing...", false);
+        if (btnGetLocation != null) {
+            btnGetLocation.setText("📍 Getting location...");
+            btnGetLocation.setEnabled(false);
+        }
 
         try {
-            Map<String, Object> productData = new HashMap<>();
-            productData.put("title", getTextFromEditText(etTitle));
-            productData.put("description", getTextFromEditText(etDescription));
-
-            String priceStr = getTextFromEditText(etPrice);
-            BigDecimal price = new BigDecimal(priceStr);
-            productData.put("price", price);
-
-            int categoryIndex = spinnerCategory.getSelectedItemPosition();
-            if (categoryIndex > 0 && categoryIndex <= categories.size()) {
-                productData.put("categoryId", categories.get(categoryIndex - 1).getId());
-            }
-
-            productData.put("condition", spinnerCondition.getSelectedItem().toString());
-            productData.put("location", getTextFromEditText(etLocation));
-
-            List<String> imageUrls = new ArrayList<>();
-            imageUrls.add(uploadedImageUrl);
-            productData.put("imageUrls", imageUrls);
-
-            String tags = getTextFromEditText(etTags);
-            if (!TextUtils.isEmpty(tags)) {
-                productData.put("tags", tags);
-            }
-
-            Log.d(TAG, "Publishing product: " + productData);
-
-            ApiClient.getApiService().createProduct(productData).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                @Override
-                public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                    updatePublishButton("Publish Product", true);
-
-                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                        Toast.makeText(getContext(), "🎉 Product published successfully! 🎉", Toast.LENGTH_LONG).show();
-                        clearForm();
-                        Log.d(TAG, "✅ Product published successfully");
-                    } else {
-                        String errorMsg = response.body() != null ? response.body().getMessage() : "Unknown error";
-                        Toast.makeText(getContext(), "❌ Publish failed: " + errorMsg, Toast.LENGTH_LONG).show();
-                        Log.e(TAG, "❌ Publish failed: " + errorMsg);
-                    }
-                }
-
-                @Override
-                public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                    updatePublishButton("Publish Product", true);
-                    Toast.makeText(getContext(), "❌ Network error: " + t.getMessage(), Toast.LENGTH_LONG).show();
-                    Log.e(TAG, "❌ Publish network error", t);
-                }
-            });
-
-        } catch (Exception e) {
-            updatePublishButton("Publish Product", true);
-            Toast.makeText(getContext(), "❌ Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            Log.e(TAG, "❌ Publish error", e);
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(location -> {
+                        resetLocationButton();
+                        if (location != null) {
+                            getAddressFromLocation(location.getLatitude(), location.getLongitude());
+                        } else {
+                            showError("Unable to get current location. Please enter manually.");
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        resetLocationButton();
+                        showError("Failed to get location: " + e.getMessage());
+                        Log.e(TAG, "❌ Location error", e);
+                    });
+        } catch (SecurityException e) {
+            resetLocationButton();
+            Log.e(TAG, "❌ Location permission error", e);
         }
+    }
+
+    private void getAddressFromLocation(double latitude, double longitude) {
+        try {
+            Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
+            List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+
+            if (addresses != null && !addresses.isEmpty()) {
+                Address address = addresses.get(0);
+                String fullAddress = address.getAddressLine(0);
+                if (fullAddress != null && etLocation != null) {
+                    etLocation.setText(fullAddress);
+                    Toast.makeText(getContext(), "📍 Location detected", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "✅ Location detected: " + fullAddress);
+                }
+            } else {
+                showError("Unable to determine address");
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "❌ Geocoder error", e);
+            showError("Geocoder service unavailable");
+        }
+    }
+
+    // Helper methods
+    @NonNull
+    private String getTextFromEditText(@Nullable TextInputEditText editText) {
+        if (editText != null && editText.getText() != null) {
+            return editText.getText().toString().trim();
+        }
+        return "";
+    }
+
+    private void setErrorAndFocus(@Nullable TextInputEditText editText, String error) {
+        if (editText != null) {
+            editText.setError(error);
+            editText.requestFocus();
+        }
+    }
+
+    private void showError(String message) {
+        if (getContext() != null) {
+            Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
+        }
+        Log.e(TAG, "Error: " + message);
+    }
+
+    private void updateImageButton(String text, boolean enabled) {
+        if (btnSelectImage != null) {
+            btnSelectImage.setText(text);
+            btnSelectImage.setEnabled(enabled);
+        }
+    }
+
+    private void resetImageButton() {
+        updateImageButton("📷 Select Image", true);
+        isUploading = false;
     }
 
     private void updatePublishButton(String text, boolean enabled) {
@@ -587,16 +585,22 @@ public class AddProductFragment extends Fragment {
         }
     }
 
+    private void resetLocationButton() {
+        if (btnGetLocation != null) {
+            btnGetLocation.setText("📍 Get Location");
+            btnGetLocation.setEnabled(true);
+        }
+    }
+
     private void clearForm() {
         if (etTitle != null) etTitle.setText("");
         if (etDescription != null) etDescription.setText("");
         if (etPrice != null) etPrice.setText("");
         if (etLocation != null) etLocation.setText("");
-        if (etTags != null) etTags.setText("");
         if (spinnerCategory != null) spinnerCategory.setSelection(0);
         if (spinnerCondition != null) spinnerCondition.setSelection(0);
         if (cbNegotiable != null) cbNegotiable.setChecked(false);
-        if (ivProductImage != null) ivProductImage.setImageResource(R.drawable.ic_add_photo_placeholder);
+        if (ivProductImage != null) ivProductImage.setImageResource(R.drawable.ic_placeholder_image);
 
         resetImageButton();
         selectedImageUri = null;
@@ -611,7 +615,7 @@ public class AddProductFragment extends Fragment {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 getCurrentLocation();
             } else {
-                Toast.makeText(getContext(), "Location permission denied", Toast.LENGTH_SHORT).show();
+                showError("Location permission denied");
             }
         }
     }

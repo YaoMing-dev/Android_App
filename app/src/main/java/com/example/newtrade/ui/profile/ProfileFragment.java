@@ -1,4 +1,4 @@
-// File: app/src/main/java/com/example/newtrade/ui/profile/ProfileFragment.java
+// app/src/main/java/com/example/newtrade/ui/profile/ProfileFragment.java - TOÀN BỘ
 package com.example.newtrade.ui.profile;
 
 import android.content.Intent;
@@ -7,7 +7,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -154,143 +153,198 @@ public class ProfileFragment extends Fragment {
             return;
         }
 
+        // TODO: Uncomment when user profile API is ready
+        /*
         ApiClient.getApiService().getUserProfile(userId).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                        userProfile = response.body().getData();
-                        displayBackendUserProfile();
-                        Log.d(TAG, "✅ User profile loaded from backend");
-                    } else {
-                        Log.w(TAG, "❌ Failed to load user profile from backend");
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error parsing user profile", e);
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    userProfile = response.body().getData();
+                    displayUserProfile();
+                    Log.d(TAG, "✅ User profile loaded from backend");
+                } else {
+                    Log.e(TAG, "❌ Failed to load user profile");
                 }
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                Log.e(TAG, "❌ User profile API call failed", t);
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "❌ User profile API error", t);
             }
         });
+        */
     }
 
     private void displayCurrentUserInfo() {
-        // Display from SharedPrefs
+        // Display info from SharedPrefs
         String displayName = prefsManager.getUserName();
         String email = prefsManager.getUserEmail();
 
-        if (tvDisplayName != null && displayName != null) {
+        if (tvDisplayName != null && displayName != null && !displayName.isEmpty()) {
             tvDisplayName.setText(displayName);
+        } else if (tvDisplayName != null) {
+            tvDisplayName.setText("User");
         }
 
-        if (tvEmail != null && email != null) {
+        if (tvEmail != null && email != null && !email.isEmpty()) {
             tvEmail.setText(email);
+        } else if (tvEmail != null) {
+            tvEmail.setText("No email");
         }
 
         if (tvMemberSince != null) {
             tvMemberSince.setText("Member since 2024");
         }
 
-        // Default stats
+        // Set mock statistics
         if (tvListingsCount != null) tvListingsCount.setText("0");
         if (tvSoldCount != null) tvSoldCount.setText("0");
         if (tvBoughtCount != null) tvBoughtCount.setText("0");
     }
 
-    private void displayBackendUserProfile() {
+    private void displayUserProfile() {
+        if (userProfile == null) return;
+
         try {
-            if (userProfile == null) return;
-
-            // Basic info
-            String displayName = (String) userProfile.get("displayName");
-            if (displayName != null && tvDisplayName != null) {
-                tvDisplayName.setText(displayName);
+            // Update UI with backend data
+            if (userProfile.containsKey("displayName")) {
+                String displayName = userProfile.get("displayName").toString();
+                if (tvDisplayName != null) tvDisplayName.setText(displayName);
             }
 
-            String email = (String) userProfile.get("email");
-            if (email != null && tvEmail != null) {
-                tvEmail.setText(email);
+            if (userProfile.containsKey("email")) {
+                String email = userProfile.get("email").toString();
+                if (tvEmail != null) tvEmail.setText(email);
             }
 
-            // Profile picture
-            String profilePicture = (String) userProfile.get("profilePicture");
-            if (profilePicture != null && !profilePicture.isEmpty() && ivProfilePicture != null) {
-                Glide.with(this)
-                        .load(profilePicture)
-                        .placeholder(R.drawable.ic_person)
-                        .error(R.drawable.ic_person)
-                        .circleCrop()
-                        .into(ivProfilePicture);
-            }
-
-            // Member since
-            String createdAt = (String) userProfile.get("createdAt");
-            if (createdAt != null && tvMemberSince != null) {
-                try {
-                    String year = createdAt.substring(0, 4);
-                    tvMemberSince.setText("Member since " + year);
-                } catch (Exception e) {
-                    tvMemberSince.setText("Member since 2024");
+            if (userProfile.containsKey("profilePicture")) {
+                String profilePicture = userProfile.get("profilePicture").toString();
+                if (profilePicture != null && !profilePicture.isEmpty() && ivProfilePicture != null) {
+                    Glide.with(this)
+                            .load(profilePicture)
+                            .placeholder(R.drawable.ic_person_placeholder)
+                            .error(R.drawable.ic_person_placeholder)
+                            .into(ivProfilePicture);
                 }
             }
 
-            // Stats
-            Object totalTransactionsObj = userProfile.get("totalTransactions");
-            if (totalTransactionsObj instanceof Number && tvSoldCount != null) {
-                int totalTransactions = ((Number) totalTransactionsObj).intValue();
-                tvSoldCount.setText(String.valueOf(totalTransactions));
+            // Update statistics if available
+            if (userProfile.containsKey("stats")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> stats = (Map<String, Object>) userProfile.get("stats");
+
+                if (stats != null) {
+                    if (tvListingsCount != null) {
+                        tvListingsCount.setText(stats.getOrDefault("totalListings", "0").toString());
+                    }
+                    if (tvSoldCount != null) {
+                        tvSoldCount.setText(stats.getOrDefault("totalSold", "0").toString());
+                    }
+                    if (tvBoughtCount != null) {
+                        tvBoughtCount.setText(stats.getOrDefault("totalBought", "0").toString());
+                    }
+                }
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error displaying backend user profile", e);
+            Log.e(TAG, "❌ Error displaying user profile", e);
         }
     }
 
-    // Navigation methods - 🔥 SIMPLIFY TO AVOID MISSING ACTIVITIES
+    // 🔥 FIX: Implement all menu functions
     private void openEditProfile() {
+        Log.d(TAG, "Opening Edit Profile");
         Toast.makeText(getContext(), "Edit profile feature coming soon! ✏️", Toast.LENGTH_SHORT).show();
+        // TODO: Create EditProfileActivity
+        /*
+        Intent intent = new Intent(getActivity(), EditProfileActivity.class);
+        startActivity(intent);
+        */
     }
 
     private void openMyListings() {
+        Log.d(TAG, "Opening My Listings");
         Toast.makeText(getContext(), "My listings feature coming soon! 📋", Toast.LENGTH_SHORT).show();
+        // TODO: Create MyListingsActivity
+        /*
+        Intent intent = new Intent(getActivity(), MyListingsActivity.class);
+        startActivity(intent);
+        */
     }
 
     private void openSavedItems() {
+        Log.d(TAG, "Opening Saved Items");
         Toast.makeText(getContext(), "Saved items feature coming soon! ❤️", Toast.LENGTH_SHORT).show();
+        // TODO: Create SavedItemsActivity
+        /*
+        Intent intent = new Intent(getActivity(), SavedItemsActivity.class);
+        startActivity(intent);
+        */
     }
 
     private void openPurchaseHistory() {
+        Log.d(TAG, "Opening Purchase History");
         Toast.makeText(getContext(), "Purchase history feature coming soon! 🛒", Toast.LENGTH_SHORT).show();
+        // TODO: Create PurchaseHistoryActivity
+        /*
+        Intent intent = new Intent(getActivity(), PurchaseHistoryActivity.class);
+        startActivity(intent);
+        */
     }
 
     private void openAccountSettings() {
+        Log.d(TAG, "Opening Account Settings");
         Toast.makeText(getContext(), "Account settings feature coming soon! ⚙️", Toast.LENGTH_SHORT).show();
+        // TODO: Create AccountSettingsActivity
+        /*
+        Intent intent = new Intent(getActivity(), AccountSettingsActivity.class);
+        startActivity(intent);
+        */
     }
 
     private void openHelpSupport() {
+        Log.d(TAG, "Opening Help & Support");
         showHelpSupportDialog();
     }
 
     private void openAbout() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("About TradeUp");
-        builder.setMessage("TradeUp v1.0\n\nA platform for buying and selling used items locally.\n\nDeveloped with ❤️");
-        builder.setPositiveButton("OK", null);
-        builder.show();
+        Log.d(TAG, "Opening About");
+        showAboutDialog();
     }
 
     private void showHelpSupportDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Help & Support");
-        builder.setMessage("Need help? Contact us:\n\n📧 support@tradeup.com\n📞 +84 123 456 789\n\nFrequently Asked Questions:\n• How to sell items?\n• How to contact buyers?\n• Payment methods");
+        builder.setMessage("Need help? Contact us:\n\n" +
+                "📧 support@tradeup.com\n" +
+                "📞 +84 123 456 789\n\n" +
+                "Frequently Asked Questions:\n" +
+                "• How to sell items?\n" +
+                "• How to contact buyers?\n" +
+                "• Payment methods\n" +
+                "• Account verification");
+
         builder.setPositiveButton("OK", null);
         builder.setNeutralButton("Contact Support", (dialog, which) -> {
             Toast.makeText(getContext(), "Opening email app... 📧", Toast.LENGTH_SHORT).show();
+            // TODO: Open email intent
         });
+        builder.show();
+    }
+
+    private void showAboutDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("About TradeUp");
+        builder.setMessage("TradeUp v1.0\n\n" +
+                "A platform for buying and selling used items locally.\n\n" +
+                "Features:\n" +
+                "• Buy & sell secondhand items\n" +
+                "• Secure messaging\n" +
+                "• Location-based search\n" +
+                "• Safe transactions\n\n" +
+                "Developed with ❤️ for local communities");
+
+        builder.setPositiveButton("OK", null);
         builder.show();
     }
 
@@ -302,10 +356,14 @@ public class ProfileFragment extends Fragment {
         builder.setItems(options, (dialog, which) -> {
             switch (which) {
                 case 0: // Change Photo
+                    Log.d(TAG, "Change photo selected");
                     Toast.makeText(getContext(), "Change photo feature coming soon! 📸", Toast.LENGTH_SHORT).show();
+                    // TODO: Implement photo picker
                     break;
                 case 1: // Remove Photo
+                    Log.d(TAG, "Remove photo selected");
                     Toast.makeText(getContext(), "Remove photo feature coming soon! 🗑️", Toast.LENGTH_SHORT).show();
+                    // TODO: Implement remove photo
                     break;
                 case 2: // Cancel
                     dialog.dismiss();
@@ -318,24 +376,28 @@ public class ProfileFragment extends Fragment {
 
     private void showLogoutDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Logout");
-        builder.setMessage("Are you sure you want to logout?");
+        builder.setTitle("Sign Out");
+        builder.setMessage("Are you sure you want to sign out of your account?");
 
-        builder.setPositiveButton("Logout", (dialog, which) -> {
-            performLogout();
-        });
-
+        builder.setPositiveButton("Sign Out", (dialog, which) -> performLogout());
         builder.setNegativeButton("Cancel", null);
-        builder.show();
+
+        // Make the positive button red for emphasis
+        AlertDialog dialog = builder.create();
+        dialog.show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(
+                getResources().getColor(R.color.error_color, null));
     }
 
     private void performLogout() {
         try {
-            // Clear user session
-            prefsManager.clearUserSession();
+            Log.d(TAG, "Performing logout");
+
+            // Clear all user data
+            prefsManager.clearUserData();
 
             // Navigate to login
-            Intent intent = new Intent(getContext(), LoginActivity.class);
+            Intent intent = new Intent(getActivity(), LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
 
@@ -343,11 +405,12 @@ public class ProfileFragment extends Fragment {
                 getActivity().finish();
             }
 
-            Toast.makeText(getContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Signed out successfully", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "✅ Logout successful");
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Error during logout", e);
-            Toast.makeText(getContext(), "Logout error", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Error signing out", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -356,5 +419,11 @@ public class ProfileFragment extends Fragment {
         super.onResume();
         // Refresh profile when returning to fragment
         loadUserProfile();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "ProfileFragment destroyed");
     }
 }
