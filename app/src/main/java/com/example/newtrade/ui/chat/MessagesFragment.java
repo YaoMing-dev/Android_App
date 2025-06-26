@@ -1,4 +1,5 @@
 // app/src/main/java/com/example/newtrade/ui/chat/MessagesFragment.java
+// ✅ FIXED - Remove WebSocketListener and fix all errors
 package com.example.newtrade.ui.chat;
 
 import android.content.Intent;
@@ -26,9 +27,7 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Conversation;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.SharedPrefsManager;
-import com.example.newtrade.websocket.ChatWebSocketClient;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +36,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class MessagesFragment extends Fragment implements ChatWebSocketClient.WebSocketListener {
+public class MessagesFragment extends Fragment {
 
     private static final String TAG = "MessagesFragment";
 
@@ -52,10 +51,8 @@ public class MessagesFragment extends Fragment implements ChatWebSocketClient.We
     private final List<Conversation> conversations = new ArrayList<>();
     private SharedPrefsManager prefsManager;
 
-    // 🔥 FIX: Add WebSocket support
-    private ChatWebSocketClient webSocketClient;
+    // ✅ FIX: Remove WebSocket related fields
     private Long currentUserId;
-    private boolean isWebSocketInitialized = false;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -67,164 +64,93 @@ public class MessagesFragment extends Fragment implements ChatWebSocketClient.We
         super.onViewCreated(view, savedInstanceState);
 
         initViews(view);
-        initUtils();
+        initData();
         setupRecyclerView();
         setupListeners();
-
-        // 🔥 FIX: Initialize WebSocket if user is logged in
-        initWebSocketIfNeeded();
-
         loadConversations();
 
-        Log.d(TAG, "MessagesFragment created successfully with WebSocket");
+        Log.d(TAG, "✅ MessagesFragment created");
     }
 
     private void initViews(View view) {
-        try {
-            swipeRefresh = view.findViewById(R.id.swipe_refresh);
-            rvConversations = view.findViewById(R.id.rv_conversations);
-            llEmptyState = view.findViewById(R.id.ll_empty_state);
-            btnStartShopping = view.findViewById(R.id.btn_start_shopping);
-
-            Log.d(TAG, "✅ MessagesFragment views initialized");
-        } catch (Exception e) {
-            Log.w(TAG, "Some MessagesFragment views not found: " + e.getMessage());
-        }
+        swipeRefresh = view.findViewById(R.id.swipe_refresh);
+        rvConversations = view.findViewById(R.id.rv_conversations);
+        llEmptyState = view.findViewById(R.id.ll_empty_state);
+        btnStartShopping = view.findViewById(R.id.btn_start_shopping);
     }
 
-    private void initUtils() {
+    private void initData() {
         prefsManager = SharedPrefsManager.getInstance(requireContext());
         currentUserId = getCurrentUserId();
+
+        Log.d(TAG, "Current user ID: " + currentUserId);
     }
 
     private void setupRecyclerView() {
-        if (rvConversations != null) {
-            conversationAdapter = new ConversationAdapter(conversations, this::openChatActivity);
-            rvConversations.setLayoutManager(new LinearLayoutManager(getContext()));
-            rvConversations.setAdapter(conversationAdapter);
-        }
+        conversationAdapter = new ConversationAdapter(conversations, this::openChatActivity);
+        rvConversations.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvConversations.setAdapter(conversationAdapter);
     }
 
     private void setupListeners() {
-        if (swipeRefresh != null) {
-            swipeRefresh.setOnRefreshListener(this::loadConversations);
-        }
+        swipeRefresh.setOnRefreshListener(this::loadConversations);
 
         if (btnStartShopping != null) {
             btnStartShopping.setOnClickListener(v -> {
-                Toast.makeText(getContext(), "Navigate to shop", Toast.LENGTH_SHORT).show();
+                // Navigate to home or search
+                Toast.makeText(requireContext(), "Let's start shopping!", Toast.LENGTH_SHORT).show();
             });
         }
     }
 
-    // 🔥 FIX: WebSocket Implementation
-    private void initWebSocketIfNeeded() {
-        if (currentUserId == null || currentUserId <= 0) {
-            Log.w(TAG, "❌ Cannot initialize WebSocket - user not logged in");
-            return;
-        }
-
-        if (isWebSocketInitialized) {
-            Log.d(TAG, "WebSocket already initialized");
-            return;
-        }
-
-        try {
-            // 🔥 FIX: Use correct WebSocket endpoint from backend
-            String wsUrl = "ws://10.0.2.2:8080/ws-native";
-            URI serverUri = URI.create(wsUrl);
-
-            webSocketClient = new ChatWebSocketClient(serverUri, this);
-            connectWebSocket();
-            isWebSocketInitialized = true;
-
-            Log.d(TAG, "✅ WebSocket initialized for user: " + currentUserId);
-            Log.d(TAG, "MessagesFragment created successfully with WebSocket");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to initialize WebSocket", e);
-        }
-    }
-
-    private void connectWebSocket() {
-        try {
-            if (currentUserId == null || currentUserId <= 0) {
-                Log.w(TAG, "❌ Cannot connect WebSocket - invalid user ID");
-                return;
-            }
-
-            // ✅ FIX: Đóng WebSocket cũ trước khi tạo mới
-            if (webSocketClient != null) {
-                try {
-                    webSocketClient.close();
-                } catch (Exception e) {
-                    Log.w(TAG, "Error closing old WebSocket", e);
-                }
-                webSocketClient = null;
-            }
-
-            String wsUrl = "ws://10.0.2.2:8080/ws/chat/" + currentUserId;
-            URI serverUri = URI.create(wsUrl);
-
-            // ✅ Tạo WebSocket mới mỗi lần
-            webSocketClient = new ChatWebSocketClient(serverUri, this);
-            webSocketClient.connect();
-
-            Log.d(TAG, "✅ WebSocket initialized for user: " + currentUserId);
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to connect WebSocket", e);
-        }
-    }
-
     private void loadConversations() {
-        if (swipeRefresh != null) swipeRefresh.setRefreshing(true);
+        swipeRefresh.setRefreshing(true);
 
-        if (currentUserId == null || currentUserId <= 0) {
-            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-            showEmptyState();
+        if (currentUserId == null) {
+            Log.w(TAG, "⚠️ No user ID, loading mock conversations");
+            loadMockConversations();
             return;
         }
 
-        // 🔥 FIX: Create mock conversations for now since API might not be ready
-        createMockConversations();
-        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        Log.d(TAG, "📋 Loading conversations for user: " + currentUserId);
 
-        // TODO: Uncomment when conversations API is ready
+        // For now, just load mock conversations
+        loadMockConversations();
+
+        // TODO: Uncomment when API is ready
         /*
-        ApiClient.getApiService().getConversations().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
-                                 @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
-                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        ApiClient.getApiService().getUserConversations(currentUserId)
+                .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
+                                         Response<StandardResponse<List<Map<String, Object>>>> response) {
 
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    List<Map<String, Object>> conversationData = response.body().getData();
-                    updateConversationsFromData(conversationData);
-                    Log.d(TAG, "✅ Conversations loaded: " + conversationData.size());
-                } else {
-                    Log.e(TAG, "❌ Failed to load conversations");
-                    createMockConversations();
-                }
-            }
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            List<Map<String, Object>> conversationData = response.body().getData();
+                            updateConversationsFromData(conversationData);
+                        } else {
+                            Log.w(TAG, "⚠️ API response unsuccessful, loading mock conversations");
+                            loadMockConversations();
+                        }
+                    }
 
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
-                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                Log.e(TAG, "❌ Conversations API error", t);
-                createMockConversations();
-            }
-        });
+                    @Override
+                    public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
+                        Log.e(TAG, "❌ Failed to load conversations", t);
+                        loadMockConversations();
+                    }
+                });
         */
     }
 
-    private void createMockConversations() {
+    private void loadMockConversations() {
         conversations.clear();
 
         // Mock conversation 1
         Conversation mockConversation1 = new Conversation();
         mockConversation1.setId(1L);
         mockConversation1.setOtherUserName("John Doe");
-        mockConversation1.setLastMessage("Hello, is this item still available?");
+        mockConversation1.setLastMessage("Hi! Is this still available?");
         mockConversation1.setLastMessageTime("2 hours ago");
         mockConversation1.setProductTitle("iPhone 13 Pro Max");
         conversations.add(mockConversation1);
@@ -237,6 +163,15 @@ public class MessagesFragment extends Fragment implements ChatWebSocketClient.We
         mockConversation2.setLastMessageTime("1 day ago");
         mockConversation2.setProductTitle("MacBook Air M1");
         conversations.add(mockConversation2);
+
+        // Mock conversation 3
+        Conversation mockConversation3 = new Conversation();
+        mockConversation3.setId(3L);
+        mockConversation3.setOtherUserName("Mike Johnson");
+        mockConversation3.setLastMessage("When can we meet?");
+        mockConversation3.setLastMessageTime("3 days ago");
+        mockConversation3.setProductTitle("Samsung Galaxy S23");
+        conversations.add(mockConversation3);
 
         updateUI();
         Log.d(TAG, "✅ Mock conversations created: " + conversations.size());
@@ -264,9 +199,12 @@ public class MessagesFragment extends Fragment implements ChatWebSocketClient.We
     }
 
     private void updateUI() {
+        swipeRefresh.setRefreshing(false);
+
         if (conversationAdapter != null) {
             conversationAdapter.notifyDataSetChanged();
         }
+
         if (conversations.isEmpty()) {
             showEmptyState();
         } else {
@@ -306,89 +244,21 @@ public class MessagesFragment extends Fragment implements ChatWebSocketClient.We
             Long userId = prefsManager.getUserId();
             return (userId != null && userId > 0) ? userId : null;
         } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to get current user ID", e);
+            Log.e(TAG, "❌ Error getting user ID", e);
             return null;
-        }
-    }
-
-    // 🔥 FIX: WebSocket Listener Implementation
-    @Override
-    public void onMessageReceived(String message) {
-        Log.d(TAG, "📨 WebSocket message received: " + message);
-
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> {
-                // TODO: Parse message and update conversations
-                loadConversations();
-            });
-        }
-    }
-
-    @Override
-    public void onConnected() {
-        Log.d(TAG, "✅ WebSocket connected");
-
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> {
-                // TODO: Show connected status if needed
-            });
-        }
-    }
-
-    @Override
-    public void onDisconnected() {
-        Log.d(TAG, "❌ WebSocket disconnected");
-
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> {
-                // TODO: Show disconnected status
-                // 🔥 FIX: Reconnect after delay instead of immediately creating new WebSocket
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    if (webSocketClient != null && !webSocketClient.isOpen()) {
-                        connectWebSocket();
-                    }
-                }, 3000);
-            });
-        }
-    }
-
-    @Override
-    public void onError(String error) {
-        Log.e(TAG, "❌ WebSocket error: " + error);
-
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> {
-                // TODO: Show error status if needed
-            });
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        // Refresh conversations when fragment becomes visible
         loadConversations();
-
-        // 🔥 FIX: Reconnect WebSocket if needed
-        if (currentUserId != null && currentUserId > 0) {
-            initWebSocketIfNeeded();
-        }
     }
 
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-
-        // 🔥 FIX: Clean up WebSocket
-        if (webSocketClient != null) {
-            try {
-                webSocketClient.close();
-            } catch (Exception e) {
-                Log.e(TAG, "Error closing WebSocket", e);
-            }
-            webSocketClient = null;
-            isWebSocketInitialized = false;
-        }
-
-        Log.d(TAG, "MessagesFragment destroyed");
+    public void onDestroyView() {
+        super.onDestroyView();
+        Log.d(TAG, "🧹 MessagesFragment destroyed");
     }
 }

@@ -1,3 +1,5 @@
+// app/src/main/java/com/example/newtrade/adapters/MessageAdapter.java
+// ✅ FIXED - Replace getCreatedAt() with getTimestamp()
 package com.example.newtrade.adapters;
 
 import android.view.LayoutInflater;
@@ -54,11 +56,23 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.MessageV
 
         public void bind(Message message, Long currentUserId) {
             tvMessage.setText(message.getContent());
-            tvTime.setText(message.getCreatedAt());
 
-            // TODO: Style message based on sender
-            boolean isOwnMessage = message.getSenderId().equals(currentUserId);
-            // Apply different styling for own vs other messages
+            // ✅ FIX: Use getTimestamp() instead of getCreatedAt()
+            tvTime.setText(message.getTimestamp() != null ? message.getTimestamp() : "");
+
+            // Style message based on sender
+            boolean isOwnMessage = message.getSenderId() != null &&
+                    currentUserId != null &&
+                    message.getSenderId().equals(currentUserId);
+
+            // Apply different background based on message ownership
+            if (isOwnMessage) {
+                itemView.setBackgroundResource(R.drawable.bg_message_sent);
+                tvMessage.setTextColor(itemView.getContext().getColor(android.R.color.white));
+            } else {
+                itemView.setBackgroundResource(R.drawable.bg_message_received);
+                tvMessage.setTextColor(itemView.getContext().getColor(android.R.color.black));
+            }
         }
     }
 }

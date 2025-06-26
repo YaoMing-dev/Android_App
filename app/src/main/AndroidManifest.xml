@@ -82,7 +82,17 @@
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
+        <service
+            android:name=".websocket.RealtimeWebSocketService"
+            android:enabled="true"
+            android:exported="false" />
 
+        <!-- ✅ ADD Location Activity -->
+        <activity
+            android:name=".ui.location.RealtimeLocationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
     </application>
 
 </manifest>
