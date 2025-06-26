@@ -258,18 +258,13 @@ public class AddProductFragment extends Fragment {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == REQUEST_IMAGE_PICK && resultCode == Activity.RESULT_OK && data != null) {
-            selectedImageUri = data.getData();
-            if (selectedImageUri != null) {
-                Log.d(TAG, "✅ Image selected: " + selectedImageUri);
-
-                // ✅ FIXED: Display selected image immediately
-                displaySelectedImage();
-
-                // Update button status
-                updateImageButton("📷 Image Selected", true);
-
-                // Upload to backend
-                uploadImageToBackend();
+            Uri imageUri = data.getData();
+            if (imageUri != null) {
+                selectedImageUri = imageUri;
+                displaySelectedImage(); // ✅ THÊM DÒNG NÀY
+                Log.d(TAG, "✅ Image selected: " + imageUri);
+            } else {
+                showError("Failed to select image");
             }
         }
     }
@@ -278,20 +273,33 @@ public class AddProductFragment extends Fragment {
     private void displaySelectedImage() {
         if (selectedImageUri != null && ivProductImage != null) {
             try {
+                // Use Glide to load and display the image
                 Glide.with(this)
                         .load(selectedImageUri)
-                        .centerCrop()
                         .placeholder(R.drawable.ic_placeholder_image)
-                        .error(R.drawable.ic_placeholder_image)
+                        .error(R.drawable.ic_error_image)
+                        .centerCrop()
                         .into(ivProductImage);
 
-                Log.d(TAG, "✅ Selected image displayed");
+                // Update button text
+                updateImageButton("✅ Image Selected", true);
+
+                // Enable publish button check
+                checkPublishButtonState();
+
+                Log.d(TAG, "✅ Image displayed successfully");
+
             } catch (Exception e) {
                 Log.e(TAG, "❌ Error displaying image", e);
-                if (ivProductImage != null) {
-                    ivProductImage.setImageResource(R.drawable.ic_placeholder_image);
-                }
+                showError("Error displaying image");
             }
+        }
+    }
+
+    private void updateImageButton(String text, boolean enabled) {
+        if (btnSelectImage != null) {
+            btnSelectImage.setText(text);
+            btnSelectImage.setEnabled(enabled);
         }
     }
 
@@ -351,52 +359,168 @@ public class AddProductFragment extends Fragment {
     }
 
     private void getCurrentLocation() {
+        // Check permission
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
+
+            Log.d(TAG, "⚠️ Location permission not granted, requesting...");
             ActivityCompat.requestPermissions(requireActivity(),
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
+                    new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                    }, REQUEST_LOCATION_PERMISSION);
             return;
         }
 
+        // Update UI
         updateLocationButton("⏳ Getting Location...", false);
+        Log.d(TAG, "🔍 Getting current location...");
 
+        try {
+            // Try getCurrentLocation first (more accurate)
+            fusedLocationClient.getCurrentLocation(
+                    com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY,
+                    null
+            ).addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult() != null) {
+                    Location location = task.getResult();
+                    handleLocationResult(location);
+                } else {
+                    // Fallback to getLastLocation
+                    Log.d(TAG, "getCurrentLocation failed, trying getLastLocation...");
+                    getLastKnownLocation();
+                }
+            }).addOnFailureListener(e -> {
+                Log.e(TAG, "❌ getCurrentLocation failed: " + e.getMessage());
+                getLastKnownLocation();
+            });
+
+        } catch (SecurityException e) {
+            updateLocationButton("📍 Get Location", true);
+            showError("Location permission denied");
+            Log.e(TAG, "❌ Security exception: " + e.getMessage());
+        }
+    }
+
+
+    private void getLastKnownLocation() {
         try {
             fusedLocationClient.getLastLocation().addOnCompleteListener(task -> {
                 updateLocationButton("📍 Get Location", true);
 
                 if (task.isSuccessful() && task.getResult() != null) {
                     Location location = task.getResult();
-                    getAddressFromLocation(location.getLatitude(), location.getLongitude());
+                    handleLocationResult(location);
+                    Log.d(TAG, "✅ Got last known location");
                 } else {
-                    showError("Unable to get current location");
+                    showError("Unable to get location. Please enter manually.");
+                    Log.w(TAG, "⚠️ No last known location available");
                 }
             });
         } catch (SecurityException e) {
             updateLocationButton("📍 Get Location", true);
             showError("Location permission denied");
+            Log.e(TAG, "❌ Security exception in getLastLocation: " + e.getMessage());
         }
     }
+
+    private void handleLocationResult(Location location) {
+        Log.d(TAG, "📍 Location: " + location.getLatitude() + ", " + location.getLongitude());
+        getAddressFromLocation(location.getLatitude(), location.getLongitude());
+    }
+
 
     private void getAddressFromLocation(double latitude, double longitude) {
         try {
-            Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
-            List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
-
-            if (addresses != null && !addresses.isEmpty()) {
-                Address address = addresses.get(0);
-                String locationText = address.getLocality() + ", " + address.getCountryName();
-                if (etLocation != null) {
-                    etLocation.setText(locationText);
-                }
-                Toast.makeText(getContext(), "Location updated: " + locationText, Toast.LENGTH_SHORT).show();
-            } else {
-                showError("Unable to get address from location");
+            if (!Geocoder.isPresent()) {
+                showError("Geocoder not available on this device");
+                return;
             }
-        } catch (IOException e) {
-            Log.e(TAG, "❌ Error getting address", e);
+
+            Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
+
+            // Use async method if available (API 33+)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                geocoder.getFromLocation(latitude, longitude, 1, new Geocoder.GeocodeListener() {
+                    @Override
+                    public void onGeocode(@NonNull List<Address> addresses) {
+                        requireActivity().runOnUiThread(() -> processAddresses(addresses));
+                    }
+
+                    @Override
+                    public void onError(@Nullable String errorMessage) {
+                        requireActivity().runOnUiThread(() -> {
+                            Log.e(TAG, "❌ Geocoder error: " + errorMessage);
+                            showError("Unable to get address");
+                        });
+                    }
+                });
+            } else {
+                // Fallback for older Android versions
+                new Thread(() -> {
+                    try {
+                        List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+                        requireActivity().runOnUiThread(() -> processAddresses(addresses));
+                    } catch (IOException e) {
+                        requireActivity().runOnUiThread(() -> {
+                            Log.e(TAG, "❌ Geocoder IO error", e);
+                            showError("Error getting address: " + e.getMessage());
+                        });
+                    }
+                }).start();
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error in getAddressFromLocation", e);
             showError("Error getting address: " + e.getMessage());
         }
     }
+
+    private void processAddresses(List<Address> addresses) {
+        if (addresses != null && !addresses.isEmpty()) {
+            Address address = addresses.get(0);
+
+            // Build location string
+            StringBuilder locationBuilder = new StringBuilder();
+
+            if (address.getSubLocality() != null) {
+                locationBuilder.append(address.getSubLocality());
+            }
+
+            if (address.getLocality() != null) {
+                if (locationBuilder.length() > 0) locationBuilder.append(", ");
+                locationBuilder.append(address.getLocality());
+            }
+
+            if (address.getAdminArea() != null) {
+                if (locationBuilder.length() > 0) locationBuilder.append(", ");
+                locationBuilder.append(address.getAdminArea());
+            }
+
+            if (address.getCountryName() != null) {
+                if (locationBuilder.length() > 0) locationBuilder.append(", ");
+                locationBuilder.append(address.getCountryName());
+            }
+
+            String locationText = locationBuilder.toString();
+            if (locationText.isEmpty()) {
+                locationText = address.getLatitude() + ", " + address.getLongitude();
+            }
+
+            if (etLocation != null) {
+                etLocation.setText(locationText);
+            }
+
+            Toast.makeText(getContext(), "✅ Location updated", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "✅ Address updated: " + locationText);
+
+        } else {
+            showError("Unable to get address from location");
+            Log.w(TAG, "⚠️ No addresses found for location");
+        }
+    }
+
+
 
     private boolean validateForm() {
         // Title validation
@@ -529,12 +653,7 @@ public class AddProductFragment extends Fragment {
         return editText != null ? editText.getText().toString().trim() : "";
     }
 
-    private void updateImageButton(String text, boolean enabled) {
-        if (btnSelectImage != null) {
-            btnSelectImage.setText(text);
-            btnSelectImage.setEnabled(enabled);
-        }
-    }
+
 
     private void resetImageButton() {
         updateImageButton("📷 Select Image", true);
@@ -552,6 +671,26 @@ public class AddProductFragment extends Fragment {
             btnPublish.setText(text);
             btnPublish.setEnabled(enabled);
         }
+    }
+
+    private void checkPublishButtonState() {
+        if (btnPublish != null) {
+            boolean canPublish = validateFormForPublish();
+            btnPublish.setEnabled(canPublish && !isUploading);
+
+            if (canPublish) {
+                btnPublish.setAlpha(1.0f);
+            } else {
+                btnPublish.setAlpha(0.5f);
+            }
+        }
+    }
+    private boolean validateFormForPublish() {
+        return !getTextFromEditText(etTitle).trim().isEmpty() &&
+                !getTextFromEditText(etDescription).trim().isEmpty() &&
+                !getTextFromEditText(etPrice).trim().isEmpty() &&
+                !getTextFromEditText(etLocation).trim().isEmpty() &&
+                selectedImageUri != null;
     }
 
     private void showError(String message) {
@@ -630,9 +769,11 @@ public class AddProductFragment extends Fragment {
 
         if (requestCode == REQUEST_LOCATION_PERMISSION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "✅ Location permission granted");
                 getCurrentLocation();
             } else {
-                showError("Location permission denied");
+                Log.w(TAG, "⚠️ Location permission denied");
+                showError("Location permission denied. Please enter location manually.");
             }
         }
     }

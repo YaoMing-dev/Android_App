@@ -13,7 +13,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import com.example.newtrade.websocket.WebSocketManager;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -26,6 +26,7 @@ import com.example.newtrade.models.Message;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.example.newtrade.utils.NavigationUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -108,14 +109,7 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            finish();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
+
 
     private void setupRecyclerView() {
         // ✅ FIX: Check if currentUserId is valid
@@ -210,5 +204,12 @@ public class ChatActivity extends AppCompatActivity {
 
         // TODO: Implement actual API call
         Log.d(TAG, "Sending message to server: " + messageText);
+    }
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (NavigationUtils.handleBackButton(this, item)) {
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

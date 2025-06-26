@@ -10,7 +10,10 @@ public class Constants {
     private static final String TAG = "Constants";
 
     // ===== API CONFIGURATION =====
-    public static final String BASE_URL = "http://10.0.2.2:8080/"; // Android Emulator
+    public static final String BASE_URL = "http://10.0.2.2:8080/";
+    public static final String WS_BASE_URL = "ws://10.0.2.2:8080";
+
+    // Android Emulator
     // public static final String BASE_URL = "http://192.168.1.100:8080/"; // Real device - change to your IP
 
     // ===== SHARED PREFERENCES =====

@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.utils.SharedPrefsManager;
+import com.example.newtrade.utils.NavigationUtils;
 import com.google.android.material.appbar.MaterialToolbar;
 
 import java.util.ArrayList;
@@ -229,8 +230,7 @@ public class AddProductActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
+        if (NavigationUtils.handleBackButton(this, item)) {
             return true;
         }
         return super.onOptionsItemSelected(item);
