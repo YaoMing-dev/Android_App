@@ -1,0 +1,157 @@
+package com.example.newtrade.ui.chat;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.Log;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.newtrade.R;
+import com.example.newtrade.adapters.MessageAdapter;
+import com.example.newtrade.api.ApiClient;
+import com.example.newtrade.models.Message;
+import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.SharedPrefsManager;
+import com.google.android.material.appbar.MaterialToolbar;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+public class ChatActivity extends AppCompatActivity {
+
+    private static final String TAG = "ChatActivity";
+
+    // UI Components
+    private MaterialToolbar toolbar;
+    private RecyclerView rvMessages;
+    private EditText etMessage;
+    private ImageButton btnSend;
+    private TextView tvProductInfo;
+
+    // Data
+    private MessageAdapter messageAdapter;
+    private final List<Message> messages = new ArrayList<>();
+    private SharedPrefsManager prefsManager;
+
+    private Long conversationId;
+    private Long productId;
+    private String productTitle;
+    private Long sellerId;
+    private Long currentUserId;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_chat);
+
+        getIntentData();
+        initViews();
+        setupToolbar();
+        setupRecyclerView();
+        setupListeners();
+        loadMessages();
+    }
+
+    private void getIntentData() {
+        conversationId = getIntent().getLongExtra("conversation_id", -1);
+        productId = getIntent().getLongExtra("product_id", -1);
+        productTitle = getIntent().getStringExtra("product_title");
+        sellerId = getIntent().getLongExtra("seller_id", -1);
+
+        prefsManager = new SharedPrefsManager(this);
+        currentUserId = prefsManager.getUserId();
+
+        Log.d(TAG, "Chat data - Conversation: " + conversationId + ", Product: " + productTitle);
+    }
+
+    private void initViews() {
+        toolbar = findViewById(R.id.toolbar);
+        rvMessages = findViewById(R.id.rv_messages);
+        etMessage = findViewById(R.id.et_message);
+        btnSend = findViewById(R.id.btn_send);
+        tvProductInfo = findViewById(R.id.tv_product_info);
+    }
+
+    private void setupToolbar() {
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("Chat");
+        }
+
+        if (tvProductInfo != null && productTitle != null) {
+            tvProductInfo.setText("About: " + productTitle);
+        }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void setupRecyclerView() {
+        messageAdapter = new MessageAdapter(messages, currentUserId);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        layoutManager.setStackFromEnd(true);
+        rvMessages.setLayoutManager(layoutManager);
+        rvMessages.setAdapter(messageAdapter);
+    }
+
+    private void setupListeners() {
+        etMessage.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                btnSend.setEnabled(!s.toString().trim().isEmpty());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        btnSend.setOnClickListener(v -> sendMessage());
+    }
+
+    private void loadMessages() {
+        // TODO: Implement load messages from API
+        Log.d(TAG, "Loading messages for conversation: " + conversationId);
+    }
+
+    private void sendMessage() {
+        String messageText = etMessage.getText().toString().trim();
+        if (messageText.isEmpty()) return;
+
+        Map<String, Object> messageData = new HashMap<>();
+        messageData.put("conversationId", conversationId);
+        messageData.put("content", messageText);
+
+        // TODO: Implement send message API call
+        Toast.makeText(this, "Message sent: " + messageText, Toast.LENGTH_SHORT).show();
+        etMessage.setText("");
+
+        Log.d(TAG, "Sending message: " + messageText);
+    }
+}
