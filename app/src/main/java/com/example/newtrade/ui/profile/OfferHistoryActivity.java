@@ -8,7 +8,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -16,9 +15,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.OfferAdapter;
-import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Offer;
-import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -27,11 +24,6 @@ import com.google.android.material.tabs.TabLayout;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 public class OfferHistoryActivity extends AppCompatActivity {
 
@@ -121,9 +113,6 @@ public class OfferHistoryActivity extends AppCompatActivity {
         } else {
             createMockReceivedOffers();
         }
-
-        // TODO: Load from API when OfferService is available
-        // loadOffersFromAPI();
     }
 
     private void createMockSentOffers() {
@@ -139,17 +128,6 @@ public class OfferHistoryActivity extends AppCompatActivity {
         offer1.setMessage("Can you consider 17M?");
         offer1.setCreatedAt("2 hours ago");
         offers.add(offer1);
-
-        // Mock sent offer 2
-        Offer offer2 = new Offer();
-        offer2.setId(2L);
-        offer2.setProductTitle("MacBook Air M1");
-        offer2.setOfferAmount(new BigDecimal("20000000"));
-        offer2.setOriginalPrice(new BigDecimal("22000000"));
-        offer2.setStatus(Offer.OfferStatus.REJECTED);
-        offer2.setMessage("Best price?");
-        offer2.setCreatedAt("1 day ago");
-        offers.add(offer2);
 
         updateUI();
     }
@@ -168,18 +146,6 @@ public class OfferHistoryActivity extends AppCompatActivity {
         offer1.setMessage("Is 12M acceptable?");
         offer1.setCreatedAt("3 hours ago");
         offers.add(offer1);
-
-        // Mock received offer 2
-        Offer offer2 = new Offer();
-        offer2.setId(4L);
-        offer2.setProductTitle("Nintendo Switch");
-        offer2.setOfferAmount(new BigDecimal("5500000"));
-        offer2.setOriginalPrice(new BigDecimal("6000000"));
-        offer2.setStatus(Offer.OfferStatus.ACCEPTED);
-        offer2.setBuyerName("Trần Thị B");
-        offer2.setMessage("Good price for quick sale");
-        offer2.setCreatedAt("2 days ago");
-        offers.add(offer2);
 
         updateUI();
     }

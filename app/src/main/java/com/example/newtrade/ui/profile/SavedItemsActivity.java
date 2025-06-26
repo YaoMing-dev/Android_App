@@ -8,7 +8,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -16,9 +15,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.ProductAdapter;
-import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Product;
-import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -26,11 +23,6 @@ import com.google.android.material.appbar.MaterialToolbar;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 public class SavedItemsActivity extends AppCompatActivity {
 
@@ -93,9 +85,6 @@ public class SavedItemsActivity extends AppCompatActivity {
 
         // Create mock data for testing
         createMockSavedItems();
-
-        // TODO: Load from API when SavedItemService is available
-        // loadSavedItemsFromAPI();
     }
 
     private void createMockSavedItems() {
@@ -111,28 +100,6 @@ public class SavedItemsActivity extends AppCompatActivity {
         product1.setLocation("Hanoi");
         product1.setStatus(Product.ProductStatus.AVAILABLE);
         savedProducts.add(product1);
-
-        // Mock saved item 2
-        Product product2 = new Product();
-        product2.setId(11L);
-        product2.setTitle("iPad Pro M2");
-        product2.setDescription("iPad Pro 12.9-inch M2 2022");
-        product2.setPrice(new BigDecimal("28000000"));
-        product2.setCondition(Product.ProductCondition.GOOD);
-        product2.setLocation("Da Nang");
-        product2.setStatus(Product.ProductStatus.AVAILABLE);
-        savedProducts.add(product2);
-
-        // Mock saved item 3
-        Product product3 = new Product();
-        product3.setId(12L);
-        product3.setTitle("Nike Air Jordan 1");
-        product3.setDescription("Nike Air Jordan 1 High OG Chicago");
-        product3.setPrice(new BigDecimal("3500000"));
-        product3.setCondition(Product.ProductCondition.GOOD);
-        product3.setLocation("Ho Chi Minh City");
-        product3.setStatus(Product.ProductStatus.AVAILABLE);
-        savedProducts.add(product3);
 
         updateUI();
     }

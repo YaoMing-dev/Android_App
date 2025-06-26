@@ -94,11 +94,15 @@
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Price -->
+            <!-- Sửa dòng có lỗi trong activity_add_product.xml -->
+            <!-- Từ: app:startIconDrawable="@ic_money" -->
+            <!-- Thành: app:startIconDrawable="@drawable/ic_money" -->
+
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Price (VND)"
-                app:startIconDrawable="@ic_money"
+                app:startIconDrawable="@drawable/ic_money"
                 app:boxStrokeColor="@color/primary_color"
                 app:hintTextColor="@color/primary_color"
                 app:errorEnabled="true"

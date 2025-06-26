@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
-import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -35,7 +34,7 @@ public class SettingsActivity extends AppCompatActivity {
     // UI Components
     private MaterialToolbar toolbar;
     private LinearLayout llEditProfile, llMyListings, llSavedItems, llOfferHistory;
-    private LinearLayout llNotifications, llPrivacy, llAbout, llLogout, llDeleteAccount;
+    private LinearLayout llNotifications, llLogout, llDeleteAccount;
     private SwitchMaterial switchNotifications, switchLocationServices;
     private TextView tvUserName, tvUserEmail;
 
@@ -65,8 +64,6 @@ public class SettingsActivity extends AppCompatActivity {
         llSavedItems = findViewById(R.id.ll_saved_items);
         llOfferHistory = findViewById(R.id.ll_offer_history);
         llNotifications = findViewById(R.id.ll_notifications);
-        llPrivacy = findViewById(R.id.ll_privacy);
-        llAbout = findViewById(R.id.ll_about);
         llLogout = findViewById(R.id.ll_logout);
         llDeleteAccount = findViewById(R.id.ll_delete_account);
 

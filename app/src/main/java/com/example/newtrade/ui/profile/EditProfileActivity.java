@@ -113,7 +113,7 @@ public class EditProfileActivity extends AppCompatActivity {
 
         // Load profile picture placeholder
         Glide.with(this)
-                .load(R.drawable.ic_default_avatar)
+                .load(R.drawable.ic_placeholder_image)
                 .circleCrop()
                 .into(ivProfilePicture);
 
@@ -168,8 +168,13 @@ public class EditProfileActivity extends AppCompatActivity {
         btnSave.setEnabled(false);
         btnSave.setText("Saving...");
 
-        // Update local data
-        prefsManager.saveUserName(displayName);
+        // ✅ FIX: Update user session với display name mới
+        Long userId = prefsManager.getUserId();
+        String email = prefsManager.getUserEmail();
+        boolean isEmailVerified = prefsManager.isEmailVerified();
+
+        // Update user session với display name mới
+        prefsManager.saveUserSession(userId, email, displayName, isEmailVerified);
 
         // TODO: Call API to update profile
         updateProfileAPI(displayName, bio, contactInfo);
