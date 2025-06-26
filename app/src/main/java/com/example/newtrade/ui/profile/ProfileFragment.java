@@ -1,6 +1,8 @@
 // app/src/main/java/com/example/newtrade/ui/profile/ProfileFragment.java - TOÀN BỘ
 package com.example.newtrade.ui.profile;
-
+import android.provider.MediaStore;
+import android.net.Uri;
+import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
@@ -46,6 +48,7 @@ public class ProfileFragment extends Fragment {
     // Data
     private SharedPrefsManager prefsManager;
     private Map<String, Object> userProfile;
+    private static final int REQUEST_GALLERY_PICK = 1001;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -153,27 +156,30 @@ public class ProfileFragment extends Fragment {
             return;
         }
 
-        // TODO: Uncomment when user profile API is ready
-        /*
+        // ✅ SỬA LẠI - UNCOMMENT VÀ SỬA:
         ApiClient.getApiService().getUserProfile(userId).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                     userProfile = response.body().getData();
                     displayUserProfile();
                     Log.d(TAG, "✅ User profile loaded from backend");
                 } else {
                     Log.e(TAG, "❌ Failed to load user profile");
+                    // Still show local data
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 Log.e(TAG, "❌ User profile API error", t);
+                // Still show local data - don't show error to user
             }
         });
-        */
     }
+
+
 
     private void displayCurrentUserInfo() {
         // Display info from SharedPrefs
@@ -350,28 +356,52 @@ public class ProfileFragment extends Fragment {
 
     private void showProfilePictureOptions() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Profile Picture");
+        builder.setTitle("Update Profile Picture");
 
-        String[] options = {"Change Photo", "Remove Photo", "Cancel"};
+        String[] options = {"Choose from Gallery", "Remove Photo"};
+
         builder.setItems(options, (dialog, which) -> {
             switch (which) {
-                case 0: // Change Photo
-                    Log.d(TAG, "Change photo selected");
-                    Toast.makeText(getContext(), "Change photo feature coming soon! 📸", Toast.LENGTH_SHORT).show();
-                    // TODO: Implement photo picker
+                case 0:
+                    openGallery();
                     break;
-                case 1: // Remove Photo
-                    Log.d(TAG, "Remove photo selected");
-                    Toast.makeText(getContext(), "Remove photo feature coming soon! 🗑️", Toast.LENGTH_SHORT).show();
-                    // TODO: Implement remove photo
-                    break;
-                case 2: // Cancel
-                    dialog.dismiss();
+                case 1:
+                    removeProfilePicture();
                     break;
             }
         });
 
         builder.show();
+    }
+    private void openGallery() {
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        intent.setType("image/*");
+        startActivityForResult(intent, REQUEST_GALLERY_PICK);
+    }
+
+    private void removeProfilePicture() {
+        if (ivProfilePicture != null) {
+            ivProfilePicture.setImageResource(R.drawable.placeholder_avatar);
+        }
+        Toast.makeText(requireContext(), "Profile picture removed", Toast.LENGTH_SHORT).show();
+    }
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_GALLERY_PICK && resultCode == Activity.RESULT_OK && data != null) {
+            Uri selectedImageUri = data.getData();
+            if (selectedImageUri != null && ivProfilePicture != null) {
+                Glide.with(this)
+                        .load(selectedImageUri)
+                        .circleCrop()
+                        .placeholder(R.drawable.placeholder_avatar)
+                        .error(R.drawable.placeholder_avatar)
+                        .into(ivProfilePicture);
+
+                Toast.makeText(requireContext(), "Profile picture updated!", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     private void showLogoutDialog() {

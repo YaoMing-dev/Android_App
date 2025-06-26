@@ -1,8 +1,8 @@
-// File: app/src/main/java/com/example/newtrade/models/Product.java
 package com.example.newtrade.models;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -11,22 +11,23 @@ public class Product {
     private String title;
     private String description;
     private BigDecimal price;
+    private String location;
     private ProductCondition condition;
     private ProductStatus status;
-    private String location;
+    private Long categoryId;
     private String categoryName;
     private String userDisplayName;
     private Integer viewCount;
     private List<String> imageUrls;
     private String createdAt;
 
-    // Enums để khớp với backend
+    // Enums
     public enum ProductCondition {
-        NEW("New"),
-        LIKE_NEW("Like New"),
-        GOOD("Good"),
-        FAIR("Fair"),
-        POOR("Poor");
+        NEW("Mới"),
+        LIKE_NEW("Như mới"),
+        GOOD("Tốt"),
+        FAIR("Khá"),
+        POOR("Cũ");
 
         private final String displayName;
 
@@ -40,14 +41,11 @@ public class Product {
     }
 
     public enum ProductStatus {
-        AVAILABLE("Available"),
-        SOLD("Sold"),
-        PENDING("Pending"),
-        PAUSED("Paused"),
-        EXPIRED("Expired"),
-        RESERVED("Reserved"),
-        DELETED("Deleted"),
-        ARCHIVED("Archived");
+        AVAILABLE("Có sẵn"),
+        SOLD("Đã bán"),
+        RESERVED("Đã đặt"),
+        DELETED("Đã xóa"),
+        ARCHIVED("Lưu trữ");
 
         private final String displayName;
 
@@ -63,18 +61,16 @@ public class Product {
     // Constructors
     public Product() {}
 
-    public Product(Long id, String title, String description, BigDecimal price,
-                   ProductCondition condition, String location, ProductStatus status) {
-        this.id = id;
+    public Product(String title, String description, BigDecimal price, String location) {
         this.title = title;
         this.description = description;
         this.price = price;
-        this.condition = condition;
         this.location = location;
-        this.status = status;
+        this.status = ProductStatus.AVAILABLE;
+        this.imageUrls = new ArrayList<>();
     }
 
-    // Getters và Setters
+    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -87,14 +83,17 @@ public class Product {
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
 
+    public String getLocation() { return location; }
+    public void setLocation(String location) { this.location = location; }
+
     public ProductCondition getCondition() { return condition; }
     public void setCondition(ProductCondition condition) { this.condition = condition; }
 
     public ProductStatus getStatus() { return status; }
     public void setStatus(ProductStatus status) { this.status = status; }
 
-    public String getLocation() { return location; }
-    public void setLocation(String location) { this.location = location; }
+    public Long getCategoryId() { return categoryId; }
+    public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
 
     public String getCategoryName() { return categoryName; }
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
@@ -117,6 +116,22 @@ public class Product {
 
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+
+    // ✅ THÊM METHOD setPrimaryImageUrl()
+    public void setPrimaryImageUrl(String primaryImageUrl) {
+        if (primaryImageUrl != null && !primaryImageUrl.isEmpty()) {
+            if (this.imageUrls == null) {
+                this.imageUrls = new ArrayList<>();
+            }
+            // Nếu chưa có image nào, thêm vào đầu list
+            if (this.imageUrls.isEmpty()) {
+                this.imageUrls.add(primaryImageUrl);
+            } else {
+                // Nếu đã có images, thay thế image đầu tiên
+                this.imageUrls.set(0, primaryImageUrl);
+            }
+        }
+    }
 
     // Helper methods
     public String getFormattedPrice() {

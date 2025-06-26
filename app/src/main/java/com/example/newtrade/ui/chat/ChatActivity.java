@@ -75,7 +75,11 @@ public class ChatActivity extends AppCompatActivity {
         productTitle = getIntent().getStringExtra("product_title");
         sellerId = getIntent().getLongExtra("seller_id", -1);
 
-        prefsManager = new SharedPrefsManager(this);
+        // ❌ SAI:
+        // prefsManager = new SharedPrefsManager(this);
+
+        // ✅ ĐÚNG:
+        prefsManager = SharedPrefsManager.getInstance(this);
         currentUserId = prefsManager.getUserId();
 
         Log.d(TAG, "Chat data - Conversation: " + conversationId + ", Product: " + productTitle);

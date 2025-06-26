@@ -288,18 +288,11 @@ public class MessagesFragment extends Fragment implements ChatWebSocketClient.We
         try {
             Log.d(TAG, "✅ Opening chat for conversation: " + conversation.getId());
 
-            // TODO: Implement ChatActivity
-            Toast.makeText(getContext(),
-                    "Opening chat for conversation: " + conversation.getId(),
-                    Toast.LENGTH_SHORT).show();
-
-            /*
             Intent intent = new Intent(getContext(), ChatActivity.class);
             intent.putExtra("conversation_id", conversation.getId());
             intent.putExtra("other_user_name", conversation.getOtherUserName());
             intent.putExtra("product_title", conversation.getProductTitle());
             startActivity(intent);
-            */
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to open chat", e);

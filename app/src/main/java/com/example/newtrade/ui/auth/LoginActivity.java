@@ -13,6 +13,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.app.AlertDialog;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -463,18 +464,23 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void navigateToRegister() {
-        // TODO: Implement RegisterActivity navigation
-        showError("Chức năng đăng ký đang được phát triển");
+        // ❌ XÓA DÒNG NÀY:
+        // showError("Chức năng đăng ký đang được phát triển");
+
+        // ✅ THÊM DÒNG NÀY:
+        Intent intent = new Intent(this, RegisterActivity.class);
+        startActivity(intent);
     }
 
     private void navigateToForgotPassword() {
-        // TODO: Implement ForgotPasswordActivity navigation
-        showError("Chức năng quên mật khẩu đang được phát triển");
+        Intent intent = new Intent(this, ForgotPasswordActivity.class);
+        startActivity(intent);
     }
 
     private void navigateToOtpVerification(String email) {
-        // TODO: Implement OtpVerificationActivity navigation
-        showError("OTP verification sẽ được thêm sau");
-        navigateToMain(); // Temporary - skip OTP for now
+        Intent intent = new Intent(this, OtpVerificationActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("fromRegister", false); // false vì đến từ login
+        startActivity(intent);
     }
 }

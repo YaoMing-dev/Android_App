@@ -1,7 +1,7 @@
 // app/src/main/java/com/example/newtrade/ui/product/ProductDetailActivity.java
 // ✅ FIXED: Added back button + Contact seller + Make offer functionality
 package com.example.newtrade.ui.product;
-
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -96,14 +96,22 @@ public class ProductDetailActivity extends AppCompatActivity {
         }
     }
 
-    // ✅ FIXED: Added back button handling
+
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            finish();
+            // ✅ SỬA LẠI:
+            onBackPressed(); // Hoặc finish()
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    // ✅ THÊM METHOD NÀY NẾU CHƯA CÓ:
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        finish();
     }
 
     private void getProductData() {
@@ -225,6 +233,7 @@ public class ProductDetailActivity extends AppCompatActivity {
     private void contactSeller() {
         try {
             if (productData != null) {
+                // Code hiện tại giữ nguyên...
                 @SuppressWarnings("unchecked")
                 Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
                 if (sellerData != null) {
@@ -232,21 +241,50 @@ public class ProductDetailActivity extends AppCompatActivity {
                     Long currentUserId = prefsManager.getUserId();
 
                     if (sellerId.equals(currentUserId)) {
-                        // User owns product - show edit option
                         Toast.makeText(this, "This is your product! Edit listing feature coming soon 📊", Toast.LENGTH_SHORT).show();
                     } else {
-                        // Contact seller - start conversation
-                        startConversationWithSeller(sellerId);
+                        // SỬA DÒNG NÀY:
+                        showContactOptions(sellerId);
                     }
                 }
             } else {
-                // Fallback
-                Toast.makeText(this, "Opening chat with seller... 💬", Toast.LENGTH_SHORT).show();
+                // SỬA DÒNG NÀY:
+                showContactOptions(null);
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error contacting seller", e);
-            Toast.makeText(this, "Opening chat with seller... 💬", Toast.LENGTH_SHORT).show();
+            // SỬA DÒNG NÀY:
+            showContactOptions(null);
         }
+    }
+
+    private void showContactOptions(Long sellerId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Contact Seller");
+
+        String[] options = {"Send Message", "Call Seller", "View Profile"};
+
+        builder.setItems(options, (dialog, which) -> {
+            switch (which) {
+                case 0:
+                    // Open chat
+                    Intent intent = new Intent(this, ChatActivity.class);
+                    intent.putExtra("conversation_id", 1L);
+                    intent.putExtra("product_id", productId);
+                    intent.putExtra("product_title", productTitle);
+                    intent.putExtra("seller_id", sellerId != null ? sellerId : 2L);
+                    startActivity(intent);
+                    break;
+                case 1:
+                    Toast.makeText(this, "Call feature coming soon!", Toast.LENGTH_SHORT).show();
+                    break;
+                case 2:
+                    Toast.makeText(this, "Profile feature coming soon!", Toast.LENGTH_SHORT).show();
+                    break;
+            }
+        });
+
+        builder.show();
     }
 
     // ✅ NEW: Start conversation with seller
@@ -327,7 +365,7 @@ public class ProductDetailActivity extends AppCompatActivity {
 
     private void showMakeOfferDialog() {
         BottomSheetDialog dialog = new BottomSheetDialog(this);
-        View view = getLayoutInflater().inflate(R.layout.dialog_make_offer, null);
+        View view = getLayoutInflater().inflate(R.layout.bottom_sheet_make_offer, null);
 
         TextInputEditText etOfferAmount = view.findViewById(R.id.et_offer_amount);
         TextInputEditText etOfferMessage = view.findViewById(R.id.et_offer_message);
