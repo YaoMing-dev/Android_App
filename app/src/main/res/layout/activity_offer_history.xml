@@ -15,6 +15,18 @@
         app:titleTextColor="@color/white"
         app:navigationIconTint="@color/white" />
 
+    <!-- TabLayout -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/white"
+        app:tabMode="fixed"
+        app:tabGravity="fill"
+        app:tabTextColor="@color/text_secondary"
+        app:tabSelectedTextColor="@color/primary_color"
+        app:tabIndicatorColor="@color/primary_color" />
+
     <!-- SwipeRefreshLayout -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh"
@@ -27,7 +39,7 @@
 
             <!-- RecyclerView -->
             <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rv_saved_items"
+                android:id="@+id/rv_offers"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:padding="8dp"
@@ -46,14 +58,14 @@
                 <ImageView
                     android:layout_width="64dp"
                     android:layout_height="64dp"
-                    android:src="@android:drawable/btn_star_big_off"
+                    android:src="@android:drawable/ic_menu_recent_history"
                     android:alpha="0.5"
                     android:layout_marginBottom="16dp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="No saved items"
+                    android:text="No offers yet"
                     android:textSize="18sp"
                     android:textColor="@color/text_secondary"
                     android:layout_marginBottom="8dp" />
@@ -61,7 +73,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Save items you're interested in"
+                    android:text="Your offer history will appear here"
                     android:textSize="14sp"
                     android:textColor="@color/text_hint"
                     android:textAlignment="center" />

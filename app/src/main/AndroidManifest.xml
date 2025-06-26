@@ -33,27 +33,52 @@
             </intent-filter>
         </activity>
 
-        <!-- Authentication Activities -->
+        <!-- ✅ AUTHENTICATION ACTIVITIES (Đã xác nhận tồn tại) -->
         <activity
             android:name=".ui.auth.LoginActivity"
             android:exported="true"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
-        <!-- 🔥 FIX: Product Activities - Change to NoActionBar -->
+        <activity
+            android:name=".ui.auth.RegisterActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.auth.LoginActivity" />
+
+        <activity
+            android:name=".ui.auth.ForgotPasswordActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.auth.LoginActivity" />
+
+        <activity
+            android:name=".ui.auth.OtpVerificationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+
+        <!-- ✅ PRODUCT ACTIVITIES (Đã xác nhận tồn tại) -->
         <activity
             android:name=".ui.product.ProductDetailActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
 
-        <!-- 🔥 FIX: Search Activities - Change to NoActionBar -->
+        <!-- ✅ CHAT ACTIVITY (Đã xác nhận tồn tại) -->
         <activity
-            android:name=".ui.search.CategoryProductsActivity"
+            android:name=".ui.chat.ChatActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
 
-        <!-- 🔥 ADD: AllProductsActivity -->
+        <!-- ✅ SEARCH ACTIVITIES (Nếu có) -->
         <activity
             android:name=".ui.search.AllProductsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.search.CategoryProductsActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />

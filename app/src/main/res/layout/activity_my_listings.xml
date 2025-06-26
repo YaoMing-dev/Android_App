@@ -1,72 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/background_light">
 
-    <!-- App Bar -->
-    <com.google.android.material.appbar.AppBarLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/white"
-        app:elevation="@dimen/elevation_md">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
+        <!-- Toolbar -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="@string/my_listings"
-            app:navigationIcon="@drawable/ic_arrow_back" />
+            android:background="@color/primary_color"
+            app:titleTextColor="@color/white"
+            app:navigationIconTint="@color/white" />
 
-        <!-- Filter Tabs -->
-        <com.google.android.material.tabs.TabLayout
-            android:id="@+id/tab_layout"
+        <!-- SwipeRefreshLayout -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipe_refresh"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:tabIndicatorColor="@color/primary_color"
-            app:tabSelectedTextColor="@color/primary_color"
-            app:tabTextColor="@color/text_secondary">
+            android:layout_height="match_parent">
 
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="All" />
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
 
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/status_available" />
+                <!-- RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_my_listings"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp"
+                    android:clipToPadding="false" />
 
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/status_sold" />
+                <!-- Empty State -->
+                <LinearLayout
+                    android:id="@+id/tv_empty_state"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:visibility="gone">
 
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/status_paused" />
+                    <ImageView
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:src="@android:drawable/ic_menu_agenda"
+                        android:alpha="0.5"
+                        android:layout_marginBottom="16dp" />
 
-        </com.google.android.material.tabs.TabLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No listings yet"
+                        android:textSize="18sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginBottom="8dp" />
 
-    </com.google.android.material.appbar.AppBarLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Add your first product to start selling"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_hint"
+                        android:textAlignment="center" />
 
-    <!-- Main Content -->
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/view_pager"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+                </LinearLayout>
 
-    <!-- FAB Add Product -->
+            </FrameLayout>
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    </LinearLayout>
+
+    <!-- FAB -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_add_product"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="@dimen/margin_lg"
-        android:src="@drawable/ic_add"
+        android:layout_margin="16dp"
+        android:src="@android:drawable/ic_input_add"
         app:tint="@color/white" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

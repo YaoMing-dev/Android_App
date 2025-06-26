@@ -1,148 +1,199 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- app/src/main/res/layout/activity_otp_verification.xml -->
+<!-- ✅ FIXED: Complete OTP verification layout -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="24dp"
-    android:background="@color/background_light">
+    android:background="@color/white">
+
+    <!-- Back Button -->
+    <LinearLayout
+        android:id="@+id/ll_back"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_arrow_back"
+            android:tint="@color/primary_color" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Back"
+            android:textColor="@color/primary_color"
+            android:textSize="16sp" />
+
+    </LinearLayout>
 
     <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
         android:orientation="vertical"
-        android:layout_marginTop="80dp">
-
-        <ImageView
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:src="@drawable/ic_email_verify"
-            app:tint="@color/primary_color" />
+        android:layout_marginTop="32dp"
+        android:gravity="center">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="Verify Your Email"
-            android:textSize="26sp"
+            android:text="Email Verification"
+            android:textSize="28sp"
             android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            android:textColor="@color/text_primary"
+            android:gravity="center" />
 
         <TextView
             android:id="@+id/tv_subtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="We've sent a 6-digit code to\nyour@email.com"
+            android:text="We've sent a verification code to your email"
             android:textColor="@color/text_secondary"
             android:textAlignment="center"
             android:lineSpacingExtra="4dp" />
 
     </LinearLayout>
 
-    <!-- OTP Input Container -->
+    <!-- OTP Input Section -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="48dp"
-        android:gravity="center"
-        android:orientation="horizontal">
+        android:orientation="vertical"
+        android:layout_marginTop="48dp">
 
-        <EditText
-            android:id="@+id/et_otp_1"
-            android:layout_width="48dp"
-            android:layout_height="56dp"
-            android:layout_margin="6dp"
-            android:background="@drawable/otp_input_background"
-            android:gravity="center"
-            android:inputType="number"
-            android:maxLength="1"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Enter 6-digit code"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="16dp" />
 
-        <EditText
-            android:id="@+id/et_otp_2"
-            android:layout_width="48dp"
-            android:layout_height="56dp"
-            android:layout_margin="6dp"
-            android:background="@drawable/otp_input_background"
+        <!-- OTP Input Fields -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
             android:gravity="center"
-            android:inputType="number"
-            android:maxLength="1"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            android:layout_marginBottom="32dp">
 
-        <EditText
-            android:id="@+id/et_otp_3"
-            android:layout_width="48dp"
-            android:layout_height="56dp"
-            android:layout_margin="6dp"
-            android:background="@drawable/otp_input_background"
-            android:gravity="center"
-            android:inputType="number"
-            android:maxLength="1"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            <EditText
+                android:id="@+id/et_otp_1"
+                android:layout_width="50dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_otp_input"
+                android:gravity="center"
+                android:inputType="number"
+                android:maxLength="1"
+                android:textSize="20sp"
+                android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/et_otp_4"
-            android:layout_width="48dp"
-            android:layout_height="56dp"
-            android:layout_margin="6dp"
-            android:background="@drawable/otp_input_background"
-            android:gravity="center"
-            android:inputType="number"
-            android:maxLength="1"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            <EditText
+                android:id="@+id/et_otp_2"
+                android:layout_width="50dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_otp_input"
+                android:gravity="center"
+                android:inputType="number"
+                android:maxLength="1"
+                android:textSize="20sp"
+                android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/et_otp_5"
-            android:layout_width="48dp"
-            android:layout_height="56dp"
-            android:layout_margin="6dp"
-            android:background="@drawable/otp_input_background"
-            android:gravity="center"
-            android:inputType="number"
-            android:maxLength="1"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            <EditText
+                android:id="@+id/et_otp_3"
+                android:layout_width="50dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_otp_input"
+                android:gravity="center"
+                android:inputType="number"
+                android:maxLength="1"
+                android:textSize="20sp"
+                android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/et_otp_6"
-            android:layout_width="48dp"
+            <EditText
+                android:id="@+id/et_otp_4"
+                android:layout_width="50dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_otp_input"
+                android:gravity="center"
+                android:inputType="number"
+                android:maxLength="1"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/et_otp_5"
+                android:layout_width="50dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_otp_input"
+                android:gravity="center"
+                android:inputType="number"
+                android:maxLength="1"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/et_otp_6"
+                android:layout_width="50dp"
+                android:layout_height="60dp"
+                android:layout_margin="4dp"
+                android:background="@drawable/bg_otp_input"
+                android:gravity="center"
+                android:inputType="number"
+                android:maxLength="1"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <!-- Verify Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_verify"
+            android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_margin="6dp"
-            android:background="@drawable/otp_input_background"
-            android:gravity="center"
-            android:inputType="number"
-            android:maxLength="1"
-            android:textSize="20sp"
+            android:text="Verify Code"
+            android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="@color/text_primary" />
+            android:enabled="false"
+            app:cornerRadius="12dp" />
 
     </LinearLayout>
 
-    <!-- Timer & Status -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Bottom Section -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:orientation="vertical"
         android:gravity="center"
-        android:orientation="vertical">
+        android:layout_marginTop="32dp">
 
         <TextView
             android:id="@+id/tv_timer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Resend code in 05:00"
+            android:text="Resend code in 60s"
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
 
@@ -151,55 +202,15 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Didn't receive code? Resend"
+            android:text="Resend Code"
             android:textColor="@color/primary_color"
+            android:textSize="16sp"
             android:textStyle="bold"
-            android:textSize="14sp"
-            android:visibility="gone" />
-
-    </LinearLayout>
-
-    <!-- Verify Button -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_verify"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginTop="40dp"
-        android:text="Verify Code"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:enabled="false"
-        app:cornerRadius="12dp" />
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <!-- Back Button -->
-    <LinearLayout
-        android:id="@+id/ll_back"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginBottom="32dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="12dp">
-
-        <ImageView
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:src="@drawable/ic_arrow_back"
-            app:tint="@color/text_secondary" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Back to Login"
-            android:textColor="@color/text_secondary"
-            android:textStyle="bold" />
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:enabled="false" />
 
     </LinearLayout>
 

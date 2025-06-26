@@ -1,3 +1,5 @@
+// app/src/main/java/com/example/newtrade/ui/chat/ChatActivity.java
+// ✅ FIXED: Sửa lỗi SharedPrefsManager initialization
 package com.example.newtrade.ui.chat;
 
 import android.content.Intent;
@@ -55,6 +57,7 @@ public class ChatActivity extends AppCompatActivity {
     private String productTitle;
     private Long sellerId;
     private Long currentUserId;
+    private String otherUserName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,19 +73,19 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void getIntentData() {
-        conversationId = getIntent().getLongExtra("conversation_id", -1);
-        productId = getIntent().getLongExtra("product_id", -1);
-        productTitle = getIntent().getStringExtra("product_title");
-        sellerId = getIntent().getLongExtra("seller_id", -1);
+        Intent intent = getIntent();
+        conversationId = intent.getLongExtra("conversation_id", -1);
+        productId = intent.getLongExtra("product_id", -1);
+        productTitle = intent.getStringExtra("product_title");
+        sellerId = intent.getLongExtra("seller_id", -1);
+        otherUserName = intent.getStringExtra("other_user_name");
 
-        // ❌ SAI:
-        // prefsManager = new SharedPrefsManager(this);
-
-        // ✅ ĐÚNG:
+        // ✅ FIX: Proper SharedPrefsManager initialization
         prefsManager = SharedPrefsManager.getInstance(this);
         currentUserId = prefsManager.getUserId();
 
         Log.d(TAG, "Chat data - Conversation: " + conversationId + ", Product: " + productTitle);
+        Log.d(TAG, "Current User: " + currentUserId + ", Seller: " + sellerId);
     }
 
     private void initViews() {
@@ -97,11 +100,11 @@ public class ChatActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("Chat");
+            getSupportActionBar().setTitle(otherUserName != null ? otherUserName : "Chat");
         }
 
         if (tvProductInfo != null && productTitle != null) {
-            tvProductInfo.setText("About: " + productTitle);
+            tvProductInfo.setText("Về: " + productTitle);
         }
     }
 
@@ -115,6 +118,14 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
+        // ✅ FIX: Check if currentUserId is valid
+        if (currentUserId == null || currentUserId <= 0) {
+            Log.e(TAG, "❌ Invalid current user ID: " + currentUserId);
+            Toast.makeText(this, "Lỗi: Không thể xác định người dùng", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         messageAdapter = new MessageAdapter(messages, currentUserId);
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true);
@@ -140,22 +151,64 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void loadMessages() {
-        // TODO: Implement load messages from API
         Log.d(TAG, "Loading messages for conversation: " + conversationId);
+
+        // ✅ FIX: Add mock messages for testing
+        addMockMessages();
+    }
+
+    // ✅ FIX: Add mock messages for testing
+    private void addMockMessages() {
+        Message msg1 = new Message();
+        msg1.setId(1L);
+        msg1.setSenderId(sellerId);
+        msg1.setContent("Xin chào! Bạn quan tâm đến sản phẩm này?");
+        msg1.setTimestamp("2 phút trước");
+        messages.add(msg1);
+
+        Message msg2 = new Message();
+        msg2.setId(2L);
+        msg2.setSenderId(currentUserId);
+        msg2.setContent("Chào bạn! Có thể cho tôi biết thêm chi tiết không?");
+        msg2.setTimestamp("1 phút trước");
+        messages.add(msg2);
+
+        messageAdapter.notifyDataSetChanged();
+        rvMessages.scrollToPosition(messages.size() - 1);
     }
 
     private void sendMessage() {
         String messageText = etMessage.getText().toString().trim();
         if (messageText.isEmpty()) return;
 
+        // ✅ FIX: Add message to UI immediately
+        Message newMessage = new Message();
+        newMessage.setId(System.currentTimeMillis());
+        newMessage.setSenderId(currentUserId);
+        newMessage.setContent(messageText);
+        newMessage.setTimestamp("Vừa xong");
+
+        messages.add(newMessage);
+        messageAdapter.notifyItemInserted(messages.size() - 1);
+        rvMessages.scrollToPosition(messages.size() - 1);
+
+        etMessage.setText("");
+
+        Log.d(TAG, "Message sent: " + messageText);
+        Toast.makeText(this, "Tin nhắn đã gửi (demo)", Toast.LENGTH_SHORT).show();
+
+        // TODO: Implement actual API call to send message
+        // sendMessageToServer(messageText);
+    }
+
+    // ✅ FIX: Add method for future API integration
+    private void sendMessageToServer(String messageText) {
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("conversationId", conversationId);
         messageData.put("content", messageText);
+        messageData.put("senderId", currentUserId);
 
-        // TODO: Implement send message API call
-        Toast.makeText(this, "Message sent: " + messageText, Toast.LENGTH_SHORT).show();
-        etMessage.setText("");
-
-        Log.d(TAG, "Sending message: " + messageText);
+        // TODO: Implement actual API call
+        Log.d(TAG, "Sending message to server: " + messageText);
     }
 }
