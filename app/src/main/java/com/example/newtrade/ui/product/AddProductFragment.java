@@ -1,5 +1,7 @@
 // app/src/main/java/com/example/newtrade/ui/product/AddProductFragment.java
 package com.example.newtrade.ui.product;
+import androidx.navigation.NavController;
+import androidx.navigation.Navigation;
 
 import android.Manifest;
 import android.app.Activity;
@@ -483,8 +485,18 @@ public class AddProductFragment extends Fragment {
                                 "🎉 Product published successfully!", Toast.LENGTH_LONG).show();
 
                         clearForm();
-                        if (getActivity() != null) {
-                            getActivity().finish();
+
+                        // ✅ Navigate về Home thay vì finish activity
+                        try {
+                            NavController navController = Navigation.findNavController(requireView());
+                            navController.navigate(R.id.nav_home);
+                            Log.d(TAG, "✅ Navigated to home after successful publish");
+                        } catch (Exception e) {
+                            Log.e(TAG, "❌ Navigation failed, staying on current fragment", e);
+                            // Không làm gì - user vẫn ở AddProductFragment với form đã clear
+                            Toast.makeText(requireContext(),
+                                    "Product published! You can continue using the app.",
+                                    Toast.LENGTH_SHORT).show();
                         }
 
                     } else {
