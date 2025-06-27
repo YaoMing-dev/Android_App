@@ -14,8 +14,14 @@ public class User {
     @SerializedName("displayName")
     private String displayName;
 
-    @SerializedName("profileImageUrl")
-    private String profileImageUrl;
+    @SerializedName("profilePicture")  // ✅ Sửa để match backend
+    private String profilePicture;
+
+    @SerializedName("bio")  // ✅ Thêm missing field
+    private String bio;
+
+    @SerializedName("contactInfo")  // ✅ Thêm missing field
+    private String contactInfo;
 
     @SerializedName("isEmailVerified")
     private Boolean isEmailVerified;
@@ -69,12 +75,40 @@ public class User {
         this.displayName = displayName;
     }
 
+    // ✅ Sửa method name để match backend
+    public String getProfilePicture() {
+        return profilePicture;
+    }
+
+    public void setProfilePicture(String profilePicture) {
+        this.profilePicture = profilePicture;
+    }
+
+    // ✅ Legacy method để backward compatibility
     public String getProfileImageUrl() {
-        return profileImageUrl;
+        return profilePicture;
     }
 
     public void setProfileImageUrl(String profileImageUrl) {
-        this.profileImageUrl = profileImageUrl;
+        this.profilePicture = profileImageUrl;
+    }
+
+    // ✅ Thêm Bio methods
+    public String getBio() {
+        return bio;
+    }
+
+    public void setBio(String bio) {
+        this.bio = bio;
+    }
+
+    // ✅ Thêm ContactInfo methods
+    public String getContactInfo() {
+        return contactInfo;
+    }
+
+    public void setContactInfo(String contactInfo) {
+        this.contactInfo = contactInfo;
     }
 
     public Boolean getIsEmailVerified() {

@@ -14,23 +14,23 @@ import retrofit2.http.Path;
 
 public interface UserService {
 
-    // Get current user profile
+    // ✅ Get current user profile - trả về UserProfileResponse từ backend
     @GET("api/users/profile")
     Call<StandardResponse<User>> getCurrentUserProfile();
 
-    // Get user profile by ID
+    // ✅ Get user profile by ID - trả về UserProfileResponse từ backend
     @GET("api/users/{id}/profile")
     Call<StandardResponse<User>> getUserProfile(@Path("id") Long userId);
 
-    // Update user profile
+    // ✅ Update user profile - match với UserProfileRequest backend
     @PUT("api/users/profile")
     Call<StandardResponse<User>> updateProfile(@Body Map<String, Object> request);
 
-    // Get user statistics
+    // ✅ Get user statistics
     @GET("api/users/stats")
     Call<StandardResponse<Map<String, Object>>> getUserStats();
 
-    // Update FCM token
+    // ✅ Update FCM token cho push notifications
     @PUT("api/users/fcm-token")
     Call<StandardResponse<String>> updateFcmToken(@Body Map<String, String> request);
 }
