@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.ProductAdapter;
 import com.example.newtrade.api.ApiClient;
+import com.example.newtrade.api.ApiService;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
@@ -61,6 +62,7 @@ public class SearchFragment extends Fragment {
     // Data & Adapters
     private ProductAdapter productAdapter;
     private final List<Product> searchResults = new ArrayList<>();
+    private final List<Product> popularProducts = new ArrayList<>(); // ✅ FIX: Add popular products
     private String currentQuery = "";
     private final Handler searchHandler = new Handler(Looper.getMainLooper());
     private Runnable searchRunnable;
@@ -113,586 +115,305 @@ public class SearchFragment extends Fragment {
         llLoadingState = view.findViewById(R.id.ll_loading_state);
         tvResultsCount = view.findViewById(R.id.tv_results_count);
         tvSortOption = view.findViewById(R.id.tv_sort_option);
-
-        // Initialize popular products title
-        tvPopularProductsTitle = new TextView(getContext());
-        tvPopularProductsTitle.setText("✨ Popular Products");
-        tvPopularProductsTitle.setTextSize(18);
-        tvPopularProductsTitle.setTextColor(getResources().getColor(R.color.text_primary));
-        tvPopularProductsTitle.setPadding(16, 16, 16, 8);
-
-        Log.d(TAG, "✅ SearchFragment views initialized");
+        tvPopularProductsTitle = view.findViewById(R.id.tv_popular_products_title);
     }
 
     private void setupRecyclerViews() {
-        if (rvSearchResults != null) {
-            productAdapter = new ProductAdapter(searchResults, this::navigateToProductDetail);
+        // ✅ FIX: Setup RecyclerView with proper layout
+        GridLayoutManager layoutManager = new GridLayoutManager(requireContext(), 2);
+        rvSearchResults.setLayoutManager(layoutManager);
 
-            GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 2);
-            rvSearchResults.setLayoutManager(layoutManager);
-            rvSearchResults.setAdapter(productAdapter);
+        productAdapter = new ProductAdapter(searchResults, product -> {
+            // Handle product click
+            Intent intent = new Intent(requireContext(), ProductDetailActivity.class);
+            intent.putExtra("product_id", product.getId());
+            startActivity(intent);
+        });
 
-            // Add scroll listener for pagination
-            rvSearchResults.addOnScrollListener(new RecyclerView.OnScrollListener() {
-                @Override
-                public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-                    super.onScrolled(recyclerView, dx, dy);
-
-                    if (!isSearching && !isShowingPopularProducts) {
-                        GridLayoutManager layoutManager = (GridLayoutManager) recyclerView.getLayoutManager();
-                        if (layoutManager != null) {
-                            int totalItemCount = layoutManager.getItemCount();
-                            int lastVisibleItem = layoutManager.findLastVisibleItemPosition();
-
-                            if (totalItemCount <= (lastVisibleItem + 5)) {
-                                // Load more items
-                                loadMoreSearchResults();
-                            }
-                        }
-                    }
-                }
-            });
-        }
+        rvSearchResults.setAdapter(productAdapter);
     }
 
     private void setupListeners() {
-        // Search input with debounce
-        if (etSearch != null) {
-            etSearch.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        // ✅ FIX: Search text watcher with debouncing
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (searchRunnable != null) {
+                    searchHandler.removeCallbacks(searchRunnable);
+                }
+
+                searchRunnable = () -> {
                     String query = s.toString().trim();
                     if (!query.equals(currentQuery)) {
                         currentQuery = query;
-                        scheduleSearch();
+                        performSearch(query);
                     }
-                }
+                };
 
-                @Override
-                public void afterTextChanged(Editable s) {}
-            });
-        }
+                searchHandler.postDelayed(searchRunnable, SEARCH_DELAY_MS);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
 
         // Filter buttons
-        if (btnCategoryFilter != null) {
-            btnCategoryFilter.setOnClickListener(v -> showCategoryFilter());
-        }
-
-        if (btnPriceFilter != null) {
-            btnPriceFilter.setOnClickListener(v -> showPriceFilter());
-        }
-
-        if (btnLocationFilter != null) {
-            btnLocationFilter.setOnClickListener(v -> showLocationFilter());
-        }
-
-        if (btnConditionFilter != null) {
-            btnConditionFilter.setOnClickListener(v -> showConditionFilter());
-        }
+        btnCategoryFilter.setOnClickListener(v -> showCategoryFilter());
+        btnPriceFilter.setOnClickListener(v -> showPriceFilter());
+        btnLocationFilter.setOnClickListener(v -> showLocationFilter());
+        btnConditionFilter.setOnClickListener(v -> showConditionFilter());
 
         // Sort option
-        if (tvSortOption != null) {
-            tvSortOption.setOnClickListener(v -> showSortOptions());
+        tvSortOption.setOnClickListener(v -> showSortOptions());
+    }
+
+    // ✅ FIX: Show initial state with popular products
+    private void showInitialState() {
+        if (TextUtils.isEmpty(currentQuery)) {
+            loadPopularProducts();
         }
     }
 
-    // ===== SEARCH FUNCTIONALITY =====
+    // ✅ FIX: Load popular products when search is empty
+    private void loadPopularProducts() {
+        Log.d(TAG, "Loading popular products...");
 
-    private void scheduleSearch() {
-        // Cancel previous search
-        if (searchRunnable != null) {
-            searchHandler.removeCallbacks(searchRunnable);
+        showLoadingState(true);
+        isShowingPopularProducts = true;
+
+        // Update UI to show popular products
+        if (tvPopularProductsTitle != null) {
+            tvPopularProductsTitle.setVisibility(View.VISIBLE);
+            tvPopularProductsTitle.setText("Popular Products");
         }
 
-        // Schedule new search
-        searchRunnable = () -> {
-            if (TextUtils.isEmpty(currentQuery)) {
-                showInitialState();
-            } else {
-                performSearch();
-            }
-        };
-
-        searchHandler.postDelayed(searchRunnable, SEARCH_DELAY_MS);
-    }
-
-    private void performSearch() {
-        if (isSearching) return;
-
-        isSearching = true;
-        isShowingPopularProducts = false;
-        showLoadingState();
-
-        Log.d(TAG, "🔍 Performing search: " + currentQuery);
-
-        // Build search parameters
-        Map<String, Object> searchParams = new HashMap<>();
-        searchParams.put("query", currentQuery);
-        searchParams.put("page", 0);
-        searchParams.put("size", 20);
-
-        if (selectedCategoryId != null) {
-            searchParams.put("categoryId", selectedCategoryId);
+        if (tvResultsCount != null) {
+            tvResultsCount.setVisibility(View.GONE);
         }
 
-        if (minPrice != null) {
-            searchParams.put("minPrice", minPrice);
-        }
+        ApiService apiService = ApiClient.getApiService();
+        Call<StandardResponse<List<Map<String, Object>>>> call = apiService.getFeaturedProducts();
 
-        if (maxPrice != null) {
-            searchParams.put("maxPrice", maxPrice);
-        }
-
-        if (selectedCondition != null) {
-            searchParams.put("condition", selectedCondition);
-        }
-
-        if (searchLatitude != null && searchLongitude != null) {
-            searchParams.put("latitude", searchLatitude);
-            searchParams.put("longitude", searchLongitude);
-            searchParams.put("radius", searchRadiusKm);
-        }
-
-        searchParams.put("sortBy", sortBy);
-
-        // Call search API
-        ApiClient.getApiService().searchProductsAdvanced(
-                currentQuery,
-                selectedCategoryId,
-                minPrice,
-                maxPrice,
-                selectedCondition,
-                searchLatitude,
-                searchLongitude,
-                searchRadiusKm,
-                sortBy,
-                0,
-                20
-        ).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+        call.enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
             @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                isSearching = false;
+            public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
+                                   Response<StandardResponse<List<Map<String, Object>>>> response) {
 
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Map<String, Object> data = response.body().getData();
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, Object>> productMaps = (List<Map<String, Object>>) data.get("content");
+                showLoadingState(false);
 
-                    if (productMaps != null) {
-                        List<Product> products = convertMapsToProducts(productMaps);
-                        displaySearchResults(products);
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<List<Map<String, Object>>> standardResponse = response.body();
 
-                        Log.d(TAG, "✅ Search completed: " + products.size() + " results");
+                    if (standardResponse.isSuccess()) {
+                        List<Map<String, Object>> productMaps = standardResponse.getData();
+
+                        popularProducts.clear();
+                        searchResults.clear();
+
+                        for (Map<String, Object> productMap : productMaps) {
+                            Product product = Product.fromMap(productMap);
+                            popularProducts.add(product);
+                            searchResults.add(product); // Add to search results for display
+                        }
+
+                        productAdapter.notifyDataSetChanged();
+
+                        // Show results or empty state
+                        if (searchResults.isEmpty()) {
+                            showEmptyState(true);
+                        } else {
+                            showEmptyState(false);
+                            Log.d(TAG, "✅ Loaded " + searchResults.size() + " popular products");
+                        }
+
                     } else {
-                        displaySearchResults(new ArrayList<>());
+                        showError("Failed to load popular products: " + standardResponse.getMessage());
+                        showEmptyState(true);
                     }
                 } else {
-                    showError("Search failed: " + (response.body() != null ? response.body().getMessage() : "Unknown error"));
-                    showEmptyState();
+                    showError("Failed to load popular products");
+                    showEmptyState(true);
+                    Log.e(TAG, "Popular products response not successful: " + response.code());
                 }
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                isSearching = false;
-                Log.e(TAG, "❌ Search failed", t);
-                showError("Search failed: " + t.getMessage());
-                showEmptyState();
+            public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
+                showLoadingState(false);
+                showEmptyState(true);
+                Log.e(TAG, "❌ Failed to load popular products", t);
+                showError("Network error while loading popular products");
             }
         });
     }
 
-    private void loadMoreSearchResults() {
-        // TODO: Implement pagination
-        Log.d(TAG, "📄 Loading more search results...");
-    }
+    private void performSearch(String query) {
+        Log.d(TAG, "Performing search: " + query);
 
-    // ===== INITIAL STATE WITH POPULAR PRODUCTS =====
-
-    private void showInitialState() {
-        hideAllStates();
-        loadPopularProducts();
-
-        // Show search suggestions
-        if (llRecentSearches != null) {
-            llRecentSearches.setVisibility(View.VISIBLE);
+        if (TextUtils.isEmpty(query)) {
+            // ✅ FIX: Show popular products when search is empty
+            loadPopularProducts();
+            return;
         }
-    }
 
-    private void loadPopularProducts() {
-        if (isSearching) return;
-
+        showLoadingState(true);
         isSearching = true;
-        isShowingPopularProducts = true;
-        showLoadingState();
+        isShowingPopularProducts = false;
 
-        Log.d(TAG, "✨ Loading popular products...");
+        // Update UI for search results
+        if (tvPopularProductsTitle != null) {
+            tvPopularProductsTitle.setVisibility(View.GONE);
+        }
 
-        // Try featured products first
-        ApiClient.getApiService().getFeaturedProducts()
-                .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-                    @Override
-                    public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
-                                           @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
-
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            List<Map<String, Object>> productMaps = response.body().getData();
-
-                            if (productMaps != null && !productMaps.isEmpty()) {
-                                List<Product> products = convertMapsToProducts(productMaps);
-                                displayPopularProducts(products);
-                                Log.d(TAG, "✅ Loaded " + products.size() + " featured products");
-                            } else {
-                                loadRecentProducts(); // Fallback
-                            }
-                        } else {
-                            loadRecentProducts(); // Fallback
-                        }
-
-                        isSearching = false;
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
-                        Log.e(TAG, "❌ Failed to load featured products", t);
-                        loadRecentProducts(); // Fallback
-                    }
-                });
-    }
-
-    private void loadRecentProducts() {
-        ApiClient.getApiService().getRecentProducts(20)
-                .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-                    @Override
-                    public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
-                                           @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
-                        isSearching = false;
-
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            List<Map<String, Object>> productMaps = response.body().getData();
-
-                            if (productMaps != null && !productMaps.isEmpty()) {
-                                List<Product> products = convertMapsToProducts(productMaps);
-                                displayPopularProducts(products);
-                                Log.d(TAG, "✅ Loaded " + products.size() + " recent products");
-                            } else {
-                                showEmptyState();
-                            }
-                        } else {
-                            showEmptyState();
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
-                        isSearching = false;
-                        Log.e(TAG, "❌ Failed to load recent products", t);
-                        showEmptyState();
-                    }
-                });
-    }
-
-    // ===== DISPLAY METHODS =====
-
-    private void displayPopularProducts(List<Product> products) {
-        hideAllStates();
-
-        searchResults.clear();
-        searchResults.addAll(products);
-        productAdapter.notifyDataSetChanged();
-
-        rvSearchResults.setVisibility(View.VISIBLE);
-
-        // Update results count
         if (tvResultsCount != null) {
-            tvResultsCount.setText("✨ Popular Products (" + products.size() + ")");
+            tvResultsCount.setVisibility(View.VISIBLE);
         }
 
-        // Show search suggestions alongside popular products
-        if (llRecentSearches != null) {
-            llRecentSearches.setVisibility(View.VISIBLE);
-        }
+        ApiService apiService = ApiClient.getApiService();
+        Call<StandardResponse<Map<String, Object>>> call = apiService.searchProductsAdvanced(
+                query, selectedCategoryId, minPrice, maxPrice, selectedCondition,
+                searchLatitude, searchLongitude, searchRadiusKm, sortBy, 0, 20
+        );
 
-        Log.d(TAG, "✅ Displayed " + products.size() + " popular products");
-    }
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                   Response<StandardResponse<Map<String, Object>>> response) {
 
-    private void displaySearchResults(List<Product> products) {
-        hideAllStates();
+                showLoadingState(false);
+                isSearching = false;
 
-        searchResults.clear();
-        searchResults.addAll(products);
-        productAdapter.notifyDataSetChanged();
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Map<String, Object>> standardResponse = response.body();
 
-        if (products.isEmpty()) {
-            showEmptyState();
-        } else {
-            rvSearchResults.setVisibility(View.VISIBLE);
-            updateResultsCount(products.size());
-        }
+                    if (standardResponse.isSuccess()) {
+                        Map<String, Object> data = standardResponse.getData();
+                        List<Map<String, Object>> productMaps = (List<Map<String, Object>>) data.get("products");
+                        Integer totalCount = (Integer) data.get("totalCount");
+
+                        searchResults.clear();
+
+                        if (productMaps != null) {
+                            for (Map<String, Object> productMap : productMaps) {
+                                Product product = Product.fromMap(productMap);
+                                searchResults.add(product);
+                            }
+                        }
+
+                        productAdapter.notifyDataSetChanged();
+
+                        // Update results count
+                        if (tvResultsCount != null) {
+                            tvResultsCount.setText(totalCount != null ?
+                                    totalCount + " results found" :
+                                    searchResults.size() + " results found");
+                        }
+
+                        // Show results or empty state
+                        if (searchResults.isEmpty()) {
+                            showEmptyState(true);
+                        } else {
+                            showEmptyState(false);
+                            Log.d(TAG, "✅ Search completed: " + searchResults.size() + " results");
+                        }
+
+                    } else {
+                        showError("Search failed: " + standardResponse.getMessage());
+                        showEmptyState(true);
+                    }
+                } else {
+                    showError("Search failed");
+                    showEmptyState(true);
+                    Log.e(TAG, "Search response not successful: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                showLoadingState(false);
+                showEmptyState(true);
+                isSearching = false;
+                Log.e(TAG, "❌ Search failed", t);
+                showError("Network error during search");
+            }
+        });
     }
 
     // ===== FILTER METHODS =====
 
     private void showCategoryFilter() {
         // TODO: Implement category filter dialog
-        Log.d(TAG, "🏷️ Show category filter");
-        Toast.makeText(getContext(), "Category filter - Coming soon", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), "Category filter coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void showPriceFilter() {
         // TODO: Implement price filter dialog
-        Log.d(TAG, "💰 Show price filter");
-        Toast.makeText(getContext(), "Price filter - Coming soon", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), "Price filter coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void showLocationFilter() {
         // TODO: Implement location filter dialog
-        Log.d(TAG, "📍 Show location filter");
-        Toast.makeText(getContext(), "Location filter - Coming soon", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), "Location filter coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void showConditionFilter() {
-        if (getContext() == null) return;
-
-        String[] conditions = {"New", "Like New", "Good", "Fair", "Poor"};
-        String[] conditionValues = {"NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
-
-        int selectedIndex = -1;
-        if (selectedCondition != null) {
-            for (int i = 0; i < conditionValues.length; i++) {
-                if (conditionValues[i].equals(selectedCondition)) {
-                    selectedIndex = i;
-                    break;
-                }
-            }
-        }
-
-        new AlertDialog.Builder(getContext())
-                .setTitle("Select Condition")
-                .setSingleChoiceItems(conditions, selectedIndex, (dialog, which) -> {
-                    selectedCondition = conditionValues[which];
-                    updateConditionFilterButton();
-                    performSearch();
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Clear", (dialog, which) -> {
-                    selectedCondition = null;
-                    updateConditionFilterButton();
-                    performSearch();
-                })
-                .setNeutralButton("Cancel", null)
-                .show();
+        // TODO: Implement condition filter dialog
+        Toast.makeText(requireContext(), "Condition filter coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void showSortOptions() {
-        if (getContext() == null) return;
+        String[] sortOptions = {"Relevance", "Price: Low to High", "Price: High to Low", "Newest First", "Oldest First"};
+        String[] sortValues = {"relevance", "price_asc", "price_desc", "newest", "oldest"};
 
-        String[] sortOptions = {"Relevance", "Newest", "Oldest", "Price: Low to High", "Price: High to Low", "Distance"};
-        String[] sortValues = {"relevance", "newest", "oldest", "price_asc", "price_desc", "distance"};
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Sort by");
+        builder.setItems(sortOptions, (dialog, which) -> {
+            sortBy = sortValues[which];
+            tvSortOption.setText(sortOptions[which]);
 
-        int selectedIndex = 0;
-        for (int i = 0; i < sortValues.length; i++) {
-            if (sortValues[i].equals(sortBy)) {
-                selectedIndex = i;
-                break;
+            // Re-perform search with new sort
+            if (!TextUtils.isEmpty(currentQuery)) {
+                performSearch(currentQuery);
+            } else if (isShowingPopularProducts) {
+                loadPopularProducts();
             }
-        }
-
-        new AlertDialog.Builder(getContext())
-                .setTitle("Sort by")
-                .setSingleChoiceItems(sortOptions, selectedIndex, (dialog, which) -> {
-                    sortBy = sortValues[which];
-                    updateSortButton();
-                    if (!TextUtils.isEmpty(currentQuery)) {
-                        performSearch();
-                    }
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        });
+        builder.show();
     }
 
-    // ===== FILTER UI UPDATES =====
+    // ===== UI STATE METHODS =====
 
-    private void updateConditionFilterButton() {
-        if (btnConditionFilter != null) {
-            if (selectedCondition != null) {
-                btnConditionFilter.setText("Condition: " + Constants.getProductConditionDisplay(selectedCondition));
-                btnConditionFilter.setIconResource(R.drawable.ic_check);
-            } else {
-                btnConditionFilter.setText("Condition");
-                btnConditionFilter.setIconResource(R.drawable.ic_arrow_drop_down);
-            }
-        }
-    }
-
-    private void updateSortButton() {
-        if (tvSortOption != null) {
-            String sortText = "Relevance";
-            switch (sortBy) {
-                case "newest": sortText = "Newest"; break;
-                case "oldest": sortText = "Oldest"; break;
-                case "price_asc": sortText = "Price ↑"; break;
-                case "price_desc": sortText = "Price ↓"; break;
-                case "distance": sortText = "Distance"; break;
-            }
-            tvSortOption.setText("Sort: " + sortText);
-        }
-    }
-
-    // ===== CLEAR FILTERS =====
-
-    private void clearAllFilters() {
-        selectedCategoryId = null;
-        selectedCategoryName = null;
-        selectedCondition = null;
-        minPrice = null;
-        maxPrice = null;
-        searchLatitude = null;
-        searchLongitude = null;
-        searchLocationName = "";
-        sortBy = "relevance";
-
-        updateFilterButtons();
-
-        if (!TextUtils.isEmpty(currentQuery)) {
-            performSearch();
-        }
-    }
-
-    private void updateFilterButtons() {
-        updateConditionFilterButton();
-        updateSortButton();
-        // TODO: Update other filter buttons
-    }
-
-    // ===== DATA CONVERSION =====
-
-    private List<Product> convertMapsToProducts(List<Map<String, Object>> productMaps) {
-        List<Product> products = new ArrayList<>();
-
-        for (Map<String, Object> productMap : productMaps) {
-            try {
-                Product product = convertMapToProduct(productMap);
-                if (product != null) {
-                    products.add(product);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "❌ Error converting product data", e);
-            }
-        }
-
-        return products;
-    }
-
-    private Product convertMapToProduct(Map<String, Object> productMap) {
-        try {
-            Product product = new Product();
-
-            // Basic info
-            if (productMap.get("id") != null) {
-                product.setId(((Number) productMap.get("id")).longValue());
-            }
-
-            product.setTitle((String) productMap.get("title"));
-            product.setDescription((String) productMap.get("description"));
-
-            // Price
-            if (productMap.get("price") != null) {
-                product.setPrice(((Number) productMap.get("price")).doubleValue());
-            }
-
-            // Images
-            String imageUrl = (String) productMap.get("imageUrl");
-            if (imageUrl != null) {
-                product.setImageUrl(Constants.getImageUrl(imageUrl));
-            }
-
-            // Location
-            product.setLocation((String) productMap.get("location"));
-
-            // Condition
-            product.setCondition((String) productMap.get("condition"));
-
-            // Status
-            product.setStatus((String) productMap.get("status"));
-
-            // Timestamps
-            product.setCreatedAt((String) productMap.get("createdAt"));
-
-            return product;
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error converting product map", e);
-            return null;
-        }
-    }
-
-    // ===== UI STATE MANAGEMENT =====
-
-    private void showLoadingState() {
-        hideAllStates();
+    private void showLoadingState(boolean show) {
         if (llLoadingState != null) {
-            llLoadingState.setVisibility(View.VISIBLE);
+            llLoadingState.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (rvSearchResults != null) {
+            rvSearchResults.setVisibility(show ? View.GONE : View.VISIBLE);
         }
     }
 
-    private void showEmptyState() {
-        hideAllStates();
+    private void showEmptyState(boolean show) {
         if (llEmptyState != null) {
-            llEmptyState.setVisibility(View.VISIBLE);
+            llEmptyState.setVisibility(show ? View.VISIBLE : View.GONE);
         }
-
-        // Show search suggestions even in empty state
-        if (llRecentSearches != null && TextUtils.isEmpty(currentQuery)) {
-            llRecentSearches.setVisibility(View.VISIBLE);
-        }
-
-        updateResultsCount(0);
-    }
-
-    private void hideAllStates() {
-        if (rvSearchResults != null) rvSearchResults.setVisibility(View.GONE);
-        if (llEmptyState != null) llEmptyState.setVisibility(View.GONE);
-        if (llLoadingState != null) llLoadingState.setVisibility(View.GONE);
-        if (llRecentSearches != null) llRecentSearches.setVisibility(View.GONE);
-    }
-
-    private void updateResultsCount(int count) {
-        if (tvResultsCount != null) {
-            if (count == 0) {
-                tvResultsCount.setText("No products found");
-            } else {
-                tvResultsCount.setText("Found " + count + " products");
-            }
+        if (rvSearchResults != null) {
+            rvSearchResults.setVisibility(show ? View.GONE : View.VISIBLE);
         }
     }
-
-    // ===== NAVIGATION =====
-
-    private void navigateToProductDetail(Product product) {
-        Intent intent = new Intent(requireContext(), ProductDetailActivity.class);
-        intent.putExtra("product_id", product.getId());
-        startActivity(intent);
-    }
-
-    // ===== ERROR HANDLING =====
 
     private void showError(String message) {
-        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-        Log.e(TAG, "Error: " + message);
+        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
     }
-
-    // ===== CLEANUP =====
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (searchRunnable != null) {
+
+        // Clean up search handler
+        if (searchHandler != null && searchRunnable != null) {
             searchHandler.removeCallbacks(searchRunnable);
         }
     }

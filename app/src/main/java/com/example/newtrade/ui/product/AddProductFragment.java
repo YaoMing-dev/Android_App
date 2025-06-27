@@ -1,7 +1,5 @@
 // app/src/main/java/com/example/newtrade/ui/product/AddProductFragment.java
 package com.example.newtrade.ui.product;
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
 
 import android.Manifest;
 import android.app.Activity;
@@ -22,10 +20,14 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.NavController;
+import androidx.navigation.Navigation;
 
 import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
@@ -57,136 +59,129 @@ import retrofit2.Response;
 public class AddProductFragment extends Fragment {
 
     private static final String TAG = "AddProductFragment";
-    private static final int REQUEST_IMAGE_PICK = 1001;
-    private static final int REQUEST_LOCATION_PERMISSION = 1002;
 
-    // UI Components - ✅ SỬA THÀNH AutoCompleteTextView
+    // UI Components
     private TextInputEditText etTitle, etDescription, etPrice, etLocation, etTags;
-    private AutoCompleteTextView spinnerCategory, spinnerCondition; // ✅ SỬA TẠI ĐÂY
+    private AutoCompleteTextView spinnerCategory, spinnerCondition;
     private ImageView ivSelectedImage;
     private Button btnSelectImage, btnGetLocation, btnPreview, btnPublish;
-    private MaterialCheckBox cbNegotiable, cbTermsConditions, cbDataProcessing;
+    private MaterialCheckBox cbNegotiable;
 
-    // Data & Utils
+    // Data
     private SharedPrefsManager prefsManager;
     private FusedLocationProviderClient fusedLocationClient;
     private Uri selectedImageUri;
     private String uploadedImageUrl;
-    private boolean isPublishing = false;
+    private boolean isLoading = false;
+
+    // ✅ FIX: Modern Activity Result API
+    private ActivityResultLauncher<Intent> imagePickerLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                    selectedImageUri = result.getData().getData();
+                    if (selectedImageUri != null) {
+                        // Display selected image
+                        Glide.with(this)
+                                .load(selectedImageUri)
+                                .centerCrop()
+                                .into(ivSelectedImage);
+
+                        ivSelectedImage.setVisibility(View.VISIBLE);
+                        uploadedImageUrl = null; // Reset uploaded URL
+                        updatePublishButtonState();
+
+                        Log.d(TAG, "✅ Image selected: " + selectedImageUri);
+                    }
+                }
+            }
+    );
+
+    // ✅ FIX: Modern Permission Request API
+    private ActivityResultLauncher<String[]> permissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            result -> {
+                Boolean fineLocationGranted = result.get(Manifest.permission.ACCESS_FINE_LOCATION);
+                Boolean coarseLocationGranted = result.get(Manifest.permission.ACCESS_COARSE_LOCATION);
+
+                if (fineLocationGranted != null && fineLocationGranted) {
+                    getCurrentLocation();
+                } else if (coarseLocationGranted != null && coarseLocationGranted) {
+                    getCurrentLocation();
+                } else {
+                    Toast.makeText(requireContext(), "Location permission denied", Toast.LENGTH_SHORT).show();
+                }
+            }
+    );
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_add_product, container, false);
+        return inflater.inflate(R.layout.fragment_add_product, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         initViews(view);
+        initData();
         setupSpinners();
         setupListeners();
+        updatePublishButtonState();
 
-        prefsManager = SharedPrefsManager.getInstance(requireContext());
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
-
-        Log.d(TAG, "AddProductFragment created");
-        return view;
+        Log.d(TAG, "✅ AddProductFragment created successfully");
     }
 
     private void initViews(View view) {
-        // Form fields
         etTitle = view.findViewById(R.id.et_title);
         etDescription = view.findViewById(R.id.et_description);
         etPrice = view.findViewById(R.id.et_price);
         etLocation = view.findViewById(R.id.et_location);
         etTags = view.findViewById(R.id.et_tags);
-
-        // ✅ SỬA: AutoCompleteTextView thay vì Spinner
         spinnerCategory = view.findViewById(R.id.spinner_category);
         spinnerCondition = view.findViewById(R.id.spinner_condition);
-
-        // Image
         ivSelectedImage = view.findViewById(R.id.iv_selected_image);
         btnSelectImage = view.findViewById(R.id.btn_select_image);
-
-        // Action buttons
         btnGetLocation = view.findViewById(R.id.btn_get_location);
         btnPreview = view.findViewById(R.id.btn_preview);
         btnPublish = view.findViewById(R.id.btn_publish);
-
-        // Checkboxes
         cbNegotiable = view.findViewById(R.id.cb_negotiable);
-        cbTermsConditions = view.findViewById(R.id.cb_terms_conditions);
-        cbDataProcessing = view.findViewById(R.id.cb_data_processing);
+    }
+
+    private void initData() {
+        prefsManager = SharedPrefsManager.getInstance(requireContext());
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
     }
 
     private void setupSpinners() {
-        // ✅ Category AutoCompleteTextView
+        // ✅ FIX: Setup Category Spinner
         String[] categories = {
-                "Electronics", "Fashion", "Home & Garden",
-                "Sports", "Books", "Automotive", "Other"
+                "Electronics", "Fashion", "Home & Garden", "Sports", "Books",
+                "Automotive", "Health & Beauty", "Toys & Games", "Music", "Other"
         };
-
         ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(
                 requireContext(), android.R.layout.simple_dropdown_item_1line, categories);
         spinnerCategory.setAdapter(categoryAdapter);
-        spinnerCategory.setText(categories[2], false); // Default to "Home & Garden"
 
-        // ✅ Condition AutoCompleteTextView
+        // ✅ FIX: Setup Condition Spinner
         String[] conditions = {"New", "Like New", "Good", "Fair", "Poor"};
-
         ArrayAdapter<String> conditionAdapter = new ArrayAdapter<>(
                 requireContext(), android.R.layout.simple_dropdown_item_1line, conditions);
         spinnerCondition.setAdapter(conditionAdapter);
-        spinnerCondition.setText(conditions[0], false); // Default to "New"
     }
 
     private void setupListeners() {
-        // Image selection
-        if (btnSelectImage != null) {
-            btnSelectImage.setOnClickListener(v -> selectImage());
-        }
+        btnSelectImage.setOnClickListener(v -> selectImage());
+        btnGetLocation.setOnClickListener(v -> requestLocationPermission());
+        btnPreview.setOnClickListener(v -> previewProduct());
+        btnPublish.setOnClickListener(v -> publishProduct());
 
-        // Location
-        if (btnGetLocation != null) {
-            btnGetLocation.setOnClickListener(v -> getCurrentLocation());
-        }
+        // ✅ FIX: Text watchers for validation
+        etTitle.addTextChangedListener(new SimpleTextWatcher(() -> updatePublishButtonState()));
+        etDescription.addTextChangedListener(new SimpleTextWatcher(() -> updatePublishButtonState()));
+        etPrice.addTextChangedListener(new SimpleTextWatcher(() -> updatePublishButtonState()));
+        etLocation.addTextChangedListener(new SimpleTextWatcher(() -> updatePublishButtonState()));
 
-        // Preview
-        if (btnPreview != null) {
-            btnPreview.setOnClickListener(v -> previewListing());
-        }
-
-        // Publish
-        if (btnPublish != null) {
-            btnPublish.setOnClickListener(v -> validateAndPublish());
-        }
-
-        // Form validation listeners
-        setupFormValidationListeners();
-    }
-
-    private void setupFormValidationListeners() {
-        // Text change listeners
-        if (etTitle != null) {
-            etTitle.addTextChangedListener(new android.text.TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    updatePublishButtonState();
-                }
-                @Override
-                public void afterTextChanged(android.text.Editable s) {}
-            });
-        }
-
-        // Checkbox listeners
-        if (cbTermsConditions != null) {
-            cbTermsConditions.setOnCheckedChangeListener((buttonView, isChecked) -> updatePublishButtonState());
-        }
-
-        if (cbDataProcessing != null) {
-            cbDataProcessing.setOnCheckedChangeListener((buttonView, isChecked) -> updatePublishButtonState());
-        }
-
-        // Spinner listeners
         spinnerCategory.setOnItemClickListener((parent, view, position, id) -> updatePublishButtonState());
         spinnerCondition.setOnItemClickListener((parent, view, position, id) -> updatePublishButtonState());
     }
@@ -194,42 +189,25 @@ public class AddProductFragment extends Fragment {
     private void selectImage() {
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
         intent.setType("image/*");
-        startActivityForResult(intent, REQUEST_IMAGE_PICK);
+        imagePickerLauncher.launch(intent); // ✅ FIX: Use modern API
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+    private void requestLocationPermission() {
+        if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
 
-        if (requestCode == REQUEST_IMAGE_PICK && resultCode == Activity.RESULT_OK && data != null) {
-            selectedImageUri = data.getData();
-            if (selectedImageUri != null) {
-                // Display selected image
-                Glide.with(this)
-                        .load(selectedImageUri)
-                        .centerCrop()
-                        .into(ivSelectedImage);
-
-                // Show image, hide placeholder
-                ivSelectedImage.setVisibility(View.VISIBLE);
-
-                // Reset uploaded URL when new image is selected
-                uploadedImageUrl = null;
-                updatePublishButtonState();
-
-                Log.d(TAG, "Image selected: " + selectedImageUri);
-            }
+            permissionLauncher.launch(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            }); // ✅ FIX: Use modern API
+        } else {
+            getCurrentLocation();
         }
     }
 
     private void getCurrentLocation() {
         if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
-
-            requestPermissions(new String[]{
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-            }, REQUEST_LOCATION_PERMISSION);
             return;
         }
 
@@ -245,9 +223,7 @@ public class AddProductFragment extends Fragment {
                         String locationText = String.format("%.4f, %.4f",
                                 location.getLatitude(), location.getLongitude());
                         etLocation.setText(locationText);
-
-                        Log.d(TAG, "Location obtained: " + locationText);
-                        Toast.makeText(requireContext(), "Location updated", Toast.LENGTH_SHORT).show();
+                        Log.d(TAG, "✅ Location obtained: " + locationText);
                     } else {
                         Toast.makeText(requireContext(), "Unable to get current location", Toast.LENGTH_SHORT).show();
                     }
@@ -255,32 +231,43 @@ public class AddProductFragment extends Fragment {
                 .addOnFailureListener(e -> {
                     btnGetLocation.setEnabled(true);
                     btnGetLocation.setText("GPS");
-                    Log.e(TAG, "Failed to get location", e);
+                    Log.e(TAG, "❌ Failed to get location", e);
                     Toast.makeText(requireContext(), "Failed to get location", Toast.LENGTH_SHORT).show();
                 });
     }
 
-    private void previewListing() {
-        if (!validateForm()) return;
-        Toast.makeText(requireContext(), "Preview functionality coming soon", Toast.LENGTH_SHORT).show();
+    private void previewProduct() {
+        if (!validateForm()) {
+            return;
+        }
+
+        // Navigate to preview fragment
+        NavController navController = Navigation.findNavController(requireView());
+        navController.navigate(R.id.action_addProduct_to_productPreview);
     }
 
-    private void validateAndPublish() {
-        if (isPublishing) return;
-
-        if (!validateForm()) return;
-
-        if (!cbTermsConditions.isChecked()) {
-            Toast.makeText(requireContext(), "Please accept Terms & Conditions", Toast.LENGTH_SHORT).show();
+    private void publishProduct() {
+        if (!validateForm()) {
             return;
         }
 
-        if (!cbDataProcessing.isChecked()) {
-            Toast.makeText(requireContext(), "Please accept Data Processing terms", Toast.LENGTH_SHORT).show();
+        updatePublishButton("Publishing...", false);
+
+        // Check if user is logged in
+        Long userId = prefsManager.getUserId();
+        if (userId == null || userId <= 0) {
+            showError("Please login to publish products");
+            updatePublishButton("Publish Listing", true);
             return;
         }
 
-        publishProduct();
+        // Step 1: Upload image first if not already uploaded
+        if (selectedImageUri != null && uploadedImageUrl == null) {
+            uploadImageToServer();
+        } else {
+            // Step 2: Create product with uploaded image URL
+            createProductOnServer();
+        }
     }
 
     private boolean validateForm() {
@@ -322,6 +309,18 @@ public class AddProductFragment extends Fragment {
             isValid = false;
         }
 
+        // Validate category
+        if (TextUtils.isEmpty(spinnerCategory.getText().toString())) {
+            spinnerCategory.setError("Category is required");
+            isValid = false;
+        }
+
+        // Validate condition
+        if (TextUtils.isEmpty(spinnerCondition.getText().toString())) {
+            spinnerCondition.setError("Condition is required");
+            isValid = false;
+        }
+
         // Validate image
         if (selectedImageUri == null) {
             Toast.makeText(requireContext(), "Please select a product image", Toast.LENGTH_SHORT).show();
@@ -329,33 +328,6 @@ public class AddProductFragment extends Fragment {
         }
 
         return isValid;
-    }
-
-    private void publishProduct() {
-        updatePublishButton("Publishing...", false);
-
-        try {
-            // Check if user is logged in
-            Long userId = prefsManager.getUserId();
-            if (userId == null || userId <= 0) {
-                showError("Please login to publish products");
-                updatePublishButton("Publish Listing", true);
-                return;
-            }
-
-            // Step 1: Upload image first if not already uploaded
-            if (selectedImageUri != null && uploadedImageUrl == null) {
-                uploadImageToServer();
-            } else {
-                // Step 2: Create product with uploaded image URL
-                createProductOnServer();
-            }
-
-        } catch (Exception e) {
-            updatePublishButton("Publish Listing", true);
-            Log.e(TAG, "❌ Error in publish workflow", e);
-            showError("Error: " + e.getMessage());
-        }
     }
 
     private void uploadImageToServer() {
@@ -436,36 +408,14 @@ public class AddProductFragment extends Fragment {
             return;
         }
 
-        // ✅ Category - Get từ AutoCompleteTextView
-        String categoryText = spinnerCategory.getText().toString();
-        int categoryIndex = getCategoryIndex(categoryText);
-        productRequest.put("categoryId", (long) (categoryIndex + 1));
-
-        // ✅ Condition - Get từ AutoCompleteTextView
-        String conditionText = spinnerCondition.getText().toString();
-        String condition = conditionText.toUpperCase().replace(" ", "_");
-        productRequest.put("condition", condition);
-
         productRequest.put("location", getTextFromEditText(etLocation));
+        productRequest.put("category", spinnerCategory.getText().toString());
+        productRequest.put("condition", spinnerCondition.getText().toString());
+        productRequest.put("tags", getTextFromEditText(etTags));
+        productRequest.put("negotiable", cbNegotiable.isChecked());
+        productRequest.put("imageUrl", uploadedImageUrl);
+        productRequest.put("sellerId", userId);
 
-        // Additional fields
-        String tags = getTextFromEditText(etTags);
-        if (!TextUtils.isEmpty(tags)) {
-            productRequest.put("tags", tags);
-        }
-
-        productRequest.put("isNegotiable", cbNegotiable != null && cbNegotiable.isChecked());
-
-        // Image URLs
-        List<String> imageUrls = new ArrayList<>();
-        if (uploadedImageUrl != null) {
-            imageUrls.add(uploadedImageUrl);
-        }
-        productRequest.put("imageUrls", imageUrls);
-
-        Log.d(TAG, "Publishing product with data: " + productRequest);
-
-        // Call API
         ApiService apiService = ApiClient.getApiService();
         Call<StandardResponse<Map<String, Object>>> call = apiService.createProduct(productRequest);
 
@@ -481,29 +431,17 @@ public class AddProductFragment extends Fragment {
 
                     if (standardResponse.isSuccess()) {
                         Log.d(TAG, "✅ Product created successfully");
-                        Toast.makeText(requireContext(),
-                                "🎉 Product published successfully!", Toast.LENGTH_LONG).show();
+                        Toast.makeText(requireContext(), "Product published successfully!", Toast.LENGTH_SHORT).show();
 
+                        // Clear form and navigate back
                         clearForm();
-
-                        // ✅ Navigate về Home thay vì finish activity
-                        try {
-                            NavController navController = Navigation.findNavController(requireView());
-                            navController.navigate(R.id.nav_home);
-                            Log.d(TAG, "✅ Navigated to home after successful publish");
-                        } catch (Exception e) {
-                            Log.e(TAG, "❌ Navigation failed, staying on current fragment", e);
-                            // Không làm gì - user vẫn ở AddProductFragment với form đã clear
-                            Toast.makeText(requireContext(),
-                                    "Product published! You can continue using the app.",
-                                    Toast.LENGTH_SHORT).show();
-                        }
+                        requireActivity().onBackPressed();
 
                     } else {
                         showError("Failed to create product: " + standardResponse.getMessage());
                     }
                 } else {
-                    showError("Failed to create product on server (HTTP " + response.code() + ")");
+                    showError("Failed to create product on server");
                     Log.e(TAG, "Product creation response not successful: " + response.code());
                 }
             }
@@ -517,48 +455,26 @@ public class AddProductFragment extends Fragment {
         });
     }
 
-    private int getCategoryIndex(String categoryText) {
-        String[] categories = {
-                "Electronics", "Fashion", "Home & Garden",
-                "Sports", "Books", "Automotive", "Other"
-        };
-
-        for (int i = 0; i < categories.length; i++) {
-            if (categories[i].equals(categoryText)) {
-                return i;
-            }
-        }
-        return 0; // Default to Electronics
-    }
+    // ===== HELPER METHODS =====
 
     private File createTempFileFromUri(Uri uri) throws Exception {
         InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
-        if (inputStream == null) {
-            throw new Exception("Could not open input stream from URI");
-        }
-
-        File tempFile = File.createTempFile("upload_image", ".jpg", requireContext().getCacheDir());
-
+        File tempFile = new File(requireContext().getCacheDir(), "temp_image.jpg");
         FileOutputStream outputStream = new FileOutputStream(tempFile);
-        byte[] buffer = new byte[4096];
+
+        byte[] buffer = new byte[1024];
         int length;
         while ((length = inputStream.read(buffer)) > 0) {
             outputStream.write(buffer, 0, length);
         }
 
-        outputStream.close();
         inputStream.close();
-
-        Log.d(TAG, "Temp file created: " + tempFile.getAbsolutePath() + " (Size: " + tempFile.length() + " bytes)");
+        outputStream.close();
         return tempFile;
     }
 
-    private void updatePublishButton(String text, boolean enabled) {
-        if (btnPublish != null) {
-            btnPublish.setText(text);
-            btnPublish.setEnabled(enabled);
-        }
-        isPublishing = !enabled;
+    private String getTextFromEditText(TextInputEditText editText) {
+        return editText.getText() != null ? editText.getText().toString().trim() : "";
     }
 
     private void updatePublishButtonState() {
@@ -566,44 +482,55 @@ public class AddProductFragment extends Fragment {
                 !TextUtils.isEmpty(getTextFromEditText(etDescription)) &&
                 !TextUtils.isEmpty(getTextFromEditText(etPrice)) &&
                 !TextUtils.isEmpty(getTextFromEditText(etLocation)) &&
-                selectedImageUri != null &&
-                (cbTermsConditions == null || cbTermsConditions.isChecked()) &&
-                (cbDataProcessing == null || cbDataProcessing.isChecked());
+                !TextUtils.isEmpty(spinnerCategory.getText().toString()) &&
+                !TextUtils.isEmpty(spinnerCondition.getText().toString()) &&
+                selectedImageUri != null;
 
-        if (btnPublish != null) {
-            btnPublish.setEnabled(!isPublishing && isFormValid);
-        }
+        btnPublish.setEnabled(isFormValid && !isLoading);
     }
 
-    private String getTextFromEditText(TextInputEditText editText) {
-        if (editText == null) return "";
-        return editText.getText().toString().trim();
+    private void updatePublishButton(String text, boolean enabled) {
+        btnPublish.setText(text);
+        btnPublish.setEnabled(enabled);
+        isLoading = !enabled;
     }
 
     private void showError(String message) {
         Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
-        Log.e(TAG, "Error: " + message);
     }
 
     private void clearForm() {
-        if (etTitle != null) etTitle.setText("");
-        if (etDescription != null) etDescription.setText("");
-        if (etPrice != null) etPrice.setText("");
-        if (etLocation != null) etLocation.setText("");
-        if (etTags != null) etTags.setText("");
-
-        if (spinnerCategory != null) spinnerCategory.setText("Home & Garden", false);
-        if (spinnerCondition != null) spinnerCondition.setText("New", false);
-
-        if (cbNegotiable != null) cbNegotiable.setChecked(false);
-        if (cbTermsConditions != null) cbTermsConditions.setChecked(false);
-        if (cbDataProcessing != null) cbDataProcessing.setChecked(false);
-
+        etTitle.setText("");
+        etDescription.setText("");
+        etPrice.setText("");
+        etLocation.setText("");
+        etTags.setText("");
+        spinnerCategory.setText("");
+        spinnerCondition.setText("");
+        cbNegotiable.setChecked(false);
         selectedImageUri = null;
         uploadedImageUrl = null;
+        ivSelectedImage.setVisibility(View.GONE);
+        updatePublishButtonState();
+    }
 
-        if (ivSelectedImage != null) {
-            ivSelectedImage.setVisibility(View.GONE);
+    // ✅ FIX: Simple TextWatcher implementation
+    private static class SimpleTextWatcher implements android.text.TextWatcher {
+        private final Runnable callback;
+
+        public SimpleTextWatcher(Runnable callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+        @Override
+        public void afterTextChanged(android.text.Editable s) {
+            callback.run();
         }
     }
 }

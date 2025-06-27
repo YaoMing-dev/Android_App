@@ -46,91 +46,78 @@
         <activity
             android:name=".ui.auth.RegisterActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.auth.ForgotPasswordActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.auth.OtpVerificationActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <!-- ===== PRODUCT ACTIVITIES ===== -->
         <activity
             android:name=".ui.product.ProductDetailActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
-
-        <activity
-            android:name=".ui.product.AddProductActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <!-- ===== PROFILE ACTIVITIES ===== -->
         <activity
             android:name=".ui.profile.EditProfileActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.profile.SettingsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.profile.MyListingsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.profile.SavedItemsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.profile.UserProfileActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <!-- ===== CHAT ACTIVITIES ===== -->
         <activity
             android:name=".ui.chat.ChatActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <!-- ===== SEARCH ACTIVITIES ===== -->
         <activity
             android:name=".ui.search.AllProductsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.search.CategoryProductsActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <!-- ===== LOCATION ACTIVITIES ===== -->
+        <!-- ✅ FIX: Add LocationPickerActivity -->
+        <activity
+            android:name=".ui.location.LocationPickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+
         <activity
             android:name=".ui.location.RealtimeLocationActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <!-- ===== SERVICES ===== -->
         <service

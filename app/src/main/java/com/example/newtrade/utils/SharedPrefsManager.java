@@ -43,8 +43,20 @@ public class SharedPrefsManager {
         return prefs.getString(Constants.PREF_USER_NAME, "");
     }
 
-    // ✅ ADD: Profile Picture Support
-    public void setUserProfilePicture(String profilePictureUrl) {
+    // ✅ FIX: Add missing methods
+    public void saveUserName(String name) {
+        prefs.edit()
+                .putString(Constants.PREF_USER_NAME, name)
+                .apply();
+    }
+
+    public void saveUserEmail(String email) {
+        prefs.edit()
+                .putString(Constants.PREF_USER_EMAIL, email)
+                .apply();
+    }
+
+    public void saveUserProfilePicture(String profilePictureUrl) {
         prefs.edit()
                 .putString(Constants.PREF_USER_PROFILE_PICTURE, profilePictureUrl)
                 .apply();
