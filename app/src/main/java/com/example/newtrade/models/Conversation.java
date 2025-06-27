@@ -12,6 +12,7 @@ public class Conversation {
     private String otherUserName;
     private String lastMessageTime;
     private String productTitle;
+    private int unreadCount;
 
     public Conversation() {}
 
@@ -39,5 +40,7 @@ public class Conversation {
     public void setLastMessageTime(String lastMessageTime) { this.lastMessageTime = lastMessageTime; }
 
     public String getProductTitle() { return productTitle; }
+    public int getUnreadCount() { return unreadCount; }
+    public void setUnreadCount(int unreadCount) { this.unreadCount = unreadCount; }
     public void setProductTitle(String productTitle) { this.productTitle = productTitle; }
 }

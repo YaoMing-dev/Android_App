@@ -1,11 +1,13 @@
 // app/src/main/java/com/example/newtrade/websocket/RealtimeWebSocketService.java
-// ✅ COMPLETE WebSocket Service cho Chat + GPS Realtime
+// ✅ FIXED: STOMP-compatible WebSocket Service cho Chat + GPS Realtime
 package com.example.newtrade.websocket;
 
 import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import com.example.newtrade.models.Message;
 import com.example.newtrade.utils.Constants;
@@ -30,6 +32,7 @@ public class RealtimeWebSocketService extends Service {
     private WebSocketClient webSocketClient;
     private boolean isConnected = false;
     private boolean isConnecting = false;
+    private boolean isStompConnected = false;
 
     // Data
     private final Gson gson = new Gson();
@@ -45,6 +48,15 @@ public class RealtimeWebSocketService extends Service {
     private int reconnectAttempts = 0;
     private static final int MAX_RECONNECT_ATTEMPTS = 5;
     private static final long RECONNECT_DELAY = 3000; // 3 seconds
+    private Handler reconnectHandler = new Handler(Looper.getMainLooper());
+
+    // STOMP frame types
+    private static final String STOMP_CONNECT = "CONNECT";
+    private static final String STOMP_CONNECTED = "CONNECTED";
+    private static final String STOMP_SEND = "SEND";
+    private static final String STOMP_SUBSCRIBE = "SUBSCRIBE";
+    private static final String STOMP_MESSAGE = "MESSAGE";
+    private static final String STOMP_ERROR = "ERROR";
 
     // Binder for activities to bind to this service
     private final IBinder binder = new LocalBinder();
@@ -106,7 +118,7 @@ public class RealtimeWebSocketService extends Service {
         Log.d(TAG, "🧹 RealtimeWebSocketService destroyed");
     }
 
-    // ===== WEBSOCKET CONNECTION =====
+    // ===== WEBSOCKET CONNECTION WITH STOMP SUPPORT =====
 
     private void connect() {
         if (isConnected || isConnecting) {
@@ -123,9 +135,9 @@ public class RealtimeWebSocketService extends Service {
         isConnecting = true;
 
         try {
-            // ✅ FIX: Complete WebSocket URL
-            String wsUrl = Constants.WS_BASE_URL + "/chat?userId=" + currentUserId;
-            Log.d(TAG, "🔗 Connecting to WebSocket: " + wsUrl);
+            // ✅ FIX: Use STOMP endpoint from backend
+            String wsUrl = Constants.WS_BASE_URL + "/ws";
+            Log.d(TAG, "🔗 Connecting to STOMP WebSocket: " + wsUrl);
 
             URI uri = URI.create(wsUrl);
 
@@ -136,20 +148,21 @@ public class RealtimeWebSocketService extends Service {
                     isConnecting = false;
                     reconnectAttempts = 0;
 
-                    Log.d(TAG, "✅ WebSocket connected");
-                    notifyConnected();
+                    Log.d(TAG, "✅ WebSocket connected, sending STOMP CONNECT");
+                    sendStompConnect();
                 }
 
                 @Override
                 public void onMessage(String message) {
-                    Log.d(TAG, "📩 Received: " + message);
-                    handleIncomingMessage(message);
+                    Log.d(TAG, "📩 Raw STOMP frame: " + message);
+                    handleStompFrame(message);
                 }
 
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
                     isConnected = false;
                     isConnecting = false;
+                    isStompConnected = false;
 
                     Log.d(TAG, "❌ WebSocket closed: " + reason);
                     notifyDisconnected();
@@ -164,113 +177,167 @@ public class RealtimeWebSocketService extends Service {
                 public void onError(Exception ex) {
                     isConnected = false;
                     isConnecting = false;
+                    isStompConnected = false;
 
                     Log.e(TAG, "❌ WebSocket error", ex);
-                    notifyError(ex.getMessage());
+                    notifyError("Connection error: " + ex.getMessage());
+
+                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        scheduleReconnect();
+                    }
                 }
             };
 
             webSocketClient.connect();
 
         } catch (Exception e) {
+            Log.e(TAG, "❌ WebSocket connection failed", e);
             isConnecting = false;
-            Log.e(TAG, "❌ Failed to create WebSocket connection", e);
             notifyError("Connection failed: " + e.getMessage());
         }
     }
 
-    private void scheduleReconnect() {
-        reconnectAttempts++;
-        Log.d(TAG, "🔄 Scheduling reconnect attempt " + reconnectAttempts + "/" + MAX_RECONNECT_ATTEMPTS);
+    // ===== STOMP PROTOCOL METHODS =====
 
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            if (!isConnected && !isConnecting) {
-                connect();
-            }
-        }, RECONNECT_DELAY * reconnectAttempts); // Exponential backoff
+    private void sendStompConnect() {
+        StringBuilder connectFrame = new StringBuilder();
+        connectFrame.append(STOMP_CONNECT).append("\n");
+        connectFrame.append("accept-version:1.1,1.0").append("\n");
+        connectFrame.append("heart-beat:10000,10000").append("\n");
+        connectFrame.append("User-ID:").append(currentUserId).append("\n");
+        connectFrame.append("\n");
+        connectFrame.append("\u0000");
+
+        sendRawMessage(connectFrame.toString());
+        Log.d(TAG, "📡 Sent STOMP CONNECT frame");
     }
 
-    public void disconnect() {
-        if (webSocketClient != null) {
-            webSocketClient.close();
-            webSocketClient = null;
-        }
-        isConnected = false;
-        isConnecting = false;
-        reconnectAttempts = 0;
-
-        Log.d(TAG, "🔌 WebSocket disconnected");
-    }
-
-    // ===== AUTHENTICATION =====
-
-    private void authenticateUser() {
-        JsonObject authMessage = new JsonObject();
-        authMessage.addProperty("type", "AUTHENTICATE");
-        authMessage.addProperty("userId", currentUserId);
-        authMessage.addProperty("action", "user_online");
-
-        sendMessage(authMessage.toString());
-        Log.d(TAG, "🔐 Authentication sent for user: " + currentUserId);
-    }
-
-    // ===== MESSAGE HANDLING =====
-
-    private void handleIncomingMessage(String rawMessage) {
+    private void handleStompFrame(String frame) {
         try {
-            JsonObject json = gson.fromJson(rawMessage, JsonObject.class);
-            String type = json.has("type") ? json.get("type").getAsString() : "";
+            String[] lines = frame.split("\n", -1);
+            if (lines.length < 1) return;
 
-            switch (type) {
-                case "CHAT_MESSAGE":
-                    handleChatMessage(json);
+            String command = lines[0];
+            Map<String, String> headers = new HashMap<>();
+            int bodyStartIndex = -1;
+
+            // Parse headers
+            for (int i = 1; i < lines.length; i++) {
+                if (lines[i].isEmpty()) {
+                    bodyStartIndex = i + 1;
                     break;
-                case "TYPING_INDICATOR":
-                    handleTypingIndicator(json);
-                    break;
-                case "MESSAGE_STATUS":
-                    handleMessageStatus(json);
-                    break;
-                case "LOCATION_UPDATE":
-                    handleLocationUpdate(json);
-                    break;
-                case "NEARBY_USERS":
-                    handleNearbyUsers(json);
-                    break;
-                case "USER_STATUS":
-                    handleUserStatus(json);
-                    break;
-                case "SYSTEM_MESSAGE":
-                    handleSystemMessage(json);
-                    break;
-                default:
-                    Log.d(TAG, "⚠️ Unknown message type: " + type);
+                }
+                String[] headerParts = lines[i].split(":", 2);
+                if (headerParts.length == 2) {
+                    headers.put(headerParts[0], headerParts[1]);
+                }
             }
 
-        } catch (JsonSyntaxException e) {
-            Log.e(TAG, "❌ Error parsing message JSON", e);
+            // Extract body
+            String body = "";
+            if (bodyStartIndex > 0 && bodyStartIndex < lines.length) {
+                StringBuilder bodyBuilder = new StringBuilder();
+                for (int i = bodyStartIndex; i < lines.length; i++) {
+                    bodyBuilder.append(lines[i]);
+                    if (i < lines.length - 1) bodyBuilder.append("\n");
+                }
+                body = bodyBuilder.toString().replace("\u0000", "");
+            }
+
+            handleStompCommand(command, headers, body);
+
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error handling message", e);
+            Log.e(TAG, "❌ Error parsing STOMP frame", e);
         }
     }
 
-    private void handleChatMessage(JsonObject json) {
+    private void handleStompCommand(String command, Map<String, String> headers, String body) {
+        switch (command) {
+            case STOMP_CONNECTED:
+                isStompConnected = true;
+                Log.d(TAG, "✅ STOMP connected successfully");
+                subscribeToUserTopics();
+                notifyConnected();
+                break;
+
+            case STOMP_MESSAGE:
+                handleStompMessage(headers, body);
+                break;
+
+            case STOMP_ERROR:
+                Log.e(TAG, "❌ STOMP error: " + body);
+                notifyError("STOMP error: " + body);
+                break;
+
+            default:
+                Log.d(TAG, "🔔 Unknown STOMP command: " + command);
+                break;
+        }
+    }
+
+    private void subscribeToUserTopics() {
+        if (!isStompConnected) return;
+
+        // Subscribe to user-specific queue
+        String userTopic = "/user/queue/messages";
+        subscribeToTopic(userTopic, "user-messages");
+
+        // Subscribe to global topics
+        subscribeToTopic("/topic/chat", "global-chat");
+        subscribeToTopic("/topic/location", "location-updates");
+
+        Log.d(TAG, "📡 Subscribed to STOMP topics for user: " + currentUserId);
+    }
+
+    private void subscribeToTopic(String destination, String id) {
+        StringBuilder subscribeFrame = new StringBuilder();
+        subscribeFrame.append(STOMP_SUBSCRIBE).append("\n");
+        subscribeFrame.append("destination:").append(destination).append("\n");
+        subscribeFrame.append("id:").append(id).append("\n");
+        subscribeFrame.append("\n");
+        subscribeFrame.append("\u0000");
+
+        sendRawMessage(subscribeFrame.toString());
+        Log.d(TAG, "📡 Subscribed to: " + destination);
+    }
+
+    private void handleStompMessage(Map<String, String> headers, String body) {
         try {
-            Message message = new Message();
+            String destination = headers.get("destination");
 
-            if (json.has("id")) message.setId(json.get("id").getAsLong());
-            if (json.has("conversationId")) message.setConversationId(json.get("conversationId").getAsLong());
-            if (json.has("senderId")) message.setSenderId(json.get("senderId").getAsLong());
-            if (json.has("senderName")) message.setSenderName(json.get("senderName").getAsString());
-            if (json.has("content")) message.setContent(json.get("content").getAsString());
-            if (json.has("messageType")) message.setMessageType(json.get("messageType").getAsString());
-            if (json.has("timestamp")) message.setTimestamp(json.get("timestamp").getAsString());
+            if (destination != null) {
+                if (destination.contains("/queue/messages") || destination.contains("/topic/chat")) {
+                    handleChatMessage(body);
+                } else if (destination.contains("/topic/location")) {
+                    handleLocationMessage(body);
+                }
+            }
 
-            // Notify chat listeners for this conversation
-            Long conversationId = message.getConversationId();
-            if (conversationId != null && chatListeners.containsKey(conversationId)) {
-                for (ChatListener listener : chatListeners.get(conversationId)) {
-                    listener.onMessageReceived(message);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error handling STOMP message", e);
+        }
+    }
+
+    private void handleChatMessage(String body) {
+        try {
+            JsonObject json = gson.fromJson(body, JsonObject.class);
+
+            if (json.has("type")) {
+                String type = json.get("type").getAsString();
+
+                switch (type) {
+                    case "NEW_MESSAGE":
+                        notifyNewMessage(json);
+                        break;
+                    case "TYPING":
+                        notifyTypingIndicator(json);
+                        break;
+                    case "MESSAGE_DELIVERED":
+                        notifyMessageDelivered(json);
+                        break;
+                    case "MESSAGE_READ":
+                        notifyMessageRead(json);
+                        break;
                 }
             }
 
@@ -279,108 +346,51 @@ public class RealtimeWebSocketService extends Service {
         }
     }
 
-    private void handleTypingIndicator(JsonObject json) {
+    private void handleLocationMessage(String body) {
         try {
-            Long conversationId = json.get("conversationId").getAsLong();
-            Long userId = json.get("userId").getAsLong();
-            boolean isTyping = json.get("isTyping").getAsBoolean();
+            JsonObject json = gson.fromJson(body, JsonObject.class);
 
-            if (chatListeners.containsKey(conversationId)) {
-                for (ChatListener listener : chatListeners.get(conversationId)) {
-                    listener.onTypingIndicator(userId, isTyping);
+            if (json.has("type")) {
+                String type = json.get("type").getAsString();
+
+                if ("LOCATION_UPDATE".equals(type)) {
+                    notifyLocationUpdate(json);
+                } else if ("NEARBY_USERS".equals(type)) {
+                    notifyNearbyUsers(json);
                 }
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing typing indicator", e);
+            Log.e(TAG, "❌ Error parsing location message", e);
         }
     }
 
-    private void handleMessageStatus(JsonObject json) {
-        try {
-            Long messageId = json.get("messageId").getAsLong();
-            String status = json.get("status").getAsString();
-            Long conversationId = json.get("conversationId").getAsLong();
+    // ===== SENDING MESSAGES VIA STOMP =====
 
-            if (chatListeners.containsKey(conversationId)) {
-                for (ChatListener listener : chatListeners.get(conversationId)) {
-                    if ("DELIVERED".equals(status)) {
-                        listener.onMessageDelivered(messageId);
-                    } else if ("READ".equals(status)) {
-                        listener.onMessageRead(messageId);
-                    }
-                }
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing message status", e);
-        }
-    }
-
-    private void handleLocationUpdate(JsonObject json) {
-        try {
-            Long userId = json.get("userId").getAsLong();
-            double latitude = json.get("latitude").getAsDouble();
-            double longitude = json.get("longitude").getAsDouble();
-
-            for (LocationListener listener : locationListeners) {
-                listener.onUserLocationUpdate(userId, latitude, longitude);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing location update", e);
-        }
-    }
-
-    private void handleNearbyUsers(JsonObject json) {
-        try {
-            Map<Long, Map<String, Object>> nearbyUsers = new HashMap<>();
-
-            if (json.has("users")) {
-                JsonObject users = json.getAsJsonObject("users");
-                for (String userIdStr : users.keySet()) {
-                    Long userId = Long.parseLong(userIdStr);
-                    JsonObject userInfo = users.getAsJsonObject(userIdStr);
-
-                    Map<String, Object> userMap = new HashMap<>();
-                    userMap.put("latitude", userInfo.get("latitude").getAsDouble());
-                    userMap.put("longitude", userInfo.get("longitude").getAsDouble());
-                    userMap.put("distance", userInfo.get("distance").getAsDouble());
-                    if (userInfo.has("name")) {
-                        userMap.put("name", userInfo.get("name").getAsString());
-                    }
-
-                    nearbyUsers.put(userId, userMap);
-                }
-            }
-
-            for (LocationListener listener : locationListeners) {
-                listener.onNearbyUsersUpdate(nearbyUsers);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing nearby users", e);
-        }
-    }
-
-    private void handleUserStatus(JsonObject json) {
-        // Handle user online/offline status
-        Log.d(TAG, "👤 User status update: " + json.toString());
-    }
-
-    private void handleSystemMessage(JsonObject json) {
-        // Handle system messages (maintenance, announcements, etc.)
-        Log.d(TAG, "🔔 System message: " + json.toString());
-    }
-
-    // ===== SENDING MESSAGES =====
-
-    private void sendMessage(String message) {
+    private void sendRawMessage(String message) {
         if (webSocketClient != null && isConnected) {
             webSocketClient.send(message);
         } else {
             Log.w(TAG, "⚠️ Cannot send message - not connected");
         }
+    }
+
+    private void sendStompMessage(String destination, String body) {
+        if (!isStompConnected) {
+            Log.w(TAG, "⚠️ STOMP not connected, cannot send message");
+            return;
+        }
+
+        StringBuilder sendFrame = new StringBuilder();
+        sendFrame.append(STOMP_SEND).append("\n");
+        sendFrame.append("destination:").append(destination).append("\n");
+        sendFrame.append("content-type:application/json").append("\n");
+        sendFrame.append("User-ID:").append(currentUserId).append("\n");
+        sendFrame.append("\n");
+        sendFrame.append(body);
+        sendFrame.append("\u0000");
+
+        sendRawMessage(sendFrame.toString());
     }
 
     // ===== CHAT METHODS =====
@@ -391,7 +401,7 @@ public class RealtimeWebSocketService extends Service {
         joinMessage.addProperty("conversationId", conversationId);
         joinMessage.addProperty("userId", currentUserId);
 
-        sendMessage(joinMessage.toString());
+        sendStompMessage("/app/chat/" + conversationId + "/join", joinMessage.toString());
         Log.d(TAG, "📡 Joined conversation: " + conversationId);
     }
 
@@ -401,7 +411,7 @@ public class RealtimeWebSocketService extends Service {
         leaveMessage.addProperty("conversationId", conversationId);
         leaveMessage.addProperty("userId", currentUserId);
 
-        sendMessage(leaveMessage.toString());
+        sendStompMessage("/app/chat/" + conversationId + "/leave", leaveMessage.toString());
         Log.d(TAG, "📡 Left conversation: " + conversationId);
     }
 
@@ -414,7 +424,7 @@ public class RealtimeWebSocketService extends Service {
         chatMessage.addProperty("messageType", messageType != null ? messageType : "TEXT");
         chatMessage.addProperty("timestamp", System.currentTimeMillis());
 
-        sendMessage(chatMessage.toString());
+        sendStompMessage("/app/chat/" + conversationId + "/send", chatMessage.toString());
         Log.d(TAG, "📤 Sent chat message to conversation: " + conversationId);
     }
 
@@ -425,7 +435,7 @@ public class RealtimeWebSocketService extends Service {
         typingMessage.addProperty("userId", currentUserId);
         typingMessage.addProperty("isTyping", isTyping);
 
-        sendMessage(typingMessage.toString());
+        sendStompMessage("/app/chat/" + conversationId + "/typing", typingMessage.toString());
     }
 
     // ===== LOCATION METHODS =====
@@ -438,20 +448,20 @@ public class RealtimeWebSocketService extends Service {
         locationMessage.addProperty("longitude", longitude);
         locationMessage.addProperty("timestamp", System.currentTimeMillis());
 
-        sendMessage(locationMessage.toString());
+        sendStompMessage("/app/location/update", locationMessage.toString());
         Log.d(TAG, "📍 Sent location update: " + latitude + ", " + longitude);
     }
 
     public void requestNearbyUsers(double latitude, double longitude, double radiusKm) {
-        JsonObject nearbyRequest = new JsonObject();
-        nearbyRequest.addProperty("type", "REQUEST_NEARBY_USERS");
-        nearbyRequest.addProperty("userId", currentUserId);
-        nearbyRequest.addProperty("latitude", latitude);
-        nearbyRequest.addProperty("longitude", longitude);
-        nearbyRequest.addProperty("radius", radiusKm);
+        JsonObject requestMessage = new JsonObject();
+        requestMessage.addProperty("type", "REQUEST_NEARBY");
+        requestMessage.addProperty("userId", currentUserId);
+        requestMessage.addProperty("latitude", latitude);
+        requestMessage.addProperty("longitude", longitude);
+        requestMessage.addProperty("radiusKm", radiusKm);
 
-        sendMessage(nearbyRequest.toString());
-        Log.d(TAG, "🔍 Requested nearby users within " + radiusKm + "km");
+        sendStompMessage("/app/location/nearby", requestMessage.toString());
+        Log.d(TAG, "📍 Requested nearby users");
     }
 
     // ===== LISTENER MANAGEMENT =====
@@ -469,10 +479,10 @@ public class RealtimeWebSocketService extends Service {
     }
 
     public void removeChatListener(Long conversationId, ChatListener listener) {
-        Set<ChatListener> listeners = chatListeners.get(conversationId);
-        if (listeners != null) {
-            listeners.remove(listener);
-            if (listeners.isEmpty()) {
+        Set<ChatListener> conversationListeners = chatListeners.get(conversationId);
+        if (conversationListeners != null) {
+            conversationListeners.remove(listener);
+            if (conversationListeners.isEmpty()) {
                 chatListeners.remove(conversationId);
             }
         }
@@ -490,33 +500,194 @@ public class RealtimeWebSocketService extends Service {
 
     private void notifyConnected() {
         for (WebSocketListener listener : listeners) {
-            listener.onConnected();
+            try {
+                listener.onConnected();
+            } catch (Exception e) {
+                Log.e(TAG, "Error notifying listener", e);
+            }
         }
     }
 
     private void notifyDisconnected() {
         for (WebSocketListener listener : listeners) {
-            listener.onDisconnected();
+            try {
+                listener.onDisconnected();
+            } catch (Exception e) {
+                Log.e(TAG, "Error notifying listener", e);
+            }
         }
     }
 
     private void notifyError(String error) {
         for (WebSocketListener listener : listeners) {
-            listener.onError(error);
+            try {
+                listener.onError(error);
+            } catch (Exception e) {
+                Log.e(TAG, "Error notifying listener", e);
+            }
         }
     }
 
-    // ===== PUBLIC GETTERS =====
+    private void notifyNewMessage(JsonObject json) {
+        try {
+            Long conversationId = json.get("conversationId").getAsLong();
+            Set<ChatListener> conversationListeners = chatListeners.get(conversationId);
+
+            if (conversationListeners != null) {
+                // Create Message object from JSON
+                Message message = parseMessageFromJson(json);
+
+                for (ChatListener listener : conversationListeners) {
+                    listener.onMessageReceived(message);
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error notifying new message", e);
+        }
+    }
+
+    private void notifyTypingIndicator(JsonObject json) {
+        try {
+            Long conversationId = json.get("conversationId").getAsLong();
+            Long userId = json.get("userId").getAsLong();
+            boolean isTyping = json.get("isTyping").getAsBoolean();
+
+            Set<ChatListener> conversationListeners = chatListeners.get(conversationId);
+            if (conversationListeners != null) {
+                for (ChatListener listener : conversationListeners) {
+                    listener.onTypingIndicator(userId, isTyping);
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error notifying typing indicator", e);
+        }
+    }
+
+    private void notifyMessageDelivered(JsonObject json) {
+        try {
+            Long messageId = json.get("messageId").getAsLong();
+            Long conversationId = json.get("conversationId").getAsLong();
+
+            Set<ChatListener> conversationListeners = chatListeners.get(conversationId);
+            if (conversationListeners != null) {
+                for (ChatListener listener : conversationListeners) {
+                    listener.onMessageDelivered(messageId);
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error notifying message delivered", e);
+        }
+    }
+
+    private void notifyMessageRead(JsonObject json) {
+        try {
+            Long messageId = json.get("messageId").getAsLong();
+            Long conversationId = json.get("conversationId").getAsLong();
+
+            Set<ChatListener> conversationListeners = chatListeners.get(conversationId);
+            if (conversationListeners != null) {
+                for (ChatListener listener : conversationListeners) {
+                    listener.onMessageRead(messageId);
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error notifying message read", e);
+        }
+    }
+
+    private void notifyLocationUpdate(JsonObject json) {
+        try {
+            Long userId = json.get("userId").getAsLong();
+            double latitude = json.get("latitude").getAsDouble();
+            double longitude = json.get("longitude").getAsDouble();
+
+            for (LocationListener listener : locationListeners) {
+                listener.onUserLocationUpdate(userId, latitude, longitude);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error notifying location update", e);
+        }
+    }
+
+    private void notifyNearbyUsers(JsonObject json) {
+        try {
+            // Parse nearby users data
+            Map<Long, Map<String, Object>> nearbyUsers = new HashMap<>();
+            // Implementation depends on JSON structure from backend
+
+            for (LocationListener listener : locationListeners) {
+                listener.onNearbyUsersUpdate(nearbyUsers);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error notifying nearby users", e);
+        }
+    }
+
+    // ===== HELPER METHODS =====
+
+    private Message parseMessageFromJson(JsonObject json) {
+        // Create Message object from JSON data
+        Message message = new Message();
+
+        if (json.has("id")) message.setId(json.get("id").getAsLong());
+        if (json.has("conversationId")) message.setConversationId(json.get("conversationId").getAsLong());
+        if (json.has("senderId")) message.setSenderId(json.get("senderId").getAsLong());
+        if (json.has("content")) message.setContent(json.get("content").getAsString());
+        if (json.has("messageType")) message.setMessageType(json.get("messageType").getAsString());
+        if (json.has("timestamp")) {
+            long timestampLong = json.get("timestamp").getAsLong();
+            // Convert to readable format like "10:30 AM"
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
+            String timeString = sdf.format(new java.util.Date(timestampLong));
+            message.setTimestamp(timeString);
+        }
+        return message;
+    }
+
+    private void scheduleReconnect() {
+        reconnectAttempts++;
+        Log.d(TAG, "🔄 Scheduling reconnect attempt " + reconnectAttempts + "/" + MAX_RECONNECT_ATTEMPTS);
+
+        reconnectHandler.postDelayed(() -> {
+            if (!isConnected && reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
+                connect();
+            }
+        }, RECONNECT_DELAY * reconnectAttempts);
+    }
+
+    public void disconnect() {
+        try {
+            if (webSocketClient != null) {
+                webSocketClient.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error disconnecting WebSocket", e);
+        }
+
+        isConnected = false;
+        isConnecting = false;
+        isStompConnected = false;
+        webSocketClient = null;
+
+        // Clear all listeners
+        listeners.clear();
+        chatListeners.clear();
+        locationListeners.clear();
+
+        Log.d(TAG, "✅ WebSocket disconnected and cleaned up");
+    }
 
     public boolean isConnected() {
-        return isConnected;
+        return isConnected && isStompConnected;
     }
 
-    public boolean isConnecting() {
-        return isConnecting;
-    }
-
-    public int getReconnectAttempts() {
-        return reconnectAttempts;
+    public Long getCurrentUserId() {
+        return currentUserId;
     }
 }

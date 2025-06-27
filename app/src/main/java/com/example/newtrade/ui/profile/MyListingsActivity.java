@@ -1,4 +1,5 @@
 // app/src/main/java/com/example/newtrade/ui/profile/MyListingsActivity.java
+// ✅ FIXED: Complete MyListingsActivity with FAB
 package com.example.newtrade.ui.profile;
 
 import android.content.Intent;
@@ -90,17 +91,29 @@ public class MyListingsActivity extends AppCompatActivity {
 
     private void setupListeners() {
         swipeRefresh.setOnRefreshListener(this::loadMyListings);
-        fabAddProduct.setOnClickListener(v -> openAddProduct());
+
+        // ✅ FIX: Setup FAB to launch AddProductActivity
+        fabAddProduct.setOnClickListener(v -> {
+            Log.d(TAG, "🎯 FAB clicked - launching AddProductActivity");
+            Intent intent = new Intent(this, AddProductActivity.class);
+            startActivity(intent);
+        });
     }
 
     private void loadMyListings() {
         swipeRefresh.setRefreshing(true);
 
-        // Create mock data for testing
-        createMockListings();
+        Long userId = prefsManager.getUserId();
+        if (userId == null) {
+            Log.w(TAG, "No user ID available");
+            createMockListings();
+            return;
+        }
 
-        // TODO: Load from API when ProductService is available
-        // loadListingsFromAPI();
+        Log.d(TAG, "📋 Loading listings for user: " + userId);
+
+        // TODO: Implement API call when ready
+        createMockListings();
     }
 
     private void createMockListings() {
@@ -108,40 +121,52 @@ public class MyListingsActivity extends AppCompatActivity {
 
         // Mock listing 1
         Product product1 = new Product();
-        product1.setId(1L);
-        product1.setTitle("iPhone 13 Pro Max");
-        product1.setDescription("iPhone 13 Pro Max 256GB, Blue color");
-        product1.setPrice(new BigDecimal("18500000"));
-        product1.setCondition(Product.ProductCondition.LIKE_NEW);
+        product1.setId(101L);
+        product1.setTitle("iPhone 14 Pro 128GB Deep Purple");
+        product1.setDescription("Brand new, sealed in box. Still has warranty.");
+        product1.setPrice(new BigDecimal("25000000"));
+        product1.setImageUrl("https://example.com/iphone14.jpg");
         product1.setLocation("Ho Chi Minh City");
-        product1.setStatus(Product.ProductStatus.AVAILABLE);
+        product1.setCondition("NEW");
         myProducts.add(product1);
 
         // Mock listing 2
         Product product2 = new Product();
-        product2.setId(2L);
-        product2.setTitle("MacBook Air M1");
-        product2.setDescription("MacBook Air M1 2020, 8GB/256GB");
-        product2.setPrice(new BigDecimal("22000000"));
-        product2.setCondition(Product.ProductCondition.GOOD);
+        product2.setId(102L);
+        product2.setTitle("MacBook Pro M2 16 inch 512GB");
+        product2.setDescription("Lightly used, excellent condition. Includes original charger and box.");
+        product2.setPrice(new BigDecimal("55000000"));
+        product2.setImageUrl("https://example.com/macbook.jpg");
         product2.setLocation("Ho Chi Minh City");
-        product2.setStatus(Product.ProductStatus.SOLD);
+        product2.setCondition("LIKE_NEW");
         myProducts.add(product2);
 
         updateUI();
+        Log.d(TAG, "✅ Mock listings created: " + myProducts.size());
     }
 
     private void updateUI() {
         swipeRefresh.setRefreshing(false);
-        productAdapter.notifyDataSetChanged();
+
+        if (productAdapter != null) {
+            productAdapter.notifyDataSetChanged();
+        }
 
         if (myProducts.isEmpty()) {
-            rvMyListings.setVisibility(View.GONE);
-            tvEmptyState.setVisibility(View.VISIBLE);
+            showEmptyState();
         } else {
-            rvMyListings.setVisibility(View.VISIBLE);
-            tvEmptyState.setVisibility(View.GONE);
+            showListings();
         }
+    }
+
+    private void showListings() {
+        if (rvMyListings != null) rvMyListings.setVisibility(View.VISIBLE);
+        if (tvEmptyState != null) tvEmptyState.setVisibility(View.GONE);
+    }
+
+    private void showEmptyState() {
+        if (rvMyListings != null) rvMyListings.setVisibility(View.GONE);
+        if (tvEmptyState != null) tvEmptyState.setVisibility(View.VISIBLE);
     }
 
     private void openProductDetail(Product product) {
@@ -152,11 +177,6 @@ public class MyListingsActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    private void openAddProduct() {
-        Intent intent = new Intent(this, AddProductActivity.class);
-        startActivity(intent);
-    }
-
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
@@ -164,5 +184,12 @@ public class MyListingsActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh listings when returning from AddProduct
+        loadMyListings();
     }
 }

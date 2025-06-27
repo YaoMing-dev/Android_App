@@ -2,13 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permissions -->
+    <!-- Essential Permissions Only -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- ✅ Camera Feature (optional) -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -22,7 +26,7 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
-        <!-- Main Activity -->
+        <!-- ===== MAIN ACTIVITY ===== -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -33,7 +37,7 @@
             </intent-filter>
         </activity>
 
-        <!-- ✅ AUTHENTICATION ACTIVITIES (Đã xác nhận tồn tại) -->
+        <!-- ===== AUTHENTICATION ACTIVITIES ===== -->
         <activity
             android:name=".ui.auth.LoginActivity"
             android:exported="true"
@@ -54,23 +58,61 @@
         <activity
             android:name=".ui.auth.OtpVerificationActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.auth.LoginActivity" />
 
-        <!-- ✅ PRODUCT ACTIVITIES (Đã xác nhận tồn tại) -->
+        <!-- ===== PRODUCT ACTIVITIES ===== -->
         <activity
             android:name=".ui.product.ProductDetailActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
-        <!-- ✅ CHAT ACTIVITY (Đã xác nhận tồn tại) -->
+        <activity
+            android:name=".ui.product.AddProductActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- ===== PROFILE ACTIVITIES ===== -->
+        <activity
+            android:name=".ui.profile.EditProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.profile.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.profile.MyListingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.profile.SavedItemsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.profile.UserProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- ===== CHAT ACTIVITIES ===== -->
         <activity
             android:name=".ui.chat.ChatActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
-        <!-- ✅ SEARCH ACTIVITIES (Nếu có) -->
+        <!-- ===== SEARCH ACTIVITIES ===== -->
         <activity
             android:name=".ui.search.AllProductsActivity"
             android:exported="false"
@@ -82,17 +124,20 @@
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
-        <service
-            android:name=".websocket.RealtimeWebSocketService"
-            android:enabled="true"
-            android:exported="false" />
 
-        <!-- ✅ ADD Location Activity -->
+        <!-- ===== LOCATION ACTIVITIES ===== -->
         <activity
             android:name=".ui.location.RealtimeLocationActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
+
+        <!-- ===== SERVICES ===== -->
+        <service
+            android:name=".websocket.RealtimeWebSocketService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>

@@ -302,7 +302,7 @@ public class ProfileFragment extends Fragment {
         Log.d(TAG, "🚪 Performing logout...");
 
         // Clear user data
-        prefsManager.clearUserData();
+        prefsManager.clearUserSession();
 
         // Navigate to login
         Intent intent = new Intent(requireContext(), LoginActivity.class);
