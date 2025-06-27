@@ -303,7 +303,10 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        return NavigationUtils.handleBackButton(this, item) || super.onOptionsItemSelected(item);
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (NavigationUtils.handleBackButton(this, item)) {
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

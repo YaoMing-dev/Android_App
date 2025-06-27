@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/newtrade/api/ApiService.java
 package com.example.newtrade.api;
 
 import com.example.newtrade.models.StandardResponse;
@@ -7,88 +8,86 @@ import java.util.Map;
 
 import okhttp3.MultipartBody;
 import retrofit2.Call;
-import retrofit2.http.*;
+import retrofit2.http.Body;
+import retrofit2.http.DELETE;
+import retrofit2.http.GET;
+import retrofit2.http.Multipart;
+import retrofit2.http.POST;
+import retrofit2.http.PUT;
+import retrofit2.http.Part;
+import retrofit2.http.Path;
+import retrofit2.http.Query;
 
 public interface ApiService {
 
-    // ===== AUTHENTICATION =====
-    @POST("api/auth/google-signin")
-    Call<StandardResponse<Map<String, Object>>> googleSignIn(@Body Map<String, String> request);
+    // ===== SEARCH METHODS - ✅ ADD THESE =====
 
-    @POST("api/auth/logout")
-    Call<StandardResponse<String>> logout();
+    /**
+     * ✅ FIX: Advanced search products
+     */
+    @GET("api/products/search")
+    Call<StandardResponse<Map<String, Object>>> searchProductsAdvanced(
+            @Query("query") String query,
+            @Query("categoryId") Long categoryId,
+            @Query("minPrice") Double minPrice,
+            @Query("maxPrice") Double maxPrice,
+            @Query("condition") String condition,
+            @Query("latitude") Double latitude,
+            @Query("longitude") Double longitude,
+            @Query("radius") Integer radius,
+            @Query("sortBy") String sortBy,
+            @Query("page") Integer page,
+            @Query("size") Integer size
+    );
 
-    // ===== CATEGORIES =====
-    @GET("api/categories")
-    Call<StandardResponse<List<Map<String, Object>>>> getCategories();
+    /**
+     * ✅ FIX: Get featured products
+     */
+    @GET("api/products/featured")
+    Call<StandardResponse<List<Map<String, Object>>>> getFeaturedProducts();
 
-    // ===== PRODUCTS =====
+    /**
+     * ✅ FIX: Get recent products
+     */
+    @GET("api/products/recent")
+    Call<StandardResponse<List<Map<String, Object>>>> getRecentProducts(@Query("limit") int limit);
+
+    // ===== EXISTING METHODS =====
+
     @GET("api/products")
     Call<StandardResponse<Map<String, Object>>> getProducts(
             @Query("page") int page,
-            @Query("size") int size,
-            @Query("search") String search,
-            @Query("category") String category
+            @Query("size") int size
     );
 
-    @GET("api/products")
-    Call<StandardResponse<Map<String, Object>>> getProducts();
+    @GET("api/products/{id}")
+    Call<StandardResponse<Map<String, Object>>> getProductById(@Path("id") Long productId);
 
     @POST("api/products")
     Call<StandardResponse<Map<String, Object>>> createProduct(@Body Map<String, Object> productData);
 
-    @GET("api/products/{id}")
-    Call<StandardResponse<Map<String, Object>>> getProductDetail(@Path("id") Long productId);
-
-    // ===== SEARCH =====
-    @GET("api/products/search")
-    Call<StandardResponse<Map<String, Object>>> searchProducts(
-            @Query("query") String query,
-            @Query("page") int page,
-            @Query("size") int size,
-            @Query("categoryId") Long categoryId,
-            @Query("condition") String condition,
-            @Query("minPrice") Double minPrice,
-            @Query("maxPrice") Double maxPrice
+    @PUT("api/products/{id}")
+    Call<StandardResponse<Map<String, Object>>> updateProduct(
+            @Path("id") Long productId,
+            @Body Map<String, Object> productData
     );
 
-    // ===== USER MANAGEMENT =====
-    @GET("api/users/{id}/profile")
-    Call<StandardResponse<Map<String, Object>>> getUserProfile(@Path("id") Long userId);
-
-    @PUT("api/users/{id}/profile")
-    Call<StandardResponse<Map<String, Object>>> updateUserProfile(
-            @Path("id") Long userId,
-            @Body Map<String, Object> profileData
-    );
-
-    @GET("api/users/{id}/stats")
-    Call<StandardResponse<Map<String, Object>>> getUserStats(@Path("id") Long userId);
-
-    // ===== CONVERSATIONS & MESSAGES =====
-    @GET("api/conversations/user/{userId}")
-    Call<StandardResponse<List<Map<String, Object>>>> getUserConversations(@Path("userId") Long userId);
-
-    @GET("api/conversations/{id}")
-    Call<StandardResponse<Map<String, Object>>> getConversation(@Path("id") Long conversationId);
-
-    @POST("api/conversations")
-    Call<StandardResponse<Map<String, Object>>> createConversation(@Body Map<String, Object> conversationData);
+    @DELETE("api/products/{id}")
+    Call<StandardResponse<Void>> deleteProduct(@Path("id") Long productId);
 
     // ===== FILE UPLOAD =====
-    @Multipart
-    @POST("api/files/upload/product")
-    Call<StandardResponse<Map<String, String>>> uploadProductImage(
-            @Part MultipartBody.Part image
-    );
 
+    /**
+     * ✅ FIX: Upload avatar image
+     */
     @Multipart
     @POST("api/files/upload/avatar")
-    Call<StandardResponse<Map<String, String>>> uploadAvatar(
-            @Part MultipartBody.Part image
-    );
+    Call<StandardResponse<Map<String, String>>> uploadAvatar(@Part MultipartBody.Part image);
 
-    // ===== HEALTH CHECK =====
-    @GET("/")
-    Call<StandardResponse<String>> healthCheck();
+    /**
+     * Upload product image
+     */
+    @Multipart
+    @POST("api/files/upload/product")
+    Call<StandardResponse<Map<String, String>>> uploadProductImage(@Part MultipartBody.Part image);
 }

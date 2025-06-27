@@ -320,7 +320,10 @@ public class ChatActivity extends AppCompatActivity implements
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        return NavigationUtils.handleBackButton(this, item) || super.onOptionsItemSelected(item);
+        if (NavigationUtils.handleBackButton(this, item)) {
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
