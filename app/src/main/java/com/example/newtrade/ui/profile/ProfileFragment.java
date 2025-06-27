@@ -1,10 +1,8 @@
 // app/src/main/java/com/example/newtrade/ui/profile/ProfileFragment.java
-// ✅ COMPLETE REWRITE - Full functionality
 package com.example.newtrade.ui.profile;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.InputType;
@@ -17,6 +15,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -40,7 +40,6 @@ import retrofit2.Response;
 public class ProfileFragment extends Fragment {
 
     private static final String TAG = "ProfileFragment";
-    private static final int REQUEST_EDIT_PROFILE = 1001;
 
     // UI Components
     private CircleImageView ivProfilePicture;
@@ -53,6 +52,18 @@ public class ProfileFragment extends Fragment {
     // Data
     private SharedPrefsManager prefsManager;
     private Map<String, Object> userProfile;
+
+    // ✅ FIX: Modern Activity Result API
+    private ActivityResultLauncher<Intent> editProfileLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                    Log.d(TAG, "✅ Profile updated, refreshing data");
+                    loadUserProfile(); // Reload profile data
+                    Toast.makeText(requireContext(), "Profile updated successfully!", Toast.LENGTH_SHORT).show();
+                }
+            }
+    );
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -101,56 +112,57 @@ public class ProfileFragment extends Fragment {
     }
 
     private void setupListeners() {
-        // Edit Profile FAB
+        // ✅ FIX: Edit Profile FAB with proper error handling
         if (fabEditProfile != null) {
             fabEditProfile.setOnClickListener(v -> {
-                Intent intent = new Intent(requireContext(), EditProfileActivity.class);
-                startActivityForResult(intent, REQUEST_EDIT_PROFILE);
+                try {
+                    Log.d(TAG, "🔍 Edit profile button clicked");
+                    Intent intent = new Intent(requireContext(), EditProfileActivity.class);
+                    editProfileLauncher.launch(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Error opening EditProfileActivity: " + e.getMessage());
+                    Toast.makeText(requireContext(), "Error opening edit profile: " + e.getMessage(),
+                            Toast.LENGTH_SHORT).show();
+                }
             });
         }
 
         // My Listings
         if (llMyListings != null) {
             llMyListings.setOnClickListener(v -> {
-                Intent intent = new Intent(requireContext(), MyListingsActivity.class);
-                startActivity(intent);
+                try {
+                    Intent intent = new Intent(requireContext(), MyListingsActivity.class);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Error opening MyListingsActivity: " + e.getMessage());
+                    Toast.makeText(requireContext(), "Feature coming soon!", Toast.LENGTH_SHORT).show();
+                }
             });
         }
 
         // Saved Items
         if (llSavedItems != null) {
             llSavedItems.setOnClickListener(v -> {
-                Intent intent = new Intent(requireContext(), SavedItemsActivity.class);
-                startActivity(intent);
-            });
-        }
-
-        // Purchase History
-        if (llPurchaseHistory != null) {
-            llPurchaseHistory.setOnClickListener(v -> {
-                Toast.makeText(requireContext(), "Purchase History - Coming Soon", Toast.LENGTH_SHORT).show();
+                try {
+                    Intent intent = new Intent(requireContext(), SavedItemsActivity.class);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Error opening SavedItemsActivity: " + e.getMessage());
+                    Toast.makeText(requireContext(), "Feature coming soon!", Toast.LENGTH_SHORT).show();
+                }
             });
         }
 
         // Account Settings
         if (llAccountSettings != null) {
             llAccountSettings.setOnClickListener(v -> {
-                Intent intent = new Intent(requireContext(), SettingsActivity.class);
-                startActivity(intent);
-            });
-        }
-
-        // Help & Support
-        if (llHelpSupport != null) {
-            llHelpSupport.setOnClickListener(v -> {
-                Toast.makeText(requireContext(), "Help & Support - Coming Soon", Toast.LENGTH_SHORT).show();
-            });
-        }
-
-        // About
-        if (llAbout != null) {
-            llAbout.setOnClickListener(v -> {
-                showAboutDialog();
+                try {
+                    Intent intent = new Intent(requireContext(), SettingsActivity.class);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Error opening SettingsActivity: " + e.getMessage());
+                    Toast.makeText(requireContext(), "Feature coming soon!", Toast.LENGTH_SHORT).show();
+                }
             });
         }
 
@@ -158,36 +170,59 @@ public class ProfileFragment extends Fragment {
         if (llLogout != null) {
             llLogout.setOnClickListener(v -> showLogoutDialog());
         }
+
+        // Other menu items with placeholder actions
+        setupPlaceholderListeners();
+    }
+
+    private void setupPlaceholderListeners() {
+        if (llPurchaseHistory != null) {
+            llPurchaseHistory.setOnClickListener(v ->
+                    Toast.makeText(requireContext(), "Purchase History - Coming soon!", Toast.LENGTH_SHORT).show());
+        }
+
+        if (llHelpSupport != null) {
+            llHelpSupport.setOnClickListener(v ->
+                    Toast.makeText(requireContext(), "Help & Support - Coming soon!", Toast.LENGTH_SHORT).show());
+        }
+
+        if (llAbout != null) {
+            llAbout.setOnClickListener(v ->
+                    Toast.makeText(requireContext(), "About TradeUp v1.0", Toast.LENGTH_SHORT).show());
+        }
     }
 
     private void loadUserProfile() {
-        // Load basic info from SharedPrefs first
-        loadBasicProfileInfo();
+        Log.d(TAG, "📋 Loading user profile...");
 
-        // Load full profile from API
+        // First load from SharedPrefs
+        loadProfileFromPrefs();
+
+        // Then try to load from API
         loadProfileFromAPI();
     }
 
-    private void loadBasicProfileInfo() {
-        String displayName = prefsManager.getUserName();
-        String email = prefsManager.getUserEmail();
+    private void loadProfileFromPrefs() {
+        String userName = prefsManager.getUserName();
+        String userEmail = prefsManager.getUserEmail();
         String profilePicture = prefsManager.getUserProfilePicture();
 
+        // Set basic info
         if (tvDisplayName != null) {
-            tvDisplayName.setText(!displayName.isEmpty() ? displayName : "User");
+            tvDisplayName.setText(userName != null ? userName : "User");
         }
 
         if (tvEmail != null) {
-            tvEmail.setText(!email.isEmpty() ? email : "user@example.com");
+            tvEmail.setText(userEmail != null ? userEmail : "user@example.com");
         }
 
         if (tvMemberSince != null) {
             tvMemberSince.setText("Member since 2024");
         }
 
-        // Load profile picture
+        // Set profile picture
         if (ivProfilePicture != null) {
-            if (!profilePicture.isEmpty()) {
+            if (profilePicture != null && !profilePicture.isEmpty()) {
                 Glide.with(this)
                         .load(profilePicture)
                         .placeholder(R.drawable.ic_person)
@@ -198,37 +233,38 @@ public class ProfileFragment extends Fragment {
             }
         }
 
-        // Load mock stats
-        loadMockStats();
-    }
+        // Set mock stats for now
+        updateStatsUI(5, 3, 2); // 5 listings, 3 sold, 2 bought
 
-    private void loadMockStats() {
-        if (tvListingsCount != null) tvListingsCount.setText("12");
-        if (tvSoldCount != null) tvSoldCount.setText("8");
-        if (tvBoughtCount != null) tvBoughtCount.setText("15");
+        Log.d(TAG, "✅ Profile loaded from SharedPrefs");
     }
 
     private void loadProfileFromAPI() {
         Long userId = prefsManager.getUserId();
         if (userId == null || userId <= 0) {
-            Log.w(TAG, "Invalid user ID");
+            Log.w(TAG, "Invalid user ID, skipping API call");
             return;
         }
 
         Log.d(TAG, "📋 Loading profile from API for user: " + userId);
 
         // TODO: Implement when API is ready
+        // For now, just populate with mock data
+        populateMockProfile();
+
         /*
-        ApiClient.getApiService().getUserProfile(userId)
+        ApiClient.getUserService().getCurrentUserProfile()
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                          Response<StandardResponse<Map<String, Object>>> response) {
 
                         if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            userProfile = response.body().getData();
-                            updateProfileUI();
+                            Map<String, Object> profile = response.body().getData();
+                            populateProfile(profile);
                             Log.d(TAG, "✅ Profile loaded from API");
+                        } else {
+                            Log.w(TAG, "⚠️ Failed to load profile from API");
                         }
                     }
 
@@ -240,200 +276,50 @@ public class ProfileFragment extends Fragment {
         */
     }
 
-    private void updateProfileUI() {
-        if (userProfile == null) return;
-
-        // Update UI with API data
-        if (userProfile.get("bio") != null) {
-            // Update bio if you have a bio TextView
-        }
-
-        // Update stats if available
-        if (userProfile.get("totalListings") != null) {
-            tvListingsCount.setText(userProfile.get("totalListings").toString());
-        }
+    private void populateMockProfile() {
+        // Mock data for testing
+        updateStatsUI(8, 5, 3); // 8 listings, 5 sold, 3 bought
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == REQUEST_EDIT_PROFILE && resultCode == Activity.RESULT_OK) {
-            // Refresh profile after edit
-            loadUserProfile();
-            Toast.makeText(requireContext(), "Profile updated", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void showAboutDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("About TradeUp")
-                .setMessage("TradeUp v1.0\n\nA marketplace for buying and selling used items locally.\n\nDeveloped with ❤️")
-                .setPositiveButton("OK", null)
-                .setIcon(R.drawable.ic_info)
-                .show();
+    private void updateStatsUI(int listings, int sold, int bought) {
+        if (tvListingsCount != null) tvListingsCount.setText(String.valueOf(listings));
+        if (tvSoldCount != null) tvSoldCount.setText(String.valueOf(sold));
+        if (tvBoughtCount != null) tvBoughtCount.setText(String.valueOf(bought));
     }
 
     private void showLogoutDialog() {
         new AlertDialog.Builder(requireContext())
                 .setTitle("Logout")
                 .setMessage("Are you sure you want to logout?")
-                .setPositiveButton("Logout", (dialog, which) -> performLogout())
+                .setPositiveButton("Logout", (dialog, which) -> {
+                    performLogout();
+                })
                 .setNegativeButton("Cancel", null)
-                .setIcon(R.drawable.ic_logout)
                 .show();
     }
 
     private void performLogout() {
-        // Show loading
-        ProgressDialog progressDialog = new ProgressDialog(requireContext());
-        progressDialog.setMessage("Logging out...");
-        progressDialog.show();
+        Log.d(TAG, "🚪 Performing logout...");
 
-        // Simulate logout delay
-        new android.os.Handler().postDelayed(() -> {
-            progressDialog.dismiss();
+        // Clear user data
+        prefsManager.clearUserData();
 
-            // Clear session
-            prefsManager.clearUserSession();
+        // Navigate to login
+        Intent intent = new Intent(requireContext(), LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
 
-            // Navigate to login
-            Intent intent = new Intent(requireContext(), LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
+        if (getActivity() != null) {
+            getActivity().finish();
+        }
 
-            Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
-        }, 1500);
-
-        // TODO: Call logout API when ready
-        /*
-        ApiClient.getAuthService().logout().enqueue(new Callback<StandardResponse<String>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<String>> call, Response<StandardResponse<String>> response) {
-                progressDialog.dismiss();
-
-                // Clear session regardless of API response
-                prefsManager.clearUserSession();
-
-                // Navigate to login
-                Intent intent = new Intent(requireContext(), LoginActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-
-                Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
-            }
-
-            @Override
-            public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
-                progressDialog.dismiss();
-
-                // Clear session even if API fails
-                prefsManager.clearUserSession();
-
-                // Navigate to login
-                Intent intent = new Intent(requireContext(), LoginActivity.class);
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-            }
-        });
-        */
+        Log.d(TAG, "✅ Logout completed");
     }
 
-    // ✅ DELETE ACCOUNT FUNCTIONALITY
-    public void showDeleteAccountDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("⚠️ Delete Account")
-                .setMessage("This action CANNOT be undone!\n\n" +
-                        "❌ All your listings will be removed\n" +
-                        "❌ Your messages will be deleted\n" +
-                        "❌ Your account data will be permanently erased\n\n" +
-                        "Are you absolutely sure?")
-                .setPositiveButton("DELETE FOREVER", (dialog, which) -> {
-                    confirmDeleteAccount();
-                })
-                .setNegativeButton("Cancel", null)
-                .setIcon(R.drawable.ic_warning)
-                .show();
-    }
-
-    private void confirmDeleteAccount() {
-        // Create email input
-        EditText emailInput = new EditText(requireContext());
-        emailInput.setHint("Enter your email to confirm");
-        emailInput.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Final Confirmation")
-                .setMessage("Type your email to confirm account deletion:")
-                .setView(emailInput)
-                .setPositiveButton("DELETE", (dialog, which) -> {
-                    String inputEmail = emailInput.getText().toString().trim();
-                    String userEmail = prefsManager.getUserEmail();
-
-                    if (inputEmail.equals(userEmail)) {
-                        performAccountDeletion();
-                    } else {
-                        Toast.makeText(requireContext(), "Email doesn't match", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void performAccountDeletion() {
-        ProgressDialog progressDialog = new ProgressDialog(requireContext());
-        progressDialog.setMessage("Deleting account...");
-        progressDialog.setCancelable(false);
-        progressDialog.show();
-
-        // Simulate account deletion
-        new android.os.Handler().postDelayed(() -> {
-            progressDialog.dismiss();
-
-            // Clear session
-            prefsManager.clearUserSession();
-
-            // Navigate to login
-            Intent intent = new Intent(requireContext(), LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-
-            Toast.makeText(requireContext(), "Account deleted successfully", Toast.LENGTH_LONG).show();
-            Log.d(TAG, "✅ Account deleted successfully (simulated)");
-        }, 3000);
-
-        // TODO: Implement real API call when ready
-        /*
-        Long userId = prefsManager.getUserId();
-
-        ApiClient.getUserService().deleteAccount(userId)
-                .enqueue(new Callback<StandardResponse<String>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<String>> call, Response<StandardResponse<String>> response) {
-                        progressDialog.dismiss();
-
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            prefsManager.clearUserSession();
-
-                            Intent intent = new Intent(requireContext(), LoginActivity.class);
-                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            startActivity(intent);
-
-                            Toast.makeText(requireContext(), "Account deleted successfully", Toast.LENGTH_LONG).show();
-                            Log.d(TAG, "✅ Account deleted successfully");
-
-                        } else {
-                            Toast.makeText(requireContext(), "Failed to delete account. Please try again.", Toast.LENGTH_LONG).show();
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
-                        progressDialog.dismiss();
-                        Toast.makeText(requireContext(), "Network error. Please try again.", Toast.LENGTH_LONG).show();
-                        Log.e(TAG, "❌ Delete account failed", t);
-                    }
-                });
-        */
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh profile when fragment becomes visible
+        loadProfileFromPrefs();
     }
 }

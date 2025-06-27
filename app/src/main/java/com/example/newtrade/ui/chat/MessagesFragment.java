@@ -1,11 +1,8 @@
 // app/src/main/java/com/example/newtrade/ui/chat/MessagesFragment.java
-// ✅ FIXED - Remove WebSocketListener and fix all errors
 package com.example.newtrade.ui.chat;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -50,8 +47,6 @@ public class MessagesFragment extends Fragment {
     private ConversationAdapter conversationAdapter;
     private final List<Conversation> conversations = new ArrayList<>();
     private SharedPrefsManager prefsManager;
-
-    // ✅ FIX: Remove WebSocket related fields
     private Long currentUserId;
 
     @Override
@@ -114,10 +109,15 @@ public class MessagesFragment extends Fragment {
 
         Log.d(TAG, "📋 Loading conversations for user: " + currentUserId);
 
-        // For now, just load mock conversations
-        loadMockConversations();
+        // ✅ FIX: Try to load real conversations first, fallback to mock
+        loadConversationsFromAPI();
+    }
 
-        // TODO: Uncomment when API is ready
+    private void loadConversationsFromAPI() {
+        // TODO: Implement when conversation API is ready
+        // For now, test with health check then fallback to mock
+        testAPIThenLoadMock();
+
         /*
         ApiClient.getApiService().getUserConversations(currentUserId)
                 .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
@@ -143,59 +143,63 @@ public class MessagesFragment extends Fragment {
         */
     }
 
+    private void testAPIThenLoadMock() {
+        ApiClient.getAuthService().healthCheck()
+                .enqueue(new Callback<StandardResponse<String>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<String>> call,
+                                           Response<StandardResponse<String>> response) {
+                        if (response.isSuccessful()) {
+                            Log.d(TAG, "✅ Backend connected, but conversation API not implemented yet");
+                        } else {
+                            Log.w(TAG, "⚠️ Backend connection issues");
+                        }
+                        loadMockConversations();
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
+                        Log.e(TAG, "❌ Backend connection failed: " + t.getMessage());
+                        loadMockConversations();
+                    }
+                });
+    }
+
     private void loadMockConversations() {
         conversations.clear();
 
-        // Mock conversation 1
+        // Mock conversation 1 - Based on sample data
         Conversation mockConversation1 = new Conversation();
         mockConversation1.setId(1L);
-        mockConversation1.setOtherUserName("John Doe");
-        mockConversation1.setLastMessage("Hi! Is this still available?");
-        mockConversation1.setLastMessageTime("2 hours ago");
-        mockConversation1.setProductTitle("iPhone 13 Pro Max");
+        mockConversation1.setOtherUserName("Nguyễn Văn Anh");
+        mockConversation1.setLastMessage("Máy còn nguyên seal không anh?");
+        mockConversation1.setLastMessageTime("10 phút trước");
+        mockConversation1.setProductTitle("iPhone 14 Pro 128GB Deep Purple");
+        mockConversation1.setUnreadCount(1);
         conversations.add(mockConversation1);
 
         // Mock conversation 2
         Conversation mockConversation2 = new Conversation();
-        mockConversation2.setId(2L);
-        mockConversation2.setOtherUserName("Jane Smith");
-        mockConversation2.setLastMessage("Thanks for the quick response!");
-        mockConversation2.setLastMessageTime("1 day ago");
-        mockConversation2.setProductTitle("MacBook Air M1");
+        mockConversation2.setId(4L);
+        mockConversation2.setOtherUserName("Trần Thị Lan");
+        mockConversation2.setLastMessage("Em lấy 55 triệu được không chị?");
+        mockConversation2.setLastMessageTime("6 giờ trước");
+        mockConversation2.setProductTitle("MacBook Pro M2 16 inch 512GB");
+        mockConversation2.setUnreadCount(0);
         conversations.add(mockConversation2);
 
         // Mock conversation 3
         Conversation mockConversation3 = new Conversation();
-        mockConversation3.setId(3L);
-        mockConversation3.setOtherUserName("Mike Johnson");
-        mockConversation3.setLastMessage("When can we meet?");
-        mockConversation3.setLastMessageTime("3 days ago");
-        mockConversation3.setProductTitle("Samsung Galaxy S23");
+        mockConversation3.setId(5L);
+        mockConversation3.setOtherUserName("Lê Hoàng Nam");
+        mockConversation3.setLastMessage("Được rồi chị, em lấy luôn!");
+        mockConversation3.setLastMessageTime("3 ngày trước");
+        mockConversation3.setProductTitle("Túi Chanel Classic Medium");
+        mockConversation3.setUnreadCount(0);
         conversations.add(mockConversation3);
 
         updateUI();
         Log.d(TAG, "✅ Mock conversations created: " + conversations.size());
-    }
-
-    private void updateConversationsFromData(@Nullable List<Map<String, Object>> conversationData) {
-        conversations.clear();
-        if (conversationData != null && !conversationData.isEmpty()) {
-            for (Map<String, Object> data : conversationData) {
-                Conversation conversation = new Conversation();
-                if (data.get("id") instanceof Number) {
-                    conversation.setId(((Number) data.get("id")).longValue());
-                }
-                conversation.setOtherUserName((String) data.get("otherUserName"));
-                conversation.setLastMessage((String) data.get("lastMessage"));
-                conversation.setLastMessageTime((String) data.get("lastMessageTime"));
-                conversation.setProductTitle((String) data.get("productTitle"));
-                conversations.add(conversation);
-            }
-            showConversations();
-        } else {
-            showEmptyState();
-        }
-        updateUI();
     }
 
     private void updateUI() {
@@ -254,11 +258,5 @@ public class MessagesFragment extends Fragment {
         super.onResume();
         // Refresh conversations when fragment becomes visible
         loadConversations();
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        Log.d(TAG, "🧹 MessagesFragment destroyed");
     }
 }
