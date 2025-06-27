@@ -19,7 +19,7 @@ public class Constants {
     public static final String PREF_USER_ID = "user_id";
     public static final String PREF_USER_EMAIL = "user_email";
     public static final String PREF_USER_NAME = "user_name";
-    public static final String PREF_USER_PROFILE_PICTURE = "user_profile_picture"; // ✅ KEEP THIS
+    public static final String PREF_USER_PROFILE_PICTURE = "user_profile_picture";
     public static final String PREF_FCM_TOKEN = "fcm_token";
     public static final String PREF_IS_LOGGED_IN = "is_logged_in";
     public static final String PREF_IS_EMAIL_VERIFIED = "is_email_verified";
@@ -54,41 +54,51 @@ public class Constants {
     // ===== ERROR MESSAGES =====
     public static final String ERROR_NETWORK = "Kiểm tra kết nối mạng và thử lại";
     public static final String ERROR_SERVER = "Lỗi server, vui lòng thử lại sau";
-    public static final String ERROR_UNAUTHORIZED = "Phiên đăng nhập hết hạn";
-    public static final String ERROR_VALIDATION = "Dữ liệu không hợp lệ";
+    public static final String ERROR_UNKNOWN = "Đã có lỗi xảy ra";
 
-    // ✅ IMPROVED: Network utility methods
+    // ===== HELPER METHODS - ✅ ADD: getImageUrl method =====
+
+    /**
+     * ✅ FIX: getImageUrl method (used in EditProfileActivity)
+     */
+    public static String getImageUrl(String relativePath) {
+        if (relativePath == null || relativePath.isEmpty()) {
+            return "";
+        }
+
+        if (relativePath.startsWith("http://") || relativePath.startsWith("https://")) {
+            return relativePath; // Already full URL
+        }
+
+        // Convert relative path to full URL
+        if (relativePath.startsWith("/")) {
+            return BASE_URL.substring(0, BASE_URL.length() - 1) + relativePath;
+        } else {
+            return BASE_URL + relativePath;
+        }
+    }
+
+    // ===== NETWORK UTILITY METHODS =====
+
     public static boolean isNetworkAvailable(Context context) {
-        try {
-            ConnectivityManager connectivityManager =
-                    (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        ConnectivityManager connectivityManager =
+                (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        if (connectivityManager != null) {
             NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
             return activeNetworkInfo != null && activeNetworkInfo.isConnected();
-        } catch (Exception e) {
-            Log.e(TAG, "Error checking network connectivity", e);
-            return false;
         }
+
+        return false;
     }
 
     public static void checkNetworkAndLog(Context context) {
-        boolean isConnected = isNetworkAvailable(context);
-        Log.d(TAG, "Network status: " + (isConnected ? "Connected" : "Disconnected"));
+        boolean networkAvailable = isNetworkAvailable(context);
+        Log.d(TAG, networkAvailable ? "✅ Network available" : "❌ No network connection");
     }
 
     public static void testBackendConnectivity(Context context) {
-        Log.d(TAG, "Backend URL: " + BASE_URL);
-        Log.d(TAG, "WebSocket URL: " + WS_BASE_URL);
-    }
-
-    public static String getNetworkErrorMessage(Throwable t) {
-        if (t instanceof java.net.UnknownHostException) {
-            return "Không thể kết nối đến server";
-        } else if (t instanceof java.net.SocketTimeoutException) {
-            return "Kết nối timeout";
-        } else if (t instanceof java.net.ConnectException) {
-            return "Lỗi kết nối mạng";
-        } else {
-            return "Lỗi mạng: " + t.getMessage();
-        }
+        Log.d(TAG, "🔗 Backend URL: " + BASE_URL);
+        Log.d(TAG, "📡 WebSocket URL: " + WS_BASE_URL);
     }
 }

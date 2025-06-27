@@ -20,44 +20,32 @@ import retrofit2.http.Query;
 
 public interface ApiService {
 
-    // ===== SEARCH METHODS - ✅ ADD THESE =====
+    // ===== PRODUCT METHODS =====
 
     /**
-     * ✅ FIX: Advanced search products
+     * ✅ FIX: Get products without parameters (fixes HomeFragment error)
      */
-    @GET("api/products/search")
-    Call<StandardResponse<Map<String, Object>>> searchProductsAdvanced(
-            @Query("query") String query,
-            @Query("categoryId") Long categoryId,
-            @Query("minPrice") Double minPrice,
-            @Query("maxPrice") Double maxPrice,
-            @Query("condition") String condition,
-            @Query("latitude") Double latitude,
-            @Query("longitude") Double longitude,
-            @Query("radius") Integer radius,
-            @Query("sortBy") String sortBy,
-            @Query("page") Integer page,
-            @Query("size") Integer size
-    );
+    @GET("api/products")
+    Call<StandardResponse<Map<String, Object>>> getProducts();
 
     /**
-     * ✅ FIX: Get featured products
+     * ✅ FIX: Get products with pagination (fixes existing usage)
      */
-    @GET("api/products/featured")
-    Call<StandardResponse<List<Map<String, Object>>>> getFeaturedProducts();
-
-    /**
-     * ✅ FIX: Get recent products
-     */
-    @GET("api/products/recent")
-    Call<StandardResponse<List<Map<String, Object>>>> getRecentProducts(@Query("limit") int limit);
-
-    // ===== EXISTING METHODS =====
-
     @GET("api/products")
     Call<StandardResponse<Map<String, Object>>> getProducts(
             @Query("page") int page,
             @Query("size") int size
+    );
+
+    /**
+     * ✅ FIX: Get products with full filters (fixes AllProductsActivity error)
+     */
+    @GET("api/products")
+    Call<StandardResponse<Map<String, Object>>> getProducts(
+            @Query("page") int page,
+            @Query("size") int size,
+            @Query("search") String search,
+            @Query("categoryId") Long categoryId
     );
 
     @GET("api/products/{id}")
@@ -75,10 +63,57 @@ public interface ApiService {
     @DELETE("api/products/{id}")
     Call<StandardResponse<Void>> deleteProduct(@Path("id") Long productId);
 
+    // ===== CATEGORY METHODS =====
+
+    /**
+     * ✅ FIX: Add getCategories method (fixes HomeFragment error "cannot find symbol method getCategories()")
+     */
+    @GET("api/categories")
+    Call<StandardResponse<List<Map<String, Object>>>> getCategories();
+
+    @GET("api/categories/{id}")
+    Call<StandardResponse<Map<String, Object>>> getCategoryById(@Path("id") Long categoryId);
+
+    // ===== SEARCH METHODS =====
+
+    /**
+     * ✅ FIX: Search products method (fixes CategoryProductsActivity error "cannot find symbol method searchProducts")
+     */
+    @GET("api/products/search")
+    Call<StandardResponse<Map<String, Object>>> searchProducts(
+            @Query("query") String query,
+            @Query("page") int page,
+            @Query("size") int size,
+            @Query("categoryId") Long categoryId,
+            @Query("condition") String condition,
+            @Query("minPrice") Double minPrice,
+            @Query("maxPrice") Double maxPrice
+    );
+
+    /**
+     * Simple search products
+     */
+    @GET("api/products/search")
+    Call<StandardResponse<Map<String, Object>>> searchProducts(@Query("query") String query);
+
+    // ===== FEATURED & SPECIAL PRODUCTS =====
+
+    /**
+     * Get featured products
+     */
+    @GET("api/products/featured")
+    Call<StandardResponse<List<Map<String, Object>>>> getFeaturedProducts();
+
+    /**
+     * Get recent products
+     */
+    @GET("api/products/recent")
+    Call<StandardResponse<List<Map<String, Object>>>> getRecentProducts(@Query("limit") int limit);
+
     // ===== FILE UPLOAD =====
 
     /**
-     * ✅ FIX: Upload avatar image
+     * Upload avatar image
      */
     @Multipart
     @POST("api/files/upload/avatar")
@@ -90,4 +125,12 @@ public interface ApiService {
     @Multipart
     @POST("api/files/upload/product")
     Call<StandardResponse<Map<String, String>>> uploadProductImage(@Part MultipartBody.Part image);
+
+    // ===== HEALTH CHECK =====
+
+    /**
+     * Health check endpoint
+     */
+    @GET("api/health")
+    Call<StandardResponse<String>> healthCheck();
 }

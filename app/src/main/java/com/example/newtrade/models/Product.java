@@ -2,127 +2,74 @@
 package com.example.newtrade.models;
 
 import java.math.BigDecimal;
-import java.util.Date;
-import java.util.Map;
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 public class Product {
     private Long id;
     private String title;
     private String description;
-    private BigDecimal price;
+    private Double price; // ✅ KEEP as Double for compatibility
     private String imageUrl;
-    private String category;
-    private String condition;
     private String location;
-    private String tags;
-    private boolean negotiable;
-    private Long sellerId;
-    private String sellerName;
-    private String sellerProfilePicture;
-    private boolean isActive;
-    private Date createdAt;
-    private Date updatedAt;
+    private String condition;
+    private String status;
+    private String createdAt;
+    private String updatedAt;
+    private Long userId;
+    private Long categoryId;
+
+    // ✅ FIX: Add missing fields causing "cannot find symbol" errors
+    private List<String> imageUrls;
+    private String categoryName;
+    private Integer viewCount = 0;
+
+    // ===== ENUMS =====
+    public enum ProductCondition {
+        NEW("New"),
+        LIKE_NEW("Like New"),
+        GOOD("Good"),
+        FAIR("Fair"),
+        POOR("Poor");
+
+        private final String displayName;
+        ProductCondition(String displayName) { this.displayName = displayName; }
+        public String getDisplayName() { return displayName; }
+        @Override
+        public String toString() { return displayName; }
+    }
+
+    public enum ProductStatus {
+        AVAILABLE("Available"),
+        SOLD("Sold"),
+        RESERVED("Reserved"),
+        DELETED("Deleted"),
+        ARCHIVED("Archived");
+
+        private final String displayName;
+        ProductStatus(String displayName) { this.displayName = displayName; }
+        public String getDisplayName() { return displayName; }
+        @Override
+        public String toString() { return displayName; }
+    }
 
     // ===== CONSTRUCTORS =====
 
-    public Product() {}
+    public Product() {
+        this.imageUrls = new ArrayList<>();
+    }
 
-    public Product(Long id, String title, String description, BigDecimal price, String imageUrl) {
+    public Product(Long id, String title, String description, Double price) {
+        this();
         this.id = id;
         this.title = title;
         this.description = description;
         this.price = price;
-        this.imageUrl = imageUrl;
     }
 
-    // ✅ FIX: Add fromMap method
-    public static Product fromMap(Map<String, Object> map) {
-        Product product = new Product();
-
-        product.id = getLongFromMap(map, "id");
-        product.title = getStringFromMap(map, "title");
-        product.description = getStringFromMap(map, "description");
-
-        // Handle price conversion
-        Object priceObj = map.get("price");
-        if (priceObj instanceof Number) {
-            product.price = new BigDecimal(priceObj.toString());
-        } else if (priceObj instanceof String) {
-            try {
-                product.price = new BigDecimal((String) priceObj);
-            } catch (NumberFormatException e) {
-                product.price = BigDecimal.ZERO;
-            }
-        } else {
-            product.price = BigDecimal.ZERO;
-        }
-
-        product.imageUrl = getStringFromMap(map, "imageUrl");
-        product.category = getStringFromMap(map, "category");
-        product.condition = getStringFromMap(map, "condition");
-        product.location = getStringFromMap(map, "location");
-        product.tags = getStringFromMap(map, "tags");
-        product.negotiable = getBooleanFromMap(map, "negotiable");
-        product.sellerId = getLongFromMap(map, "sellerId");
-        product.sellerName = getStringFromMap(map, "sellerName");
-        product.sellerProfilePicture = getStringFromMap(map, "sellerProfilePicture");
-        product.isActive = getBooleanFromMap(map, "isActive");
-
-        // Handle dates
-        product.createdAt = getDateFromMap(map, "createdAt");
-        product.updatedAt = getDateFromMap(map, "updatedAt");
-
-        return product;
-    }
-
-    // ===== HELPER METHODS FOR MAP CONVERSION =====
-
-    private static String getStringFromMap(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        return value != null ? value.toString() : "";
-    }
-
-    private static Long getLongFromMap(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Number) {
-            return ((Number) value).longValue();
-        } else if (value instanceof String) {
-            try {
-                return Long.parseLong((String) value);
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private static boolean getBooleanFromMap(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Boolean) {
-            return (Boolean) value;
-        } else if (value instanceof String) {
-            return Boolean.parseBoolean((String) value);
-        }
-        return false;
-    }
-
-    private static Date getDateFromMap(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Date) {
-            return (Date) value;
-        } else if (value instanceof Long) {
-            return new Date((Long) value);
-        } else if (value instanceof String) {
-            try {
-                return new Date(Long.parseLong((String) value));
-            } catch (NumberFormatException e) {
-                return new Date();
-            }
-        }
-        return new Date();
-    }
-
-    // ===== GETTERS AND SETTERS =====
+    // ===== EXISTING GETTERS & SETTERS =====
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -133,42 +80,99 @@ public class Product {
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
-    public BigDecimal getPrice() { return price; }
-    public void setPrice(BigDecimal price) { this.price = price; }
+    public Double getPrice() { return price; }
+    public void setPrice(Double price) { this.price = price; }
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
-    public String getCategory() { return category; }
-    public void setCategory(String category) { this.category = category; }
+    public String getLocation() { return location; }
+    public void setLocation(String location) { this.location = location; }
 
     public String getCondition() { return condition; }
     public void setCondition(String condition) { this.condition = condition; }
 
-    public String getLocation() { return location; }
-    public void setLocation(String location) { this.location = location; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public String getTags() { return tags; }
-    public void setTags(String tags) { this.tags = tags; }
+    public String getCreatedAt() { return createdAt; }
+    public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 
-    public boolean isNegotiable() { return negotiable; }
-    public void setNegotiable(boolean negotiable) { this.negotiable = negotiable; }
+    public String getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
 
-    public Long getSellerId() { return sellerId; }
-    public void setSellerId(Long sellerId) { this.sellerId = sellerId; }
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 
-    public String getSellerName() { return sellerName; }
-    public void setSellerName(String sellerName) { this.sellerName = sellerName; }
+    public Long getCategoryId() { return categoryId; }
+    public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
 
-    public String getSellerProfilePicture() { return sellerProfilePicture; }
-    public void setSellerProfilePicture(String sellerProfilePicture) { this.sellerProfilePicture = sellerProfilePicture; }
+    // ✅ FIX: Add NEW methods that were causing "cannot find symbol" errors
 
-    public boolean isActive() { return isActive; }
-    public void setActive(boolean active) { isActive = active; }
+    /**
+     * getFormattedPrice() - was causing "cannot find symbol method getFormattedPrice()" error
+     */
+    public String getFormattedPrice() {
+        if (price == null || price <= 0) {
+            return "Free";
+        }
 
-    public Date getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+        try {
+            NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+            return formatter.format(price).replace("₫", "đ");
+        } catch (Exception e) {
+            return String.format("%,.0f đ", price);
+        }
+    }
 
-    public Date getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+    /**
+     * getPrimaryImageUrl() - was causing "cannot find symbol method getPrimaryImageUrl()" error
+     */
+    public String getPrimaryImageUrl() {
+        if (imageUrls != null && !imageUrls.isEmpty()) {
+            return imageUrls.get(0);
+        }
+        return imageUrl; // fallback to single imageUrl
+    }
+
+    /**
+     * setImageUrls() - was causing "cannot find symbol method setImageUrls(List<String>)" error
+     */
+    public List<String> getImageUrls() {
+        return imageUrls != null ? imageUrls : new ArrayList<>();
+    }
+
+    public void setImageUrls(List<String> imageUrls) {
+        this.imageUrls = imageUrls != null ? imageUrls : new ArrayList<>();
+    }
+
+    /**
+     * setCategoryName() - was causing "cannot find symbol method setCategoryName(String)" error
+     */
+    public String getCategoryName() { return categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
+
+    /**
+     * setViewCount() - was causing "cannot find symbol method setViewCount(int)" error
+     */
+    public Integer getViewCount() { return viewCount != null ? viewCount : 0; }
+    public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
+
+    // ✅ FIX: Add setPrimaryImageUrl() - was causing error in CategoryProductsActivity
+    public void setPrimaryImageUrl(String primaryImageUrl) {
+        this.imageUrl = primaryImageUrl; // set to main imageUrl field
+    }
+
+    // ===== HELPER METHODS =====
+
+    public boolean hasImages() {
+        return (imageUrls != null && !imageUrls.isEmpty()) || (imageUrl != null && !imageUrl.isEmpty());
+    }
+
+    public void addImageUrl(String imageUrl) {
+        if (imageUrls == null) {
+            imageUrls = new ArrayList<>();
+        }
+        imageUrls.add(imageUrl);
+    }
 }

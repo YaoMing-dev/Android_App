@@ -30,6 +30,17 @@ public class SharedPrefsManager {
                 .apply();
     }
 
+    // ✅ FIX: Add saveUserSession() - was causing "cannot find symbol method saveUserSession(Long,String,String,boolean)" error
+    public void saveUserSession(Long userId, String email, String name, boolean isEmailVerified) {
+        prefs.edit()
+                .putLong(Constants.PREF_USER_ID, userId)
+                .putString(Constants.PREF_USER_EMAIL, email)
+                .putString(Constants.PREF_USER_NAME, name)
+                .putBoolean(Constants.PREF_IS_LOGGED_IN, true)
+                .putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, isEmailVerified)
+                .apply();
+    }
+
     public Long getUserId() {
         long id = prefs.getLong(Constants.PREF_USER_ID, -1L);
         return id == -1L ? null : id;
@@ -43,20 +54,8 @@ public class SharedPrefsManager {
         return prefs.getString(Constants.PREF_USER_NAME, "");
     }
 
-    // ✅ FIX: Add missing methods
-    public void saveUserName(String name) {
-        prefs.edit()
-                .putString(Constants.PREF_USER_NAME, name)
-                .apply();
-    }
-
-    public void saveUserEmail(String email) {
-        prefs.edit()
-                .putString(Constants.PREF_USER_EMAIL, email)
-                .apply();
-    }
-
-    public void saveUserProfilePicture(String profilePictureUrl) {
+    // ✅ ADD: Profile Picture Support
+    public void setUserProfilePicture(String profilePictureUrl) {
         prefs.edit()
                 .putString(Constants.PREF_USER_PROFILE_PICTURE, profilePictureUrl)
                 .apply();
@@ -102,9 +101,19 @@ public class SharedPrefsManager {
         return prefs.getString(Constants.PREF_FCM_TOKEN, "");
     }
 
+    // ✅ FIX: Add saveFcmToken() - was causing "cannot find symbol method saveFcmToken(String)" error
+    public void saveFcmToken(String token) {
+        setFcmToken(token);
+    }
+
     // ===== LOGOUT =====
 
     public void logout() {
         prefs.edit().clear().apply();
+    }
+
+    // ✅ FIX: Add clearUserSession() - was causing "cannot find symbol method clearUserSession()" error
+    public void clearUserSession() {
+        logout();
     }
 }
