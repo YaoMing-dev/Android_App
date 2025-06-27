@@ -108,7 +108,7 @@ public class RealtimeWebSocketService extends Service {
 
     // ===== WEBSOCKET CONNECTION =====
 
-    public void connect() {
+    private void connect() {
         if (isConnected || isConnecting) {
             Log.d(TAG, "Already connected or connecting");
             return;
@@ -123,75 +123,59 @@ public class RealtimeWebSocketService extends Service {
         isConnecting = true;
 
         try {
-            String wsUrl = Constants.WS_BASE_URL + "/ws";
-            Log.d(TAG, "🔌 Connecting to WebSocket: " + wsUrl);
+            // ✅ FIX: Complete WebSocket URL
+            String wsUrl = Constants.WS_BASE_URL + "/chat?userId=" + currentUserId;
+            Log.d(TAG, "🔗 Connecting to WebSocket: " + wsUrl);
 
-            URI serverUri = URI.create(wsUrl);
+            URI uri = URI.create(wsUrl);
 
-            // Add headers for authentication
-            Map<String, String> headers = new HashMap<>();
-            headers.put("User-ID", currentUserId.toString());
-            String accessToken = prefsManager.getAccessToken();
-            if (!accessToken.isEmpty()) {
-                headers.put("Authorization", "Bearer " + accessToken);
-            }
-
-            webSocketClient = new WebSocketClient(serverUri, new Draft_6455(), headers, 5000) {
+            webSocketClient = new WebSocketClient(uri, new Draft_6455()) {
                 @Override
                 public void onOpen(ServerHandshake handshake) {
-                    Log.d(TAG, "✅ WebSocket connected");
                     isConnected = true;
                     isConnecting = false;
                     reconnectAttempts = 0;
 
-                    // Send authentication
-                    authenticateUser();
-
-                    // Notify listeners
+                    Log.d(TAG, "✅ WebSocket connected");
                     notifyConnected();
                 }
 
                 @Override
                 public void onMessage(String message) {
-                    Log.d(TAG, "📨 Received: " + message);
+                    Log.d(TAG, "📩 Received: " + message);
                     handleIncomingMessage(message);
                 }
 
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
-                    Log.d(TAG, "❌ WebSocket closed: " + reason + " (Code: " + code + ")");
                     isConnected = false;
                     isConnecting = false;
 
+                    Log.d(TAG, "❌ WebSocket closed: " + reason);
                     notifyDisconnected();
 
-                    // Auto-reconnect if not manually closed
-                    if (remote && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    // Auto reconnect
+                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                         scheduleReconnect();
                     }
                 }
 
                 @Override
                 public void onError(Exception ex) {
-                    Log.e(TAG, "❌ WebSocket error", ex);
                     isConnected = false;
                     isConnecting = false;
 
-                    notifyError("Connection error: " + ex.getMessage());
-
-                    // Try to reconnect
-                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                        scheduleReconnect();
-                    }
+                    Log.e(TAG, "❌ WebSocket error", ex);
+                    notifyError(ex.getMessage());
                 }
             };
 
             webSocketClient.connect();
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to create WebSocket connection", e);
             isConnecting = false;
-            notifyError("Failed to connect: " + e.getMessage());
+            Log.e(TAG, "❌ Failed to create WebSocket connection", e);
+            notifyError("Connection failed: " + e.getMessage());
         }
     }
 

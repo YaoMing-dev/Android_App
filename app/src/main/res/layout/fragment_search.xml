@@ -172,62 +172,54 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:padding="8dp"
-            android:clipToPadding="false"
-            tools:itemCount="4"
+            android:visibility="gone"
             tools:listitem="@layout/item_product_grid" />
 
         <!-- Empty State -->
         <LinearLayout
             android:id="@+id/ll_empty_state"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:orientation="vertical"
             android:gravity="center"
+            android:padding="32dp"
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:src="@drawable/ic_search_empty"
-                android:alpha="0.6"
-                app:tint="@color/text_secondary" />
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:src="@drawable/ic_search"
+                app:tint="@color/text_secondary"
+                android:layout_marginBottom="24dp" />
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
                 android:text="No products found"
                 android:textSize="18sp"
                 android:textStyle="bold"
-                android:textColor="@color/text_primary" />
+                android:textColor="@color/text_primary"
+                android:gravity="center"
+                android:layout_marginBottom="8dp" />
 
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 android:text="Try adjusting your search or filters"
+                android:textSize="14sp"
                 android:textColor="@color/text_secondary"
-                android:textAlignment="center" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_clear_filters"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Clear Filters" />
+                android:gravity="center" />
 
         </LinearLayout>
 
         <!-- Loading State -->
         <LinearLayout
-            android:id="@+id/ll_loading"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
+            android:id="@+id/ll_loading_state"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:orientation="vertical"
             android:gravity="center"
+            android:padding="32dp"
             android:visibility="gone">
 
             <ProgressBar
@@ -251,7 +243,7 @@
             android:layout_height="match_parent"
             android:orientation="vertical"
             android:padding="16dp"
-            android:visibility="gone">
+            android:visibility="visible">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -261,30 +253,30 @@
                 android:textStyle="bold"
                 android:textColor="@color/text_primary" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rv_recent_searches"
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                tools:itemCount="3"
-                tools:listitem="@layout/item_recent_search" />
+                android:layout_marginTop="8dp"
+                android:text="Your recent searches will appear here"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="32dp"
                 android:text="Popular Categories"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rv_popular_categories"
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                tools:itemCount="4"
-                tools:listitem="@layout/item_category_popular" />
+                android:layout_marginTop="8dp"
+                android:text="Electronics • Fashion • Home and Garden • Sports"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary" />
 
         </LinearLayout>
 

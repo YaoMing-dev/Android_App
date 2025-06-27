@@ -1,4 +1,4 @@
-// File: app/src/main/java/com/example/newtrade/ui/search/SearchFragment.java
+// app/src/main/java/com/example/newtrade/ui/search/SearchFragment.java
 package com.example.newtrade.ui.search;
 
 import android.app.AlertDialog;
@@ -12,11 +12,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -26,10 +23,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.ProductAdapter;
-import com.example.newtrade.api.ApiClient;
-import com.example.newtrade.models.Category;
 import com.example.newtrade.models.Product;
-import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -39,11 +33,6 @@ import com.google.android.material.textfield.TextInputEditText;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 public class SearchFragment extends Fragment {
 
@@ -55,13 +44,12 @@ public class SearchFragment extends Fragment {
     private MaterialButton btnCategoryFilter, btnPriceFilter, btnLocationFilter, btnConditionFilter;
     private ChipGroup chipGroupFilters;
     private RecyclerView rvSearchResults;
-    private LinearLayout llEmptyState, llRecentSearches;
+    private LinearLayout llEmptyState, llRecentSearches, llLoadingState;
     private TextView tvResultsCount, tvSortOption;
 
     // Data & Adapters
     private ProductAdapter searchAdapter;
     private final List<Product> searchResults = new ArrayList<>();
-    private final List<Category> categories = new ArrayList<>();
     private String currentQuery = "";
     private final Handler searchHandler = new Handler(Looper.getMainLooper());
     private Runnable searchRunnable;
@@ -75,6 +63,12 @@ public class SearchFragment extends Fragment {
     private String sortBy = "relevance";
     private boolean isSearching = false;
 
+    // Location Filter
+    private Double searchLatitude = null;
+    private Double searchLongitude = null;
+    private String searchLocationName = "";
+    private int searchRadiusKm = 10;
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_search, container, false);
@@ -87,30 +81,26 @@ public class SearchFragment extends Fragment {
         initViews(view);
         setupRecyclerViews();
         setupListeners();
-        loadCategories();
         showInitialState();
 
         Log.d(TAG, "SearchFragment created successfully");
     }
 
     private void initViews(View view) {
-        try {
-            etSearch = view.findViewById(R.id.et_search);
-            btnCategoryFilter = view.findViewById(R.id.btn_category_filter);
-            btnPriceFilter = view.findViewById(R.id.btn_price_filter);
-            btnLocationFilter = view.findViewById(R.id.btn_location_filter);
-            btnConditionFilter = view.findViewById(R.id.btn_condition_filter);
-            chipGroupFilters = view.findViewById(R.id.chip_group_filters);
-            rvSearchResults = view.findViewById(R.id.rv_search_results);
-            llEmptyState = view.findViewById(R.id.ll_empty_state);
-            llRecentSearches = view.findViewById(R.id.ll_recent_searches);
-            tvResultsCount = view.findViewById(R.id.tv_results_count);
-            tvSortOption = view.findViewById(R.id.tv_sort_option);
+        etSearch = view.findViewById(R.id.et_search);
+        btnCategoryFilter = view.findViewById(R.id.btn_category_filter);
+        btnPriceFilter = view.findViewById(R.id.btn_price_filter);
+        btnLocationFilter = view.findViewById(R.id.btn_location_filter);
+        btnConditionFilter = view.findViewById(R.id.btn_condition_filter);
+        chipGroupFilters = view.findViewById(R.id.chip_group_filters);
+        rvSearchResults = view.findViewById(R.id.rv_search_results);
+        llEmptyState = view.findViewById(R.id.ll_empty_state);
+        llRecentSearches = view.findViewById(R.id.ll_recent_searches);
+        llLoadingState = view.findViewById(R.id.ll_loading_state);
+        tvResultsCount = view.findViewById(R.id.tv_results_count);
+        tvSortOption = view.findViewById(R.id.tv_sort_option);
 
-            Log.d(TAG, "✅ SearchFragment views initialized");
-        } catch (Exception e) {
-            Log.w(TAG, "Some SearchFragment views not found: " + e.getMessage());
-        }
+        Log.d(TAG, "✅ SearchFragment views initialized");
     }
 
     private void setupRecyclerViews() {
@@ -122,516 +112,468 @@ public class SearchFragment extends Fragment {
     }
 
     private void setupListeners() {
-        try {
-            // 🔥 SEARCH INPUT WITH DELAY
-            if (etSearch != null) {
-                etSearch.addTextChangedListener(new TextWatcher() {
-                    @Override
-                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        // Search input with debounce
+        if (etSearch != null) {
+            etSearch.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-                    @Override
-                    public void onTextChanged(CharSequence s, int start, int before, int count) {
-                        currentQuery = s.toString().trim();
-
-                        // Remove previous search callback
-                        if (searchRunnable != null) {
-                            searchHandler.removeCallbacks(searchRunnable);
-                        }
-
-                        // Schedule new search
-                        searchRunnable = () -> performSearch();
-                        searchHandler.postDelayed(searchRunnable, SEARCH_DELAY_MS);
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    String query = s.toString().trim();
+                    if (!query.equals(currentQuery)) {
+                        currentQuery = query;
+                        scheduleSearch();
                     }
-
-                    @Override
-                    public void afterTextChanged(Editable s) {}
-                });
-            }
-
-            // 🔥 FILTER BUTTONS
-            if (btnCategoryFilter != null) {
-                btnCategoryFilter.setOnClickListener(v -> showCategoryFilterDialog());
-            }
-
-            if (btnPriceFilter != null) {
-                btnPriceFilter.setOnClickListener(v -> showPriceFilterDialog());
-            }
-
-            if (btnConditionFilter != null) {
-                btnConditionFilter.setOnClickListener(v -> showConditionFilterDialog());
-            }
-
-            if (btnLocationFilter != null) {
-                btnLocationFilter.setOnClickListener(v -> showLocationFilterDialog());
-            }
-
-            // 🔥 SORT OPTIONS
-            if (tvSortOption != null) {
-                tvSortOption.setOnClickListener(v -> showSortDialog());
-            }
-
-            Log.d(TAG, "✅ SearchFragment listeners setup");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error setting up listeners", e);
-        }
-    }
-
-    private void loadCategories() {
-        ApiClient.getApiService().getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
-                                   Response<StandardResponse<List<Map<String, Object>>>> response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                        List<Map<String, Object>> categoryData = response.body().getData();
-                        categories.clear();
-
-                        for (Map<String, Object> data : categoryData) {
-                            Category category = new Category();
-                            category.setId(((Number) data.get("id")).longValue());
-                            category.setName((String) data.get("name"));
-                            categories.add(category);
-                        }
-
-                        Log.d(TAG, "✅ Loaded " + categories.size() + " categories for search");
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error parsing categories", e);
                 }
-            }
 
-            @Override
-            public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
-                Log.e(TAG, "❌ Categories API call failed", t);
+                @Override
+                public void afterTextChanged(Editable s) {}
+            });
+        }
+
+        // Filter buttons
+        if (btnCategoryFilter != null) {
+            btnCategoryFilter.setOnClickListener(v -> showCategoryFilterDialog());
+        }
+
+        if (btnPriceFilter != null) {
+            btnPriceFilter.setOnClickListener(v -> showPriceFilterDialog());
+        }
+
+        if (btnLocationFilter != null) {
+            btnLocationFilter.setOnClickListener(v -> showLocationFilterDialog());
+        }
+
+        if (btnConditionFilter != null) {
+            btnConditionFilter.setOnClickListener(v -> showConditionFilterDialog());
+        }
+
+        // Sort option
+        if (tvSortOption != null) {
+            View llSortOptions = requireView().findViewById(R.id.ll_sort_options);
+            if (llSortOptions != null) {
+                llSortOptions.setOnClickListener(v -> showSortDialog());
             }
-        });
+        }
+
+        Log.d(TAG, "✅ SearchFragment listeners setup completed");
     }
 
-    private void showInitialState() {
-        if (llRecentSearches != null) {
-            llRecentSearches.setVisibility(View.VISIBLE);
+    private void scheduleSearch() {
+        // Cancel previous search
+        if (searchRunnable != null) {
+            searchHandler.removeCallbacks(searchRunnable);
         }
-        if (rvSearchResults != null) {
-            rvSearchResults.setVisibility(View.GONE);
-        }
-        if (llEmptyState != null) {
-            llEmptyState.setVisibility(View.GONE);
-        }
-        if (tvResultsCount != null) {
-            tvResultsCount.setVisibility(View.GONE);
-        }
+
+        // Schedule new search with delay
+        searchRunnable = this::performSearch;
+        searchHandler.postDelayed(searchRunnable, SEARCH_DELAY_MS);
     }
 
     private void performSearch() {
-        if (isSearching) return;
+        String query = currentQuery.trim();
 
-        Log.d(TAG, "🔍 Performing search: '" + currentQuery + "'");
-
-        if (currentQuery.isEmpty()) {
+        if (query.isEmpty() && !hasActiveFilters()) {
             showInitialState();
+            return;
+        }
+
+        showLoadingState();
+        isSearching = true;
+
+        // Search with location if available
+        if (searchLatitude != null && searchLongitude != null) {
+            searchWithLocation(query, searchLatitude, searchLongitude, searchRadiusKm);
+        } else {
+            searchWithoutLocation(query);
+        }
+    }
+
+    private void searchWithLocation(String query, Double latitude, Double longitude, int radiusKm) {
+        loadMockSearchResults(query, true);
+        Log.d(TAG, "🔍 Searching with location: " + query + " near " + latitude + "," + longitude + " (" + radiusKm + "km)");
+    }
+
+    private void searchWithoutLocation(String query) {
+        loadMockSearchResults(query, false);
+        Log.d(TAG, "🔍 Searching without location: " + query);
+    }
+
+    private void loadMockSearchResults(String query, boolean hasLocation) {
+        // Simulate API delay
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
             searchResults.clear();
+
+            // Mock search results based on query and location
+            if (query.toLowerCase().contains("iphone")) {
+                addMockProduct("iPhone 13 Pro Max", "25000000");
+                addMockProduct("iPhone 12", "18000000");
+                addMockProduct("iPhone 14", "28000000");
+            } else if (query.toLowerCase().contains("samsung")) {
+                addMockProduct("Samsung Galaxy S23", "19000000");
+                addMockProduct("Samsung Galaxy Note 20", "15000000");
+            } else if (query.toLowerCase().contains("macbook")) {
+                addMockProduct("MacBook Air M2", "32000000");
+                addMockProduct("MacBook Pro 14\"", "45000000");
+            } else if (!query.isEmpty()) {
+                // General search results
+                addMockProduct("iPhone 13 Pro Max", "25000000");
+                addMockProduct("Samsung Galaxy S23", "19000000");
+                addMockProduct("MacBook Air M2", "32000000");
+                addMockProduct("AirPods Pro", "6000000");
+            } else if (hasActiveFilters()) {
+                // Results based on filters only
+                addMockProduct("Filtered Product 1", "15000000");
+                addMockProduct("Filtered Product 2", "22000000");
+            }
+
+            // Apply additional filters
+            applyFilters();
+
             if (searchAdapter != null) {
                 searchAdapter.notifyDataSetChanged();
             }
-            return;
-        }
+            updateResultsCount(searchResults.size());
+            showResults();
+            isSearching = false;
+        }, 800);
+    }
 
-        isSearching = true;
-        showLoadingState();
+    private void addMockProduct(String title, String price) {
+        Product product = new Product();
+        product.setId(System.currentTimeMillis() + searchResults.size());
+        product.setTitle(title);
+        product.setPrice(new BigDecimal(price));
+        product.setCondition(Product.ProductCondition.GOOD);
+        product.setImageUrl("https://example.com/product.jpg");
+        product.setLocation("Ho Chi Minh City");
 
-        // 🔥 CALL SEARCH API
-        ApiClient.getApiService().searchProducts(
-                currentQuery,
-                0, // page
-                20, // size
-                selectedCategoryId,
-                selectedCondition,
-                minPrice,
-                maxPrice
-        ).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-                isSearching = false;
+        searchResults.add(product);
+    }
 
-                try {
-                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                        Map<String, Object> data = response.body().getData();
-                        List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
+    private void applyFilters() {
+        List<Product> filteredResults = new ArrayList<>();
 
-                        searchResults.clear();
+        for (Product product : searchResults) {
+            boolean passesFilters = true;
 
-                        if (productList != null && !productList.isEmpty()) {
-                            for (Map<String, Object> productData : productList) {
-                                Product product = new Product();
-                                product.setId(((Number) productData.get("id")).longValue());
-                                product.setTitle((String) productData.get("title"));
-                                product.setDescription((String) productData.get("description"));
-
-                                // Handle price conversion
-                                Object priceObj = productData.get("price");
-                                if (priceObj instanceof Number) {
-                                    product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
-                                }
-
-                                product.setLocation((String) productData.get("location"));
-
-                                // Handle imageUrls
-                                Object imageUrlsObj = productData.get("imageUrls");
-                                if (imageUrlsObj instanceof List) {
-                                    product.setImageUrls((List<String>) imageUrlsObj);
-                                } else if (imageUrlsObj instanceof String) {
-                                    product.setImageUrl((String) imageUrlsObj);
-                                }
-
-                                // Handle condition
-                                String condition = (String) productData.get("condition");
-                                if (condition != null) {
-                                    try {
-                                        product.setCondition(Product.ProductCondition.valueOf(condition));
-                                    } catch (IllegalArgumentException e) {
-                                        product.setCondition(Product.ProductCondition.GOOD);
-                                    }
-                                }
-
-                                searchResults.add(product);
-                            }
-
-                            showSearchResults();
-                        } else {
-                            showEmptyResults();
-                        }
-
-                        if (searchAdapter != null) {
-                            searchAdapter.notifyDataSetChanged();
-                        }
-
-                        Log.d(TAG, "✅ Search completed: " + searchResults.size() + " results");
-                    } else {
-                        Log.w(TAG, "❌ Search response unsuccessful");
-                        showEmptyResults();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error parsing search results", e);
-                    showEmptyResults();
-                }
+            // Price filter
+            if (minPrice != null && product.getPrice().doubleValue() < minPrice) {
+                passesFilters = false;
+            }
+            if (maxPrice != null && product.getPrice().doubleValue() > maxPrice) {
+                passesFilters = false;
             }
 
-            @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                isSearching = false;
-                Log.e(TAG, "❌ Search API call failed", t);
-                showEmptyResults();
-                Toast.makeText(getContext(), "Search failed: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            // Condition filter
+            if (selectedCondition != null && !selectedCondition.equals(product.getCondition().name())) {
+                passesFilters = false;
             }
-        });
+
+            if (passesFilters) {
+                filteredResults.add(product);
+            }
+        }
+
+        searchResults.clear();
+        searchResults.addAll(filteredResults);
     }
 
-    private void showLoadingState() {
-        if (llRecentSearches != null) {
-            llRecentSearches.setVisibility(View.GONE);
-        }
-        if (rvSearchResults != null) {
-            rvSearchResults.setVisibility(View.VISIBLE);
-        }
-        if (llEmptyState != null) {
-            llEmptyState.setVisibility(View.GONE);
-        }
-        if (tvResultsCount != null) {
-            tvResultsCount.setVisibility(View.VISIBLE);
-            tvResultsCount.setText("Searching...");
-        }
+    private boolean hasActiveFilters() {
+        return selectedCategoryId != null ||
+                minPrice != null || maxPrice != null ||
+                selectedCondition != null ||
+                (searchLatitude != null && searchLongitude != null);
     }
 
-    private void showSearchResults() {
-        if (llRecentSearches != null) {
-            llRecentSearches.setVisibility(View.GONE);
-        }
-        if (rvSearchResults != null) {
-            rvSearchResults.setVisibility(View.VISIBLE);
-        }
-        if (llEmptyState != null) {
-            llEmptyState.setVisibility(View.GONE);
-        }
-        if (tvResultsCount != null) {
-            tvResultsCount.setVisibility(View.VISIBLE);
-            tvResultsCount.setText("Found " + searchResults.size() + " products");
-        }
-    }
+    // ===== Filter Dialogs =====
 
-    private void showEmptyResults() {
-        if (llRecentSearches != null) {
-            llRecentSearches.setVisibility(View.GONE);
-        }
-        if (rvSearchResults != null) {
-            rvSearchResults.setVisibility(View.GONE);
-        }
-        if (llEmptyState != null) {
-            llEmptyState.setVisibility(View.VISIBLE);
-        }
-        if (tvResultsCount != null) {
-            tvResultsCount.setVisibility(View.VISIBLE);
-            tvResultsCount.setText("No products found");
-        }
-    }
-
-    // 🔥 FILTER DIALOGS
     private void showCategoryFilterDialog() {
-        if (categories.isEmpty()) {
-            Toast.makeText(getContext(), "Loading categories...", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        String[] categoryNames = {"Electronics", "Fashion", "Home & Garden", "Sports", "Books", "Automotive"};
 
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Select Category");
-
-        // Create category list
-        List<String> categoryNames = new ArrayList<>();
-        categoryNames.add("All Categories");
-        for (Category category : categories) {
-            categoryNames.add(category.getName());
-        }
-
-        String[] categoryArray = categoryNames.toArray(new String[0]);
-        int selectedIndex = 0;
-        if (selectedCategoryName != null) {
-            for (int i = 0; i < categoryArray.length; i++) {
-                if (categoryArray[i].equals(selectedCategoryName)) {
-                    selectedIndex = i;
-                    break;
-                }
-            }
-        }
-
-        builder.setSingleChoiceItems(categoryArray, selectedIndex, (dialog, which) -> {
-            if (which == 0) {
-                // All Categories
-                selectedCategoryId = null;
-                selectedCategoryName = null;
-                btnCategoryFilter.setText("Category");
-            } else {
-                Category selectedCategory = categories.get(which - 1);
-                selectedCategoryId = selectedCategory.getId();
-                selectedCategoryName = selectedCategory.getName();
-                btnCategoryFilter.setText(selectedCategoryName);
-            }
-
-            updateFilterChips();
+        builder.setItems(categoryNames, (dialog, which) -> {
+            selectedCategoryId = (long) (which + 1);
+            selectedCategoryName = categoryNames[which];
+            updateCategoryFilterButton();
             performSearch();
-            dialog.dismiss();
         });
-
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
-    }
-
-    private void showConditionFilterDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Select Condition");
-
-        String[] conditions = {"All Conditions", "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"};
-        int selectedIndex = 0;
-        if (selectedCondition != null) {
-            for (int i = 0; i < conditions.length; i++) {
-                if (conditions[i].equals(selectedCondition)) {
-                    selectedIndex = i;
-                    break;
-                }
-            }
-        }
-
-        builder.setSingleChoiceItems(conditions, selectedIndex, (dialog, which) -> {
-            if (which == 0) {
-                selectedCondition = null;
-                btnConditionFilter.setText("Condition");
-            } else {
-                selectedCondition = conditions[which];
-                btnConditionFilter.setText(selectedCondition.replace("_", " "));
-            }
-
-            updateFilterChips();
+        builder.setNegativeButton("Clear", (dialog, which) -> {
+            selectedCategoryId = null;
+            selectedCategoryName = null;
+            updateCategoryFilterButton();
             performSearch();
-            dialog.dismiss();
         });
-
-        builder.setNegativeButton("Cancel", null);
         builder.show();
     }
 
     private void showPriceFilterDialog() {
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_price_filter, null);
+
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Price Range");
-
-        // Simple price ranges
-        String[] priceRanges = {
-                "All Prices",
-                "Under 100,000 VNĐ",
-                "100,000 - 500,000 VNĐ",
-                "500,000 - 1,000,000 VNĐ",
-                "1,000,000 - 5,000,000 VNĐ",
-                "Above 5,000,000 VNĐ"
-        };
-
-        builder.setSingleChoiceItems(priceRanges, 0, (dialog, which) -> {
-            switch (which) {
-                case 0:
-                    minPrice = null;
-                    maxPrice = null;
-                    btnPriceFilter.setText("Price");
-                    break;
-                case 1:
-                    minPrice = null;
-                    maxPrice = 100000.0;
-                    btnPriceFilter.setText("< 100K");
-                    break;
-                case 2:
-                    minPrice = 100000.0;
-                    maxPrice = 500000.0;
-                    btnPriceFilter.setText("100K-500K");
-                    break;
-                case 3:
-                    minPrice = 500000.0;
-                    maxPrice = 1000000.0;
-                    btnPriceFilter.setText("500K-1M");
-                    break;
-                case 4:
-                    minPrice = 1000000.0;
-                    maxPrice = 5000000.0;
-                    btnPriceFilter.setText("1M-5M");
-                    break;
-                case 5:
-                    minPrice = 5000000.0;
-                    maxPrice = null;
-                    btnPriceFilter.setText("> 5M");
-                    break;
-            }
-
-            updateFilterChips();
+        builder.setView(dialogView);
+        builder.setPositiveButton("Apply", (dialog, which) -> {
+            // Mock price values for now
+            minPrice = 5000000.0;
+            maxPrice = 50000000.0;
+            updatePriceFilterButton();
             performSearch();
-            dialog.dismiss();
         });
-
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
-    }
-
-    private void showSortDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Sort By");
-
-        String[] sortOptions = {"Relevance", "Newest", "Price: Low to High", "Price: High to Low"};
-        int selectedIndex = 0;
-        switch (sortBy) {
-            case "newest": selectedIndex = 1; break;
-            case "price_asc": selectedIndex = 2; break;
-            case "price_desc": selectedIndex = 3; break;
-            default: selectedIndex = 0; break;
-        }
-
-        builder.setSingleChoiceItems(sortOptions, selectedIndex, (dialog, which) -> {
-            switch (which) {
-                case 0:
-                    sortBy = "relevance";
-                    if (tvSortOption != null) tvSortOption.setText("Sort: Relevance");
-                    break;
-                case 1:
-                    sortBy = "newest";
-                    if (tvSortOption != null) tvSortOption.setText("Sort: Newest");
-                    break;
-                case 2:
-                    sortBy = "price_asc";
-                    if (tvSortOption != null) tvSortOption.setText("Sort: Price ↑");
-                    break;
-                case 3:
-                    sortBy = "price_desc";
-                    if (tvSortOption != null) tvSortOption.setText("Sort: Price ↓");
-                    break;
-            }
-
+        builder.setNegativeButton("Clear", (dialog, which) -> {
+            minPrice = null;
+            maxPrice = null;
+            updatePriceFilterButton();
             performSearch();
-            dialog.dismiss();
         });
-
-        builder.setNegativeButton("Cancel", null);
         builder.show();
     }
 
     private void showLocationFilterDialog() {
-        Toast.makeText(getContext(), "Location filter coming soon! 📍", Toast.LENGTH_SHORT).show();
+        LocationFilterDialog dialog = LocationFilterDialog.newInstance();
+        dialog.setLocationFilterListener(new LocationFilterDialog.LocationFilterListener() {
+            @Override
+            public void onLocationFilterApplied(Double latitude, Double longitude, String locationName, int radiusKm) {
+                searchLatitude = latitude;
+                searchLongitude = longitude;
+                searchLocationName = locationName;
+                searchRadiusKm = radiusKm;
+
+                updateLocationFilterButton();
+                performSearch();
+
+                Log.d(TAG, "✅ Location filter applied: " + locationName + " (" + radiusKm + "km)");
+            }
+
+            @Override
+            public void onLocationFilterCleared() {
+                searchLatitude = null;
+                searchLongitude = null;
+                searchLocationName = "";
+                searchRadiusKm = 10;
+
+                updateLocationFilterButton();
+                performSearch();
+
+                Log.d(TAG, "✅ Location filter cleared");
+            }
+        });
+
+        dialog.show(getParentFragmentManager(), "LocationFilterDialog");
     }
 
-    private void updateFilterChips() {
-        if (chipGroupFilters != null) {
-            chipGroupFilters.removeAllViews();
+    private void showConditionFilterDialog() {
+        String[] conditions = {"New", "Like New", "Good", "Fair", "Poor"};
 
-            // Add category chip
-            if (selectedCategoryName != null) {
-                addFilterChip(selectedCategoryName, () -> {
-                    selectedCategoryId = null;
-                    selectedCategoryName = null;
-                    btnCategoryFilter.setText("Category");
-                    updateFilterChips();
-                    performSearch();
-                });
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Select Condition");
+        builder.setItems(conditions, (dialog, which) -> {
+            selectedCondition = Product.ProductCondition.values()[which].name();
+            updateConditionFilterButton();
+            performSearch();
+        });
+        builder.setNegativeButton("Clear", (dialog, which) -> {
+            selectedCondition = null;
+            updateConditionFilterButton();
+            performSearch();
+        });
+        builder.show();
+    }
+
+    private void showSortDialog() {
+        String[] sortOptions = {"Relevance", "Newest", "Price: Low to High", "Price: High to Low", "Distance"};
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Sort by");
+        builder.setItems(sortOptions, (dialog, which) -> {
+            sortBy = sortOptions[which].toLowerCase().replace(" ", "_");
+            if (tvSortOption != null) {
+                tvSortOption.setText(sortOptions[which]);
             }
+            performSearch();
+        });
+        builder.show();
+    }
 
-            // Add condition chip
-            if (selectedCondition != null) {
-                addFilterChip(selectedCondition.replace("_", " "), () -> {
-                    selectedCondition = null;
-                    btnConditionFilter.setText("Condition");
-                    updateFilterChips();
-                    performSearch();
-                });
-            }
+    // ===== Filter Button Updates =====
 
-            // Add price chip
-            if (minPrice != null || maxPrice != null) {
-                String priceText = "";
-                if (minPrice != null && maxPrice != null) {
-                    priceText = String.format("%.0f - %.0f VNĐ", minPrice, maxPrice);
-                } else if (minPrice != null) {
-                    priceText = String.format("> %.0f VNĐ", minPrice);
-                } else if (maxPrice != null) {
-                    priceText = String.format("< %.0f VNĐ", maxPrice);
-                }
+    private void updateCategoryFilterButton() {
+        if (btnCategoryFilter == null) return;
 
-                addFilterChip(priceText, () -> {
-                    minPrice = null;
-                    maxPrice = null;
-                    btnPriceFilter.setText("Price");
-                    updateFilterChips();
-                    performSearch();
-                });
-            }
-
-            // Show/hide chip group
-            chipGroupFilters.setVisibility(chipGroupFilters.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+        if (selectedCategoryId != null) {
+            btnCategoryFilter.setText(selectedCategoryName);
+            addActiveFilterChip("Category: " + selectedCategoryName, "category");
+        } else {
+            btnCategoryFilter.setText("Category");
+            removeActiveFilterChip("category");
         }
     }
 
-    private void addFilterChip(String text, Runnable onCloseClick) {
-        if (chipGroupFilters != null) {
-            Chip chip = new Chip(requireContext());
-            chip.setText(text);
-            chip.setCloseIconVisible(true);
-            chip.setOnCloseIconClickListener(v -> onCloseClick.run());
-            chipGroupFilters.addView(chip);
+    private void updatePriceFilterButton() {
+        if (btnPriceFilter == null) return;
+
+        if (minPrice != null || maxPrice != null) {
+            String priceText = "Price Set";
+            btnPriceFilter.setText(priceText);
+            addActiveFilterChip("Price: " + priceText, "price");
+        } else {
+            btnPriceFilter.setText("Price");
+            removeActiveFilterChip("price");
+        }
+    }
+
+    private void updateLocationFilterButton() {
+        if (btnLocationFilter == null) return;
+
+        if (searchLatitude != null && searchLongitude != null) {
+            btnLocationFilter.setText("📍 " + searchRadiusKm + "km");
+            addActiveFilterChip("Location: " + searchLocationName + " (" + searchRadiusKm + "km)", "location");
+        } else {
+            btnLocationFilter.setText("Location");
+            removeActiveFilterChip("location");
+        }
+    }
+
+    private void updateConditionFilterButton() {
+        if (btnConditionFilter == null) return;
+
+        if (selectedCondition != null) {
+            String conditionText = selectedCondition.replace("_", " ");
+            btnConditionFilter.setText(conditionText);
+            addActiveFilterChip("Condition: " + conditionText, "condition");
+        } else {
+            btnConditionFilter.setText("Condition");
+            removeActiveFilterChip("condition");
+        }
+    }
+
+    // ===== Active Filter Chips =====
+
+    private void addActiveFilterChip(String text, String tag) {
+        if (chipGroupFilters == null) return;
+
+        // Remove existing chip with same tag
+        removeActiveFilterChip(tag);
+
+        // Add new chip
+        Chip chip = new Chip(requireContext());
+        chip.setText(text);
+        chip.setTag(tag);
+        chip.setCloseIconVisible(true);
+        chip.setOnCloseIconClickListener(v -> {
+            removeFilter(tag);
+            removeActiveFilterChip(tag);
+        });
+
+        chipGroupFilters.addView(chip);
+        chipGroupFilters.setVisibility(View.VISIBLE);
+    }
+
+    private void removeActiveFilterChip(String tag) {
+        if (chipGroupFilters == null) return;
+
+        for (int i = 0; i < chipGroupFilters.getChildCount(); i++) {
+            View child = chipGroupFilters.getChildAt(i);
+            if (child instanceof Chip && tag.equals(child.getTag())) {
+                chipGroupFilters.removeView(child);
+                break;
+            }
+        }
+
+        if (chipGroupFilters.getChildCount() == 0) {
+            chipGroupFilters.setVisibility(View.GONE);
+        }
+    }
+
+    private void removeFilter(String tag) {
+        switch (tag) {
+            case "category":
+                selectedCategoryId = null;
+                selectedCategoryName = null;
+                updateCategoryFilterButton();
+                break;
+            case "price":
+                minPrice = null;
+                maxPrice = null;
+                updatePriceFilterButton();
+                break;
+            case "location":
+                searchLatitude = null;
+                searchLongitude = null;
+                searchLocationName = "";
+                updateLocationFilterButton();
+                break;
+            case "condition":
+                selectedCondition = null;
+                updateConditionFilterButton();
+                break;
+        }
+        performSearch();
+    }
+
+    // ===== UI State Management =====
+
+    private void showInitialState() {
+        hideAllStates();
+        if (llRecentSearches != null) {
+            llRecentSearches.setVisibility(View.VISIBLE);
+        }
+        updateResultsCount(0);
+    }
+
+    private void showLoadingState() {
+        hideAllStates();
+        if (llLoadingState != null) {
+            llLoadingState.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void showResults() {        hideAllStates();
+        if (rvSearchResults != null) {
+            rvSearchResults.setVisibility(View.VISIBLE);
+        }
+
+        if (searchResults.isEmpty()) {
+            showEmptyState();
+        }
+    }
+
+    private void showEmptyState() {
+        hideAllStates();
+        if (llEmptyState != null) {
+            llEmptyState.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void hideAllStates() {
+        if (rvSearchResults != null) rvSearchResults.setVisibility(View.GONE);
+        if (llEmptyState != null) llEmptyState.setVisibility(View.GONE);
+        if (llRecentSearches != null) llRecentSearches.setVisibility(View.GONE);
+        if (llLoadingState != null) llLoadingState.setVisibility(View.GONE);
+    }
+
+    private void updateResultsCount(int count) {
+        if (tvResultsCount != null) {
+            if (count == 0) {
+                tvResultsCount.setText("No products found");
+            } else {
+                tvResultsCount.setText("Found " + count + " products");
+            }
         }
     }
 
     private void navigateToProductDetail(Product product) {
-        Intent intent = new Intent(getContext(), ProductDetailActivity.class);
+        Intent intent = new Intent(requireContext(), ProductDetailActivity.class);
         intent.putExtra("product_id", product.getId());
-        intent.putExtra("product_title", product.getTitle());
-        intent.putExtra("product_price", product.getFormattedPrice());
         startActivity(intent);
     }
 
     @Override
-    public void onDestroy() {
-        super.onDestroy();
-        if (searchHandler != null && searchRunnable != null) {
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (searchRunnable != null) {
             searchHandler.removeCallbacks(searchRunnable);
         }
     }

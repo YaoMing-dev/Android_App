@@ -13,7 +13,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import com.example.newtrade.ui.profile.UserProfileActivity;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -340,9 +340,27 @@ public class ProductDetailActivity extends AppCompatActivity {
     }
 
     private void viewSellerProfile() {
-        Toast.makeText(this, "Xem hồ sơ người bán - Chức năng sẽ có sớm!", Toast.LENGTH_SHORT).show();
+        try {
+            Long sellerId = getSellerIdFromProduct();
+            if (sellerId != null && sellerId > 0) {
+                Intent intent = new Intent(this, UserProfileActivity.class);
+                intent.putExtra("user_id", sellerId);
+                startActivity(intent);
+
+                Log.d(TAG, "✅ Opening seller profile: " + sellerId);
+            } else {
+                Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error opening seller profile", e);
+            Toast.makeText(this, "Cannot view seller profile", Toast.LENGTH_SHORT).show();
+        }
     }
 
+    private Long getSellerIdFromProduct() {
+        // TODO: Get from actual product data
+        return 1L; // Mock seller ID for now
+    }
     private void shareProduct() {
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
