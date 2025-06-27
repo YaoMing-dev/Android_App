@@ -21,12 +21,28 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
+import com.example.newtrade.api.ApiClient;
+import com.example.newtrade.api.ApiService;
+import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.NavigationUtils;
 import com.google.android.material.appbar.MaterialToolbar;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class AddProductActivity extends AppCompatActivity {
 
@@ -44,6 +60,7 @@ public class AddProductActivity extends AppCompatActivity {
     private SharedPrefsManager prefsManager;
     private Uri selectedImageUri;
     private boolean isLoading = false;
+    private String uploadedImageUrl = null; // Store uploaded image URL
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -149,6 +166,9 @@ public class AddProductActivity extends AppCompatActivity {
                         .load(selectedImageUri)
                         .centerCrop()
                         .into(ivProductImage);
+
+                // Reset uploaded image URL when new image selected
+                uploadedImageUrl = null;
                 updatePublishButton();
             }
         }
@@ -159,17 +179,176 @@ public class AddProductActivity extends AppCompatActivity {
 
         if (!validateForm()) return;
 
-        String title = etTitle.getText().toString().trim();
-        String description = etDescription.getText().toString().trim();
-        String priceStr = etPrice.getText().toString().trim();
-        String location = etLocation.getText().toString().trim();
+        setLoading(true);
 
-        isLoading = true;
-        btnPublish.setEnabled(false);
-        btnPublish.setText("Publishing...");
+        // Step 1: Upload image first if selected
+        if (selectedImageUri != null && uploadedImageUrl == null) {
+            uploadImageToServer();
+        } else {
+            // Step 2: Create product with uploaded image URL
+            createProductOnServer();
+        }
+    }
 
-        // TODO: Call API to create product
-        publishProductAPI(title, description, priceStr, location);
+    private void uploadImageToServer() {
+        Log.d(TAG, "Uploading image to server...");
+
+        try {
+            // Convert URI to File
+            File imageFile = createTempFileFromUri(selectedImageUri);
+
+            // Create RequestBody
+            RequestBody requestFile = RequestBody.create(
+                    MediaType.parse("image/*"), imageFile);
+
+            MultipartBody.Part imagePart = MultipartBody.Part.createFormData(
+                    "file", imageFile.getName(), requestFile);
+
+            // Upload to server
+            ApiService apiService = ApiClient.getApiService();
+            Call<StandardResponse<Map<String, String>>> call =
+                    apiService.uploadProductImage(imagePart);
+
+            call.enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+                @Override
+                public void onResponse(Call<StandardResponse<Map<String, String>>> call,
+                                       Response<StandardResponse<Map<String, String>>> response) {
+
+                    if (response.isSuccessful() && response.body() != null) {
+                        StandardResponse<Map<String, String>> standardResponse = response.body();
+
+                        if (standardResponse.isSuccess()) {
+                            Map<String, String> data = standardResponse.getData();
+                            uploadedImageUrl = data.get("imageUrl");
+
+                            Log.d(TAG, "✅ Image uploaded successfully: " + uploadedImageUrl);
+
+                            // Now create product with uploaded image URL
+                            createProductOnServer();
+
+                        } else {
+                            setLoading(false);
+                            showError("Failed to upload image: " + standardResponse.getMessage());
+                        }
+                    } else {
+                        setLoading(false);
+                        showError("Failed to upload image to server");
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
+                    setLoading(false);
+                    Log.e(TAG, "❌ Image upload failed", t);
+                    showError("Network error while uploading image");
+                }
+            });
+
+        } catch (Exception e) {
+            setLoading(false);
+            Log.e(TAG, "❌ Error preparing image for upload", e);
+            showError("Error preparing image: " + e.getMessage());
+        }
+    }
+
+    private void createProductOnServer() {
+        Log.d(TAG, "Creating product on server...");
+
+        // Check if user is logged in
+        Long userId = prefsManager.getUserId();
+        if (userId == null || userId <= 0) {
+            setLoading(false);
+            showError("Please login to publish products");
+            return;
+        }
+
+        // Prepare product data
+        Map<String, Object> productRequest = new HashMap<>();
+        productRequest.put("title", etTitle.getText().toString().trim());
+        productRequest.put("description", etDescription.getText().toString().trim());
+
+        try {
+            BigDecimal price = new BigDecimal(etPrice.getText().toString().trim());
+            productRequest.put("price", price);
+        } catch (NumberFormatException e) {
+            setLoading(false);
+            showError("Invalid price format");
+            return;
+        }
+
+        // Category
+        int categoryIndex = spCategory.getSelectedItemPosition();
+        productRequest.put("categoryId", (long) (categoryIndex + 1)); // Categories start from 1
+
+        // Condition - Convert to backend enum format
+        String conditionText = spCondition.getSelectedItem().toString();
+        String condition = conditionText.toUpperCase().replace(" ", "_");
+        productRequest.put("condition", condition);
+
+        productRequest.put("location", etLocation.getText().toString().trim());
+
+        // Image URLs
+        List<String> imageUrls = new ArrayList<>();
+        if (uploadedImageUrl != null) {
+            imageUrls.add(uploadedImageUrl);
+        }
+        productRequest.put("imageUrls", imageUrls);
+
+        Log.d(TAG, "Product request: " + productRequest);
+
+        // Call API to create product
+        ApiService apiService = ApiClient.getApiService();
+        Call<StandardResponse<Map<String, Object>>> call =
+                apiService.createProduct(productRequest);
+
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                   Response<StandardResponse<Map<String, Object>>> response) {
+
+                setLoading(false);
+
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Map<String, Object>> standardResponse = response.body();
+
+                    if (standardResponse.isSuccess()) {
+                        Log.d(TAG, "✅ Product created successfully");
+                        Toast.makeText(AddProductActivity.this,
+                                "🎉 Product published successfully!", Toast.LENGTH_LONG).show();
+                        finish();
+
+                    } else {
+                        showError("Failed to create product: " + standardResponse.getMessage());
+                    }
+                } else {
+                    showError("Failed to create product on server");
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                setLoading(false);
+                Log.e(TAG, "❌ Product creation failed", t);
+                showError("Network error while creating product");
+            }
+        });
+    }
+
+    private File createTempFileFromUri(Uri uri) throws Exception {
+        InputStream inputStream = getContentResolver().openInputStream(uri);
+        File tempFile = File.createTempFile("upload_image", ".jpg", getCacheDir());
+
+        FileOutputStream outputStream = new FileOutputStream(tempFile);
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = inputStream.read(buffer)) > 0) {
+            outputStream.write(buffer, 0, length);
+        }
+
+        outputStream.close();
+        inputStream.close();
+
+        return tempFile;
     }
 
     private boolean validateForm() {
@@ -203,19 +382,10 @@ public class AddProductActivity extends AppCompatActivity {
         return isValid;
     }
 
-    private void publishProductAPI(String title, String description, String price, String location) {
-        // TODO: Implement API call when ProductService is available
-        Log.d(TAG, "Publishing product: " + title + ", Price: " + price);
-
-        // Simulate success for now
-        new android.os.Handler().postDelayed(() -> {
-            isLoading = false;
-            btnPublish.setEnabled(true);
-            btnPublish.setText("Publish Product");
-
-            Toast.makeText(this, "Product published successfully!", Toast.LENGTH_SHORT).show();
-            finish();
-        }, 2000);
+    private void setLoading(boolean loading) {
+        isLoading = loading;
+        btnPublish.setEnabled(!loading);
+        btnPublish.setText(loading ? "Publishing..." : "Publish Product");
     }
 
     private void updatePublishButton() {
@@ -226,6 +396,10 @@ public class AddProductActivity extends AppCompatActivity {
                 selectedImageUri != null;
 
         btnPublish.setEnabled(!isLoading && isFormValid);
+    }
+
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
     @Override

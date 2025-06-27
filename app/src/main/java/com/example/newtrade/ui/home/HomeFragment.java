@@ -127,7 +127,7 @@ public class HomeFragment extends Fragment {
     private void setupListeners() {
         try {
             if (swipeRefresh != null) {
-                swipeRefresh.setOnRefreshListener(() -> loadData());
+                swipeRefresh.setOnRefreshListener(this::loadData);
             }
 
             // 🔥 HOẠT ĐỘNG CLICK VIEW ALL CATEGORIES

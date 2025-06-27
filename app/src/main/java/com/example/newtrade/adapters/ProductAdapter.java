@@ -1,4 +1,4 @@
-// File: app/src/main/java/com/example/newtrade/adapters/ProductAdapter.java
+// app/src/main/java/com/example/newtrade/adapters/ProductAdapter.java
 package com.example.newtrade.adapters;
 
 import android.text.TextUtils;
@@ -15,6 +15,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
+import com.example.newtrade.utils.Constants;
 
 import java.util.List;
 
@@ -25,6 +26,11 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
 
     public interface OnProductClickListener {
         void onProductClick(Product product);
+
+        // ✅ DEFAULT METHOD - không bắt buộc implement
+        default void onProductLongClick(Product product) {
+            // Empty default implementation
+        }
     }
 
     public ProductAdapter(List<Product> products, OnProductClickListener listener) {
@@ -74,7 +80,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
             }
 
             // Set price
-            if (tvPrice != null) {
+            if (tvPrice != null && product.getPrice() != null) {
                 tvPrice.setText(product.getFormattedPrice());
             }
 
@@ -83,7 +89,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                 tvLocation.setText(product.getLocation());
             }
 
-            // Set condition - SỬA LỖI TẠI ĐÂY
+            // Set condition
             if (tvCondition != null) {
                 Product.ProductCondition condition = product.getCondition();
                 if (condition != null) {
@@ -94,34 +100,45 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                 }
             }
 
-            // Load product image with better error handling
+            // Load product image
             if (ivProduct != null) {
                 String imageUrl = product.getPrimaryImageUrl();
 
                 try {
                     if (!TextUtils.isEmpty(imageUrl)) {
+                        String fullImageUrl = imageUrl;
+                        if (imageUrl.startsWith("/")) {
+                            fullImageUrl = Constants.BASE_URL + imageUrl.substring(1);
+                        }
+
                         Glide.with(itemView.getContext())
-                                .load(imageUrl)
-                                .placeholder(R.drawable.ic_placeholder_image)
-                                .error(R.drawable.ic_placeholder_image)
+                                .load(fullImageUrl)
+                                .placeholder(R.drawable.ic_image_placeholder)
+                                .error(R.drawable.ic_image_placeholder)
                                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                                 .centerCrop()
                                 .into(ivProduct);
                     } else {
-                        // Show placeholder if no image
-                        ivProduct.setImageResource(R.drawable.ic_placeholder_image);
+                        ivProduct.setImageResource(R.drawable.ic_image_placeholder);
                     }
                 } catch (Exception e) {
-                    // Fallback to placeholder on any error
-                    ivProduct.setImageResource(R.drawable.ic_placeholder_image);
+                    ivProduct.setImageResource(R.drawable.ic_image_placeholder);
                 }
             }
 
-            // Set click listener
+            // Set click listeners
             itemView.setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onProductClick(product);
                 }
+            });
+
+            itemView.setOnLongClickListener(v -> {
+                if (listener != null) {
+                    listener.onProductLongClick(product);
+                    return true;
+                }
+                return false;
             });
         }
     }
