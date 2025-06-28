@@ -1,27 +1,27 @@
-<?xml version="1.0" encoding="utf-8"?>
+<!-- ✅ FIX: Ensure these IDs exist in your menu file -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/nav_home"
-        android:title="@string/nav_home"
-        android:icon="@drawable/ic_home" />
+        android:icon="@drawable/ic_home"
+        android:title="@string/nav_home" />
 
     <item
         android:id="@+id/nav_search"
-        android:title="@string/nav_search"
-        android:icon="@drawable/ic_search" />
+        android:icon="@drawable/ic_search"
+        android:title="@string/nav_search" />
 
     <item
-        android:id="@+id/nav_add_product"
-        android:title="@string/nav_sell"
-        android:icon="@drawable/ic_add_circle" />
+        android:id="@+id/nav_sell"
+        android:icon="@drawable/ic_add"
+        android:title="@string/nav_sell" />
 
     <item
         android:id="@+id/nav_messages"
-        android:title="@string/nav_messages"
-        android:icon="@drawable/ic_chat" />
+        android:icon="@drawable/ic_message"
+        android:title="@string/nav_messages" />
 
     <item
         android:id="@+id/nav_profile"
-        android:title="@string/nav_profile"
-        android:icon="@drawable/ic_person" />
+        android:icon="@drawable/ic_person"
+        android:title="@string/nav_profile" />
 </menu>

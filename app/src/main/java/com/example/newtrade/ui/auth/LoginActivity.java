@@ -203,6 +203,7 @@ public class LoginActivity extends AppCompatActivity {
                 });
     }
 
+
     private void signInWithGoogle() {
         if (isLoading) return;
 
