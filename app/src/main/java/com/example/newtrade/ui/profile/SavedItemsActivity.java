@@ -22,7 +22,9 @@ import com.google.android.material.appbar.MaterialToolbar;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class SavedItemsActivity extends AppCompatActivity {
 
@@ -83,46 +85,96 @@ public class SavedItemsActivity extends AppCompatActivity {
     private void loadSavedItems() {
         swipeRefresh.setRefreshing(true);
 
-        // Create mock data for testing
+        // Create mock data for testing - replace with actual API call
         createMockSavedItems();
     }
 
+    // ✅ FIX: Create mock data with proper BigDecimal/ProductCondition/ProductStatus handling
     private void createMockSavedItems() {
         savedProducts.clear();
 
         // Mock saved item 1
-        Product product1 = new Product();
-        product1.setId(10L);
-        product1.setTitle("Samsung Galaxy S23");
-        product1.setDescription("Samsung Galaxy S23 Ultra 256GB");
-        product1.setPrice(new BigDecimal("25000000"));
-        product1.setCondition(Product.ProductCondition.LIKE_NEW);
-        product1.setLocation("Hanoi");
-        product1.setStatus(Product.ProductStatus.AVAILABLE);
+        Product product1 = createMockProduct(1L, "iPhone 14 Pro Max",
+                "Like new iPhone 14 Pro Max 256GB", 25000000.0,
+                "Ho Chi Minh City", "LIKE_NEW", "AVAILABLE");
+
+        // Mock saved item 2
+        Product product2 = createMockProduct(2L, "MacBook Air M2",
+                "MacBook Air M2 8GB RAM 256GB SSD", 28000000.0,
+                "Hanoi", "GOOD", "AVAILABLE");
+
+        // Mock saved item 3
+        Product product3 = createMockProduct(3L, "Samsung Galaxy S23",
+                "Samsung Galaxy S23 Ultra 512GB", 22000000.0,
+                "Da Nang", "NEW", "SOLD");
+
         savedProducts.add(product1);
+        savedProducts.add(product2);
+        savedProducts.add(product3);
 
-        updateUI();
-    }
-
-    private void updateUI() {
         swipeRefresh.setRefreshing(false);
-        productAdapter.notifyDataSetChanged();
 
         if (savedProducts.isEmpty()) {
-            rvSavedItems.setVisibility(View.GONE);
-            tvEmptyState.setVisibility(View.VISIBLE);
+            showEmptyState();
         } else {
-            rvSavedItems.setVisibility(View.VISIBLE);
-            tvEmptyState.setVisibility(View.GONE);
+            showSavedItems();
         }
+
+        productAdapter.notifyDataSetChanged();
+        Log.d(TAG, "✅ Mock saved items created: " + savedProducts.size());
+    }
+
+    // ✅ FIX: Helper method to create mock product with proper type handling
+    private Product createMockProduct(Long id, String title, String description,
+                                      Double price, String location, String condition, String status) {
+        Product product = new Product();
+
+        product.setId(id);
+        product.setTitle(title);
+        product.setDescription(description);
+
+        // ✅ FIX: Handle BigDecimal to Double conversion
+        product.setPrice(price);
+
+        product.setLocation(location);
+
+        // ✅ FIX: Handle ProductCondition to String conversion
+        product.setCondition(condition);
+
+        // ✅ FIX: Handle ProductStatus to String conversion
+        product.setStatus(status);
+
+        product.setImageUrl("https://via.placeholder.com/300x300");
+        product.setPrimaryImageUrl("https://via.placeholder.com/300x300");
+        product.setCreatedAt("2024-01-15T10:30:00");
+        product.setUpdatedAt("2024-01-15T10:30:00");
+        product.setUserId(2L);
+        product.setCategoryId(1L);
+        product.setCategoryName("Electronics");
+        product.setViewCount(25);
+
+        return product;
     }
 
     private void openProductDetail(Product product) {
         Intent intent = new Intent(this, ProductDetailActivity.class);
         intent.putExtra("product_id", product.getId());
         intent.putExtra("product_title", product.getTitle());
-        intent.putExtra("product_price", product.getPrice().toString());
+        intent.putExtra("product_price", product.getFormattedPrice());
         startActivity(intent);
+    }
+
+    private void showSavedItems() {
+        if (rvSavedItems != null) rvSavedItems.setVisibility(View.VISIBLE);
+        if (tvEmptyState != null) tvEmptyState.setVisibility(View.GONE);
+    }
+
+    private void showEmptyState() {
+        if (rvSavedItems != null) rvSavedItems.setVisibility(View.GONE);
+        if (tvEmptyState != null) {
+            tvEmptyState.setVisibility(View.VISIBLE);
+            tvEmptyState.setText("No saved items yet.\nSave products you're interested in!");
+        }
     }
 
     @Override
@@ -132,5 +184,12 @@ public class SavedItemsActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh saved items when returning to activity
+        loadSavedItems();
     }
 }

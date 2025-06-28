@@ -6,25 +6,27 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class Product {
     private Long id;
     private String title;
     private String description;
-    private Double price; // ✅ KEEP as Double for compatibility
+    private Double price; // Keep as Double for Android compatibility
     private String imageUrl;
     private String location;
-    private String condition;
-    private String status;
+    private String condition; // String version for compatibility
+    private String status;    // String version for compatibility
     private String createdAt;
     private String updatedAt;
     private Long userId;
     private Long categoryId;
 
-    // ✅ FIX: Add missing fields causing "cannot find symbol" errors
+    // Additional fields
     private List<String> imageUrls;
     private String categoryName;
     private Integer viewCount = 0;
+    private String primaryImageUrl;
 
     // ===== ENUMS =====
     public enum ProductCondition {
@@ -39,6 +41,18 @@ public class Product {
         public String getDisplayName() { return displayName; }
         @Override
         public String toString() { return displayName; }
+
+        // ✅ FIX: Add conversion from String
+        public static ProductCondition fromString(String value) {
+            if (value == null) return null;
+            for (ProductCondition condition : values()) {
+                if (condition.displayName.equalsIgnoreCase(value) ||
+                        condition.name().equalsIgnoreCase(value)) {
+                    return condition;
+                }
+            }
+            return NEW; // default
+        }
     }
 
     public enum ProductStatus {
@@ -53,10 +67,21 @@ public class Product {
         public String getDisplayName() { return displayName; }
         @Override
         public String toString() { return displayName; }
+
+        // ✅ FIX: Add conversion from String
+        public static ProductStatus fromString(String value) {
+            if (value == null) return null;
+            for (ProductStatus status : values()) {
+                if (status.displayName.equalsIgnoreCase(value) ||
+                        status.name().equalsIgnoreCase(value)) {
+                    return status;
+                }
+            }
+            return AVAILABLE; // default
+        }
     }
 
     // ===== CONSTRUCTORS =====
-
     public Product() {
         this.imageUrls = new ArrayList<>();
     }
@@ -69,7 +94,81 @@ public class Product {
         this.price = price;
     }
 
-    // ===== EXISTING GETTERS & SETTERS =====
+    // ✅ FIX: Add fromMap method for SearchFragment
+    public static Product fromMap(Map<String, Object> productData) {
+        Product product = new Product();
+
+        try {
+            if (productData.get("id") instanceof Number) {
+                product.setId(((Number) productData.get("id")).longValue());
+            }
+
+            product.setTitle((String) productData.get("title"));
+            product.setDescription((String) productData.get("description"));
+
+            // ✅ FIX: Handle BigDecimal to Double conversion
+            if (productData.get("price") instanceof Number) {
+                product.setPrice(((Number) productData.get("price")).doubleValue());
+            }
+
+            product.setLocation((String) productData.get("location"));
+            product.setImageUrl((String) productData.get("primaryImageUrl"));
+            product.setPrimaryImageUrl((String) productData.get("primaryImageUrl"));
+
+            // ✅ FIX: Handle condition conversion
+            Object conditionObj = productData.get("condition");
+            if (conditionObj != null) {
+                product.setCondition(conditionObj.toString());
+            }
+
+            // ✅ FIX: Handle status conversion
+            Object statusObj = productData.get("status");
+            if (statusObj != null) {
+                product.setStatus(statusObj.toString());
+            }
+
+            product.setCreatedAt((String) productData.get("createdAt"));
+            product.setUpdatedAt((String) productData.get("updatedAt"));
+
+            if (productData.get("userId") instanceof Number) {
+                product.setUserId(((Number) productData.get("userId")).longValue());
+            }
+
+            if (productData.get("categoryId") instanceof Number) {
+                product.setCategoryId(((Number) productData.get("categoryId")).longValue());
+            }
+
+            product.setCategoryName((String) productData.get("categoryName"));
+
+            if (productData.get("viewCount") instanceof Number) {
+                product.setViewCount(((Number) productData.get("viewCount")).intValue());
+            }
+
+        } catch (Exception e) {
+            android.util.Log.e("Product", "Error parsing product from map", e);
+        }
+
+        return product;
+    }
+
+    // ===== HELPER METHODS =====
+
+    public String getFormattedPrice() {
+        if (price == null) return "0 VND";
+        NumberFormat formatter = NumberFormat.getNumberInstance(new Locale("vi", "VN"));
+        return formatter.format(price) + " VND";
+    }
+
+    // ✅ FIX: Add enum getters that return proper enum types
+    public ProductCondition getConditionEnum() {
+        return ProductCondition.fromString(this.condition);
+    }
+
+    public ProductStatus getStatusEnum() {
+        return ProductStatus.fromString(this.status);
+    }
+
+    // ===== GETTERS & SETTERS =====
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -83,8 +182,16 @@ public class Product {
     public Double getPrice() { return price; }
     public void setPrice(Double price) { this.price = price; }
 
+    // ✅ FIX: Add method to set price from BigDecimal (for backend compatibility)
+    public void setPriceFromBigDecimal(BigDecimal price) {
+        this.price = price != null ? price.doubleValue() : null;
+    }
+
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public String getPrimaryImageUrl() { return primaryImageUrl; }
+    public void setPrimaryImageUrl(String primaryImageUrl) { this.primaryImageUrl = primaryImageUrl; }
 
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
@@ -107,72 +214,12 @@ public class Product {
     public Long getCategoryId() { return categoryId; }
     public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
 
-    // ✅ FIX: Add NEW methods that were causing "cannot find symbol" errors
+    public List<String> getImageUrls() { return imageUrls; }
+    public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }
 
-    /**
-     * getFormattedPrice() - was causing "cannot find symbol method getFormattedPrice()" error
-     */
-    public String getFormattedPrice() {
-        if (price == null || price <= 0) {
-            return "Free";
-        }
-
-        try {
-            NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
-            return formatter.format(price).replace("₫", "đ");
-        } catch (Exception e) {
-            return String.format("%,.0f đ", price);
-        }
-    }
-
-    /**
-     * getPrimaryImageUrl() - was causing "cannot find symbol method getPrimaryImageUrl()" error
-     */
-    public String getPrimaryImageUrl() {
-        if (imageUrls != null && !imageUrls.isEmpty()) {
-            return imageUrls.get(0);
-        }
-        return imageUrl; // fallback to single imageUrl
-    }
-
-    /**
-     * setImageUrls() - was causing "cannot find symbol method setImageUrls(List<String>)" error
-     */
-    public List<String> getImageUrls() {
-        return imageUrls != null ? imageUrls : new ArrayList<>();
-    }
-
-    public void setImageUrls(List<String> imageUrls) {
-        this.imageUrls = imageUrls != null ? imageUrls : new ArrayList<>();
-    }
-
-    /**
-     * setCategoryName() - was causing "cannot find symbol method setCategoryName(String)" error
-     */
     public String getCategoryName() { return categoryName; }
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
 
-    /**
-     * setViewCount() - was causing "cannot find symbol method setViewCount(int)" error
-     */
-    public Integer getViewCount() { return viewCount != null ? viewCount : 0; }
+    public Integer getViewCount() { return viewCount; }
     public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
-
-    // ✅ FIX: Add setPrimaryImageUrl() - was causing error in CategoryProductsActivity
-    public void setPrimaryImageUrl(String primaryImageUrl) {
-        this.imageUrl = primaryImageUrl; // set to main imageUrl field
-    }
-
-    // ===== HELPER METHODS =====
-
-    public boolean hasImages() {
-        return (imageUrls != null && !imageUrls.isEmpty()) || (imageUrl != null && !imageUrl.isEmpty());
-    }
-
-    public void addImageUrl(String imageUrl) {
-        if (imageUrls == null) {
-            imageUrls = new ArrayList<>();
-        }
-        imageUrls.add(imageUrl);
-    }
 }

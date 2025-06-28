@@ -22,24 +22,15 @@ public interface ApiService {
 
     // ===== PRODUCT METHODS =====
 
-    /**
-     * ✅ FIX: Get products without parameters (fixes HomeFragment error)
-     */
     @GET("api/products")
     Call<StandardResponse<Map<String, Object>>> getProducts();
 
-    /**
-     * ✅ FIX: Get products with pagination (fixes existing usage)
-     */
     @GET("api/products")
     Call<StandardResponse<Map<String, Object>>> getProducts(
             @Query("page") int page,
             @Query("size") int size
     );
 
-    /**
-     * ✅ FIX: Get products with full filters (fixes AllProductsActivity error)
-     */
     @GET("api/products")
     Call<StandardResponse<Map<String, Object>>> getProducts(
             @Query("page") int page,
@@ -65,9 +56,6 @@ public interface ApiService {
 
     // ===== CATEGORY METHODS =====
 
-    /**
-     * ✅ FIX: Add getCategories method (fixes HomeFragment error "cannot find symbol method getCategories()")
-     */
     @GET("api/categories")
     Call<StandardResponse<List<Map<String, Object>>>> getCategories();
 
@@ -76,9 +64,6 @@ public interface ApiService {
 
     // ===== SEARCH METHODS =====
 
-    /**
-     * ✅ FIX: Search products method (fixes CategoryProductsActivity error "cannot find symbol method searchProducts")
-     */
     @GET("api/products/search")
     Call<StandardResponse<Map<String, Object>>> searchProducts(
             @Query("query") String query,
@@ -90,47 +75,45 @@ public interface ApiService {
             @Query("maxPrice") Double maxPrice
     );
 
-    /**
-     * Simple search products
-     */
+    // ✅ FIX: Add searchProductsAdvanced method for SearchFragment
+    @GET("api/products/search/advanced")
+    Call<StandardResponse<Map<String, Object>>> searchProductsAdvanced(
+            @Query("query") String query,
+            @Query("categoryId") Long categoryId,
+            @Query("minPrice") Double minPrice,
+            @Query("maxPrice") Double maxPrice,
+            @Query("condition") String condition,
+            @Query("latitude") Double latitude,
+            @Query("longitude") Double longitude,
+            @Query("radiusKm") int radiusKm,
+            @Query("sortBy") String sortBy,
+            @Query("page") int page,
+            @Query("size") int size
+    );
+
     @GET("api/products/search")
     Call<StandardResponse<Map<String, Object>>> searchProducts(@Query("query") String query);
 
     // ===== FEATURED & SPECIAL PRODUCTS =====
 
-    /**
-     * Get featured products
-     */
     @GET("api/products/featured")
     Call<StandardResponse<List<Map<String, Object>>>> getFeaturedProducts();
 
-    /**
-     * Get recent products
-     */
     @GET("api/products/recent")
     Call<StandardResponse<List<Map<String, Object>>>> getRecentProducts(@Query("limit") int limit);
 
     // ===== FILE UPLOAD =====
 
-    /**
-     * Upload avatar image
-     */
     @Multipart
     @POST("api/files/upload/avatar")
     Call<StandardResponse<Map<String, String>>> uploadAvatar(@Part MultipartBody.Part image);
 
-    /**
-     * Upload product image
-     */
     @Multipart
     @POST("api/files/upload/product")
     Call<StandardResponse<Map<String, String>>> uploadProductImage(@Part MultipartBody.Part image);
 
     // ===== HEALTH CHECK =====
 
-    /**
-     * Health check endpoint
-     */
     @GET("api/health")
     Call<StandardResponse<String>> healthCheck();
 }

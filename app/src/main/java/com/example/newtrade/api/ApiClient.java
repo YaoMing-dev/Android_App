@@ -31,7 +31,7 @@ public class ApiClient {
     private static AuthService authService;
     private static UserService userService;
     private static ProductService productService;
-    private static ApiService apiService; // ✅ THÊM CÁI NÀY
+    private static ApiService apiService; // ✅ FIX: Add ApiService
 
     public static void init(Context context) {
         if (retrofit == null) {
@@ -47,7 +47,7 @@ public class ApiClient {
             authService = retrofit.create(AuthService.class);
             userService = retrofit.create(UserService.class);
             productService = retrofit.create(ProductService.class);
-            apiService = retrofit.create(ApiService.class); // ✅ THÊM CÁI NÀY
+            apiService = retrofit.create(ApiService.class); // ✅ FIX: Initialize ApiService
 
             Log.d(TAG, "✅ ApiClient initialized with base URL: " + Constants.BASE_URL);
         }
@@ -81,30 +81,24 @@ public class ApiClient {
 
                     Request newRequest = originalRequest.newBuilder()
                             .addHeader("Content-Type", "application/json")
-                            .addHeader("Accept", "application/json")
                             .build();
 
-                    Log.d(TAG, "🔍 Auth endpoint - no User-ID header added");
                     return chain.proceed(newRequest);
                 }
 
-                // Add User-ID header for authenticated requests
+                // Add User-ID header for protected endpoints
                 SharedPrefsManager prefsManager = SharedPrefsManager.getInstance(context);
-                long userId = prefsManager.getUserId();
+                Long userId = prefsManager.getUserId();
 
-                if (userId > 0) {
-                    Request newRequest = originalRequest.newBuilder()
-                            .addHeader("User-ID", String.valueOf(userId))
-                            .addHeader("Content-Type", "application/json")
-                            .addHeader("Accept", "application/json")
-                            .build();
+                Request.Builder requestBuilder = originalRequest.newBuilder()
+                        .addHeader("Content-Type", "application/json");
 
-                    Log.d(TAG, "🔍 Adding User-ID header: " + userId);
-                    return chain.proceed(newRequest);
-                } else {
-                    Log.w(TAG, "🔍 No User-ID found, proceeding without auth header");
-                    return chain.proceed(originalRequest);
+                if (userId != null && userId > 0) {
+                    requestBuilder.addHeader("User-ID", userId.toString());
+                    Log.d(TAG, "🔑 Added User-ID header: " + userId);
                 }
+
+                return chain.proceed(requestBuilder.build());
             }
         };
 
@@ -174,7 +168,7 @@ public class ApiClient {
         return productService;
     }
 
-    // ✅ THÊM METHOD NÀY
+    // ✅ FIX: Add getApiService method
     public static ApiService getApiService() {
         if (apiService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
@@ -192,7 +186,7 @@ public class ApiClient {
         authService = null;
         userService = null;
         productService = null;
-        apiService = null; // ✅ THÊM CÁI NÀY
+        apiService = null; // ✅ FIX: Reset ApiService
         Log.d(TAG, "ApiClient reset");
     }
 }

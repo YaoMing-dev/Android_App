@@ -19,7 +19,7 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull; // ✅ FIX: Add this import
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -108,27 +108,36 @@ public class ChatActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
+        // Get intent data
         getIntentData();
+
+        // Initialize components
         initViews();
-        initUtils();
         setupToolbar();
         setupRecyclerView();
         setupListeners();
-        startAndBindWebSocketService();
+
+        // Load existing messages
         loadMessages();
 
-        Log.d(TAG, "ChatActivity created for conversation: " + conversationId);
+        // Bind to WebSocket service
+        bindToWebSocketService();
+
+        Log.d(TAG, "ChatActivity created");
     }
 
     private void getIntentData() {
-        conversationId = getIntent().getLongExtra("conversation_id", -1L);
-        productId = getIntent().getLongExtra("product_id", -1L);
-        productTitle = getIntent().getStringExtra("product_title");
-        sellerId = getIntent().getLongExtra("seller_id", -1L);
-        otherUserName = getIntent().getStringExtra("other_user_name");
+        Intent intent = getIntent();
+        conversationId = intent.getLongExtra("conversation_id", -1L);
+        productId = intent.getLongExtra("product_id", -1L);
+        productTitle = intent.getStringExtra("product_title");
+        sellerId = intent.getLongExtra("seller_id", -1L);
+        otherUserName = intent.getStringExtra("other_user_name");
 
-        Log.d(TAG, "Intent data - ConversationId: " + conversationId +
-                ", ProductId: " + productId + ", SellerId: " + sellerId);
+        prefsManager = SharedPrefsManager.getInstance(this);
+        currentUserId = prefsManager.getUserId();
+
+        Log.d(TAG, "Chat data - Conversation: " + conversationId + ", Product: " + productTitle);
     }
 
     private void initViews() {
@@ -139,188 +148,215 @@ public class ChatActivity extends AppCompatActivity implements
         tvProductInfo = findViewById(R.id.tv_product_info);
         tvConnectionStatus = findViewById(R.id.tv_connection_status);
         tvTypingIndicator = findViewById(R.id.tv_typing_indicator);
-    }
 
-    private void initUtils() {
-        prefsManager = SharedPrefsManager.getInstance(this);
-        currentUserId = prefsManager.getUserId();
         typingHandler = new Handler(Looper.getMainLooper());
     }
 
     private void setupToolbar() {
-        NavigationUtils.setupToolbarWithBackButton(this, toolbar,
-                otherUserName != null ? otherUserName : "Chat");
-
-        if (getSupportActionBar() != null && productTitle != null) {
-            getSupportActionBar().setSubtitle(productTitle);
-        }
-
-        // Show product info if available
-        if (tvProductInfo != null && productTitle != null) {
-            tvProductInfo.setText("📱 " + productTitle);
-            tvProductInfo.setVisibility(View.VISIBLE);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle(otherUserName != null ? otherUserName : "Chat");
         }
     }
 
     private void setupRecyclerView() {
         messageAdapter = new MessageAdapter(messages, currentUserId);
-
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setStackFromEnd(true);
-
+        layoutManager.setStackFromEnd(true); // Start from bottom
         rvMessages.setLayoutManager(layoutManager);
         rvMessages.setAdapter(messageAdapter);
     }
 
     private void setupListeners() {
-        // Send button
         btnSend.setOnClickListener(v -> sendMessage());
 
-        // Text change listener for typing indicator
         etMessage.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                boolean hasText = s.toString().trim().length() > 0;
-                btnSend.setEnabled(hasText);
+                if (s.length() > 0 && !isUserTyping) {
+                    isUserTyping = true;
+                    sendTypingIndicator(true);
+                }
 
-                handleTypingIndicator(hasText);
+                // Reset typing timeout
+                typingHandler.removeCallbacks(stopTypingRunnable);
+                typingHandler.postDelayed(stopTypingRunnable, TYPING_TIMEOUT);
             }
 
             @Override
             public void afterTextChanged(Editable s) {}
         });
 
-        // Product info click
-        if (tvProductInfo != null) {
-            tvProductInfo.setOnClickListener(v -> openProductDetail());
+        // Update product info if available
+        if (productTitle != null) {
+            tvProductInfo.setText("About: " + productTitle);
+            tvProductInfo.setVisibility(View.VISIBLE);
         }
     }
 
-    private void startAndBindWebSocketService() {
-        Intent serviceIntent = new Intent(this, RealtimeWebSocketService.class);
-        startService(serviceIntent);
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
+    private final Runnable stopTypingRunnable = () -> {
+        if (isUserTyping) {
+            isUserTyping = false;
+            sendTypingIndicator(false);
+        }
+    };
+
+    private void sendMessage() {
+        String messageText = etMessage.getText().toString().trim();
+        if (messageText.isEmpty()) return;
+
+        if (webSocketService != null && webSocketService.isConnected()) {
+            // ✅ FIX: Add sendChatMessage method implementation
+            sendChatMessage(conversationId, messageText, "text");
+            etMessage.setText("");
+        } else {
+            Toast.makeText(this, "Not connected. Please try again.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ✅ FIX: Add missing sendChatMessage method
+    private void sendChatMessage(Long conversationId, String content, String messageType) {
+        if (webSocketService != null && webSocketService.isConnected()) {
+            webSocketService.sendMessage(conversationId, content);
+
+            // Add message to local list immediately for better UX
+            Message localMessage = new Message();
+            localMessage.setConversationId(conversationId);
+            localMessage.setSenderId(currentUserId);
+            localMessage.setContent(content);
+            localMessage.setMessageType(messageType);
+            localMessage.setTimestamp(java.text.DateFormat.getTimeInstance().format(new java.util.Date()));
+
+            messages.add(localMessage);
+            messageAdapter.notifyItemInserted(messages.size() - 1);
+            rvMessages.scrollToPosition(messages.size() - 1);
+        }
+    }
+
+    private void sendTypingIndicator(boolean isTyping) {
+        if (webSocketService != null && webSocketService.isConnected() && conversationId != null) {
+            webSocketService.sendTypingIndicator(conversationId, isTyping);
+        }
     }
 
     private void loadMessages() {
-        // Load mock messages for now
-        loadMockMessages();
-
-        // TODO: Load real messages from API
-        // loadMessagesFromAPI();
+        // TODO: Load existing messages from API
+        // For now, create mock messages
+        createMockMessages();
     }
 
-    private void loadMockMessages() {
-        messages.clear();
+    private void createMockMessages() {
+        // Mock message 1
+        Message message1 = new Message();
+        message1.setId(1L);
+        message1.setConversationId(conversationId);
+        message1.setSenderId(sellerId);
+        message1.setContent("Hi! Is this product still available?");
+        message1.setMessageType("text");
+        message1.setTimestamp("10:30 AM");
+        messages.add(message1);
 
-        // Mock message 1 (from other user)
-        Message msg1 = new Message();
-        msg1.setId(1L);
-        msg1.setConversationId(conversationId);
-        msg1.setSenderId(sellerId);
-        msg1.setSenderName(otherUserName);
-        msg1.setContent("Hi! Is this item still available?");
-        msg1.setMessageType("TEXT");
-        msg1.setTimestamp("10:30 AM");
-        messages.add(msg1);
-
-        // Mock message 2 (from current user)
-        Message msg2 = new Message();
-        msg2.setId(2L);
-        msg2.setConversationId(conversationId);
-        msg2.setSenderId(currentUserId);
-        msg2.setSenderName("You");
-        msg2.setContent("Yes, it's still available! Would you like more details?");
-        msg2.setMessageType("TEXT");
-        msg2.setTimestamp("10:32 AM");
-        messages.add(msg2);
+        // Mock message 2
+        Message message2 = new Message();
+        message2.setId(2L);
+        message2.setConversationId(conversationId);
+        message2.setSenderId(currentUserId);
+        message2.setContent("Yes, it's still available. Would you like to see it?");
+        message2.setMessageType("text");
+        message2.setTimestamp("10:35 AM");
+        messages.add(message2);
 
         messageAdapter.notifyDataSetChanged();
-        scrollToBottom();
+        rvMessages.scrollToPosition(messages.size() - 1);
     }
 
-    private void sendMessage() {
-        String content = etMessage.getText().toString().trim();
-        if (content.isEmpty()) {
-            return;
-        }
-
-        // Create local message first
-        Message localMessage = new Message();
-        localMessage.setId(System.currentTimeMillis()); // Temporary ID
-        localMessage.setConversationId(conversationId);
-        localMessage.setSenderId(currentUserId);
-        localMessage.setSenderName("You");
-        localMessage.setContent(content);
-        localMessage.setMessageType("TEXT");
-        localMessage.setTimestamp(getCurrentTime());
-
-        // Add to list
-        messages.add(localMessage);
-        messageAdapter.notifyItemInserted(messages.size() - 1);
-        scrollToBottom();
-
-        // Clear input
-        etMessage.setText("");
-
-        // Send via WebSocket
-        if (webSocketService != null && webSocketService.isConnected()) {
-            webSocketService.sendChatMessage(conversationId, content, "TEXT");
-        } else {
-            Toast.makeText(this, "No connection - message will be sent when connected",
-                    Toast.LENGTH_SHORT).show();
-        }
-
-        Log.d(TAG, "📤 Message sent: " + content);
+    private void bindToWebSocketService() {
+        Intent intent = new Intent(this, RealtimeWebSocketService.class);
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
-    private void handleTypingIndicator(boolean hasText) {
-        if (hasText && !isUserTyping) {
-            isUserTyping = true;
-            if (webSocketService != null && webSocketService.isConnected()) {
-                webSocketService.sendTypingIndicator(conversationId, true);
+    private void updateConnectionStatus(boolean isConnected) {
+        if (tvConnectionStatus != null) {
+            tvConnectionStatus.setText(isConnected ? "Connected" : "Connecting...");
+            tvConnectionStatus.setTextColor(getResources().getColor(
+                    isConnected ? android.R.color.holo_green_dark : android.R.color.holo_orange_dark
+            ));
+        }
+    }
+
+    // ===== WebSocketListener Implementation =====
+
+    @Override
+    public void onConnected() {
+        runOnUiThread(() -> updateConnectionStatus(true));
+    }
+
+    @Override
+    public void onDisconnected() {
+        runOnUiThread(() -> updateConnectionStatus(false));
+    }
+
+    @Override
+    public void onError(String error) {
+        runOnUiThread(() -> {
+            updateConnectionStatus(false);
+            Toast.makeText(this, "Connection error: " + error, Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    // ===== ChatListener Implementation =====
+
+    @Override
+    public void onMessageReceived(Message message) {
+        runOnUiThread(() -> {
+            messages.add(message);
+            messageAdapter.notifyItemInserted(messages.size() - 1);
+            rvMessages.scrollToPosition(messages.size() - 1);
+        });
+    }
+
+    @Override
+    public void onTypingIndicator(Long userId, boolean isTyping) {
+        runOnUiThread(() -> {
+            if (!userId.equals(currentUserId)) { // Don't show our own typing
+                tvTypingIndicator.setText(isTyping ? otherUserName + " is typing..." : "");
+                tvTypingIndicator.setVisibility(isTyping ? View.VISIBLE : View.GONE);
             }
-        }
-
-        // Reset typing timeout
-        typingHandler.removeCallbacksAndMessages(null);
-        typingHandler.postDelayed(() -> {
-            if (isUserTyping) {
-                isUserTyping = false;
-                if (webSocketService != null && webSocketService.isConnected()) {
-                    webSocketService.sendTypingIndicator(conversationId, false);
-                }
-            }
-        }, TYPING_TIMEOUT);
+        });
     }
 
-    private void scrollToBottom() {
-        if (messages.size() > 0) {
-            rvMessages.smoothScrollToPosition(messages.size() - 1);
-        }
+    @Override
+    public void onMessageDelivered(Long messageId) {
+        // Update message delivery status
+        runOnUiThread(() -> {
+            // TODO: Update message status in list
+        });
     }
 
-    private String getCurrentTime() {
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm",
-                java.util.Locale.getDefault());
-        return sdf.format(new java.util.Date());
+    @Override
+    public void onMessageRead(Long messageId) {
+        // Update message read status
+        runOnUiThread(() -> {
+            // TODO: Update message status in list
+        });
     }
 
-    private void openProductDetail() {
-        if (productId != null && productId > 0) {
-            // TODO: Open ProductDetailActivity
-            Toast.makeText(this, "Open product detail: " + productTitle, Toast.LENGTH_SHORT).show();
+    // ✅ FIX: Add missing leaveConversation method
+    private void leaveConversation(Long conversationId) {
+        if (webSocketService != null && conversationId != null) {
+            webSocketService.removeChatListener(conversationId, this);
+            Log.d(TAG, "Left conversation: " + conversationId);
         }
     }
-
-    // ===== Navigation =====
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (NavigationUtils.handleBackButton(this, item)) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -330,133 +366,22 @@ public class ChatActivity extends AppCompatActivity implements
     protected void onDestroy() {
         super.onDestroy();
 
-        // Clean up WebSocket listeners
-        if (webSocketService != null) {
-            webSocketService.removeWebSocketListener(this);
-            webSocketService.removeChatListener(conversationId, this);
-
-            if (conversationId != null && conversationId > 0) {
-                webSocketService.leaveConversation(conversationId);
-            }
+        // Remove typing timeout
+        if (typingHandler != null) {
+            typingHandler.removeCallbacks(stopTypingRunnable);
         }
 
-        // Unbind service
+        // Leave conversation and remove listeners
+        if (conversationId != null) {
+            leaveConversation(conversationId);
+        }
+
+        // Unbind from service
         if (isServiceBound) {
             unbindService(serviceConnection);
             isServiceBound = false;
         }
 
-        // Clean up handlers
-        if (typingHandler != null) {
-            typingHandler.removeCallbacksAndMessages(null);
-        }
-
         Log.d(TAG, "ChatActivity destroyed");
-    }
-
-    // ===== WebSocket Listeners =====
-
-    @Override
-    public void onConnected() {
-        runOnUiThread(() -> {
-            updateConnectionStatus(true);
-            Toast.makeText(this, "Connected to chat", Toast.LENGTH_SHORT).show();
-        });
-    }
-
-    @Override
-    public void onDisconnected() {
-        runOnUiThread(() -> {
-            updateConnectionStatus(false);
-        });
-    }
-
-    @Override
-    public void onError(String error) {
-        runOnUiThread(() -> {
-            Toast.makeText(this, "Connection error: " + error, Toast.LENGTH_SHORT).show();
-        });
-    }
-
-    // ===== Chat Listeners =====
-
-    @Override
-    public void onMessageReceived(Message message) {
-        runOnUiThread(() -> {
-            // Only add if it's for this conversation and not from current user
-            if (message.getConversationId().equals(conversationId) &&
-                    !message.getSenderId().equals(currentUserId)) {
-
-                messages.add(message);
-                messageAdapter.notifyItemInserted(messages.size() - 1);
-                scrollToBottom();
-
-                Log.d(TAG, "✅ New message received: " + message.getContent());
-            }
-        });
-    }
-
-    @Override
-    public void onTypingIndicator(Long userId, boolean isTyping) {
-        runOnUiThread(() -> {
-            if (!userId.equals(currentUserId)) {
-                showTypingIndicator(isTyping);
-            }
-        });
-    }
-
-    @Override
-    public void onMessageDelivered(Long messageId) {
-        runOnUiThread(() -> {
-            // Update message status to delivered
-            updateMessageStatus(messageId, "Delivered");
-        });
-    }
-
-    @Override
-    public void onMessageRead(Long messageId) {
-        runOnUiThread(() -> {
-            // Update message status to read
-            updateMessageStatus(messageId, "Read");
-        });
-    }
-
-    // ===== Helper Methods =====
-
-    private void updateConnectionStatus(boolean connected) {
-        if (tvConnectionStatus != null) {
-            if (connected) {
-                tvConnectionStatus.setVisibility(View.GONE);
-            } else {
-                tvConnectionStatus.setVisibility(View.VISIBLE);
-                tvConnectionStatus.setText("⚠️ Connecting...");
-            }
-        }
-
-        Log.d(TAG, (connected ? "🟢 Connected" : "🔴 Disconnected"));
-    }
-
-    private void showTypingIndicator(boolean show) {
-        if (tvTypingIndicator != null) {
-            if (show) {
-                tvTypingIndicator.setVisibility(View.VISIBLE);
-                tvTypingIndicator.setText(otherUserName + " is typing...");
-            } else {
-                tvTypingIndicator.setVisibility(View.GONE);
-            }
-        }
-
-        Log.d(TAG, (show ? "⌨️ User typing" : "⌨️ User stopped typing"));
-    }
-
-    private void updateMessageStatus(Long messageId, String status) {
-        // Find and update message status
-        for (Message message : messages) {
-            if (message.getId().equals(messageId)) {
-                // message.setStatus(status); // If you have status field
-                messageAdapter.notifyDataSetChanged();
-                break;
-            }
-        }
     }
 }

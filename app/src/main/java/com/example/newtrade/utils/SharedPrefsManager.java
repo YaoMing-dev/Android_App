@@ -30,7 +30,6 @@ public class SharedPrefsManager {
                 .apply();
     }
 
-    // ✅ FIX: Add saveUserSession() - was causing "cannot find symbol method saveUserSession(Long,String,String,boolean)" error
     public void saveUserSession(Long userId, String email, String name, boolean isEmailVerified) {
         prefs.edit()
                 .putLong(Constants.PREF_USER_ID, userId)
@@ -54,7 +53,26 @@ public class SharedPrefsManager {
         return prefs.getString(Constants.PREF_USER_NAME, "");
     }
 
-    // ✅ ADD: Profile Picture Support
+    // ✅ FIX: Add missing methods for EditProfileActivity
+    public void saveUserName(String name) {
+        prefs.edit()
+                .putString(Constants.PREF_USER_NAME, name)
+                .apply();
+    }
+
+    public void saveUserEmail(String email) {
+        prefs.edit()
+                .putString(Constants.PREF_USER_EMAIL, email)
+                .apply();
+    }
+
+    public void saveUserProfilePicture(String profilePictureUrl) {
+        prefs.edit()
+                .putString(Constants.PREF_USER_PROFILE_PICTURE, profilePictureUrl)
+                .apply();
+    }
+
+    // ===== PROFILE PICTURE SUPPORT =====
     public void setUserProfilePicture(String profilePictureUrl) {
         prefs.edit()
                 .putString(Constants.PREF_USER_PROFILE_PICTURE, profilePictureUrl)
@@ -101,7 +119,6 @@ public class SharedPrefsManager {
         return prefs.getString(Constants.PREF_FCM_TOKEN, "");
     }
 
-    // ✅ FIX: Add saveFcmToken() - was causing "cannot find symbol method saveFcmToken(String)" error
     public void saveFcmToken(String token) {
         setFcmToken(token);
     }
@@ -112,7 +129,6 @@ public class SharedPrefsManager {
         prefs.edit().clear().apply();
     }
 
-    // ✅ FIX: Add clearUserSession() - was causing "cannot find symbol method clearUserSession()" error
     public void clearUserSession() {
         logout();
     }

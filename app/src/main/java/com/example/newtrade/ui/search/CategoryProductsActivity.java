@@ -1,5 +1,4 @@
 // app/src/main/java/com/example/newtrade/ui/search/CategoryProductsActivity.java
-// ✅ FIXED: Added back button handling
 package com.example.newtrade.ui.search;
 
 import android.content.Intent;
@@ -62,14 +61,16 @@ public class CategoryProductsActivity extends AppCompatActivity {
     }
 
     private void getIntentData() {
-        categoryId = getIntent().getLongExtra("category_id", -1);
+        categoryId = getIntent().getLongExtra("category_id", -1L);
         categoryName = getIntent().getStringExtra("category_name");
 
-        if (categoryName == null) {
-            categoryName = "Category Products";
+        if (categoryId <= 0) {
+            Log.e(TAG, "Invalid category ID");
+            finish();
+            return;
         }
 
-        Log.d(TAG, "Category ID: " + categoryId + ", Name: " + categoryName);
+        Log.d(TAG, "Loading products for category: " + categoryName + " (ID: " + categoryId + ")");
     }
 
     private void initViews() {
@@ -83,18 +84,8 @@ public class CategoryProductsActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle(categoryName);
+            getSupportActionBar().setTitle(categoryName != null ? categoryName : "Category Products");
         }
-    }
-
-    // ✅ FIXED: Added back button handling
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            finish();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
     }
 
     private void setupRecyclerView() {
@@ -117,53 +108,61 @@ public class CategoryProductsActivity extends AppCompatActivity {
     private void loadProducts() {
         swipeRefresh.setRefreshing(true);
 
-        // Search products by category
-        ApiClient.getApiService().searchProducts(null, 0, 50, categoryId, null, null, null)
+        ApiClient.getApiService().searchProducts("", 0, 20, categoryId, null, null, null)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
-                    public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                           @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
                         swipeRefresh.setRefreshing(false);
 
                         try {
-                            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                                Map<String, Object> data = response.body().getData();
-                                if (data != null && data.containsKey("content")) {
-                                    @SuppressWarnings("unchecked")
-                                    List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
-                                    updateProductList(productList);
+                            if (response.isSuccessful() && response.body() != null) {
+                                StandardResponse<Map<String, Object>> apiResponse = response.body();
+
+                                if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                                    Map<String, Object> data = apiResponse.getData();
+                                    List<Map<String, Object>> productList =
+                                            (List<Map<String, Object>>) data.get("products");
+
+                                    if (productList != null) {
+                                        updateProducts(productList);
+                                    } else {
+                                        showEmptyState();
+                                    }
                                 } else {
+                                    Log.e(TAG, "API error: " + apiResponse.getMessage());
                                     showEmptyState();
                                 }
                             } else {
-                                Log.e(TAG, "❌ Failed to load products");
+                                Log.e(TAG, "Request failed: " + response.code());
                                 showEmptyState();
                             }
                         } catch (Exception e) {
-                            Log.e(TAG, "❌ Error parsing products", e);
+                            Log.e(TAG, "Error processing response", e);
                             showEmptyState();
                         }
                     }
 
                     @Override
-                    public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                         swipeRefresh.setRefreshing(false);
-                        Log.e(TAG, "❌ Products API call failed", t);
+                        Log.e(TAG, "Request failed", t);
                         showEmptyState();
                     }
                 });
     }
 
-    private void updateProductList(List<Map<String, Object>> productList) {
+    // ✅ FIX: Handle BigDecimal conversion properly
+    private void updateProducts(List<Map<String, Object>> productMaps) {
         products.clear();
 
-        if (productList != null && !productList.isEmpty()) {
-            for (Map<String, Object> productData : productList) {
+        if (productMaps != null && !productMaps.isEmpty()) {
+            for (Map<String, Object> productMap : productMaps) {
                 try {
-                    Product product = parseProductFromMap(productData);
+                    Product product = parseProductFromMap(productMap);
                     products.add(product);
                 } catch (Exception e) {
-                    Log.w(TAG, "Error parsing product: " + productData, e);
+                    Log.w(TAG, "Error parsing product: " + productMap, e);
                 }
             }
 
@@ -180,22 +179,64 @@ public class CategoryProductsActivity extends AppCompatActivity {
         Log.d(TAG, "✅ Products updated: " + products.size());
     }
 
+    // ✅ FIX: Parse product with proper BigDecimal conversion
     private Product parseProductFromMap(Map<String, Object> productData) {
         Product product = new Product();
 
-        if (productData.get("id") instanceof Number) {
-            product.setId(((Number) productData.get("id")).longValue());
+        try {
+            if (productData.get("id") instanceof Number) {
+                product.setId(((Number) productData.get("id")).longValue());
+            }
+
+            product.setTitle((String) productData.get("title"));
+            product.setDescription((String) productData.get("description"));
+
+            // ✅ FIX: Handle BigDecimal to Double conversion
+            Object priceObj = productData.get("price");
+            if (priceObj != null) {
+                if (priceObj instanceof BigDecimal) {
+                    product.setPriceFromBigDecimal((BigDecimal) priceObj);
+                } else if (priceObj instanceof Number) {
+                    product.setPrice(((Number) priceObj).doubleValue());
+                }
+            }
+
+            product.setLocation((String) productData.get("location"));
+            product.setImageUrl((String) productData.get("primaryImageUrl"));
+            product.setPrimaryImageUrl((String) productData.get("primaryImageUrl"));
+
+            // Handle condition conversion
+            Object conditionObj = productData.get("condition");
+            if (conditionObj != null) {
+                product.setCondition(conditionObj.toString());
+            }
+
+            // Handle status conversion
+            Object statusObj = productData.get("status");
+            if (statusObj != null) {
+                product.setStatus(statusObj.toString());
+            }
+
+            product.setCreatedAt((String) productData.get("createdAt"));
+            product.setUpdatedAt((String) productData.get("updatedAt"));
+
+            if (productData.get("userId") instanceof Number) {
+                product.setUserId(((Number) productData.get("userId")).longValue());
+            }
+
+            if (productData.get("categoryId") instanceof Number) {
+                product.setCategoryId(((Number) productData.get("categoryId")).longValue());
+            }
+
+            product.setCategoryName((String) productData.get("categoryName"));
+
+            if (productData.get("viewCount") instanceof Number) {
+                product.setViewCount(((Number) productData.get("viewCount")).intValue());
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing product from map", e);
         }
-
-        product.setTitle((String) productData.get("title"));
-        product.setDescription((String) productData.get("description"));
-
-        if (productData.get("price") instanceof Number) {
-            product.setPrice(BigDecimal.valueOf(((Number) productData.get("price")).doubleValue()));
-        }
-
-        product.setLocation((String) productData.get("location"));
-        product.setPrimaryImageUrl((String) productData.get("primaryImageUrl"));
 
         return product;
     }
@@ -211,5 +252,14 @@ public class CategoryProductsActivity extends AppCompatActivity {
             tvEmptyState.setVisibility(View.VISIBLE);
             tvEmptyState.setText("No products found in " + categoryName);
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

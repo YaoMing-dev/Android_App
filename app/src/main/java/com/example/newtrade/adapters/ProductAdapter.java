@@ -27,7 +27,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
     public interface OnProductClickListener {
         void onProductClick(Product product);
 
-        // ✅ DEFAULT METHOD - không bắt buộc implement
         default void onProductLongClick(Product product) {
             // Empty default implementation
         }
@@ -89,56 +88,57 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                 tvLocation.setText(product.getLocation());
             }
 
-            // Set condition
+            // ✅ FIX: Set condition - handle String to ProductCondition conversion
             if (tvCondition != null) {
-                Product.ProductCondition condition = product.getCondition();
-                if (condition != null) {
-                    tvCondition.setText(condition.getDisplayName());
-                    tvCondition.setVisibility(View.VISIBLE);
+                String conditionStr = product.getCondition();
+                if (conditionStr != null && !conditionStr.isEmpty()) {
+                    // Convert string to enum and get display name
+                    Product.ProductCondition condition = Product.ProductCondition.fromString(conditionStr);
+                    if (condition != null) {
+                        tvCondition.setText(condition.getDisplayName());
+                        tvCondition.setVisibility(View.VISIBLE);
+                    } else {
+                        tvCondition.setText(conditionStr); // fallback to raw string
+                        tvCondition.setVisibility(View.VISIBLE);
+                    }
                 } else {
                     tvCondition.setVisibility(View.GONE);
                 }
             }
 
-            // Load product image
+            // Set product image
             if (ivProduct != null) {
                 String imageUrl = product.getPrimaryImageUrl();
+                if (imageUrl == null) {
+                    imageUrl = product.getImageUrl();
+                }
 
-                try {
-                    if (!TextUtils.isEmpty(imageUrl)) {
-                        String fullImageUrl = imageUrl;
-                        if (imageUrl.startsWith("/")) {
-                            fullImageUrl = Constants.BASE_URL + imageUrl.substring(1);
-                        }
-
-                        Glide.with(itemView.getContext())
-                                .load(fullImageUrl)
-                                .placeholder(R.drawable.ic_image_placeholder)
-                                .error(R.drawable.ic_image_placeholder)
-                                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                                .centerCrop()
-                                .into(ivProduct);
-                    } else {
-                        ivProduct.setImageResource(R.drawable.ic_image_placeholder);
-                    }
-                } catch (Exception e) {
+                if (imageUrl != null && !imageUrl.isEmpty()) {
+                    Glide.with(itemView.getContext())
+                            .load(imageUrl)
+                            .centerCrop()
+                            .placeholder(R.drawable.ic_image_placeholder)
+                            .error(R.drawable.ic_image_placeholder)
+                            .diskCacheStrategy(DiskCacheStrategy.ALL)
+                            .into(ivProduct);
+                } else {
                     ivProduct.setImageResource(R.drawable.ic_image_placeholder);
                 }
             }
 
-            // Set click listeners
+            // Set click listener
             itemView.setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onProductClick(product);
                 }
             });
 
+            // Set long click listener
             itemView.setOnLongClickListener(v -> {
                 if (listener != null) {
                     listener.onProductLongClick(product);
-                    return true;
                 }
-                return false;
+                return true;
             });
         }
     }

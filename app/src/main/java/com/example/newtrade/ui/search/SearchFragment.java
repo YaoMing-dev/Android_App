@@ -62,7 +62,7 @@ public class SearchFragment extends Fragment {
     // Data & Adapters
     private ProductAdapter productAdapter;
     private final List<Product> searchResults = new ArrayList<>();
-    private final List<Product> popularProducts = new ArrayList<>(); // ✅ FIX: Add popular products
+    private final List<Product> popularProducts = new ArrayList<>();
     private String currentQuery = "";
     private final Handler searchHandler = new Handler(Looper.getMainLooper());
     private Runnable searchRunnable;
@@ -119,12 +119,10 @@ public class SearchFragment extends Fragment {
     }
 
     private void setupRecyclerViews() {
-        // ✅ FIX: Setup RecyclerView with proper layout
         GridLayoutManager layoutManager = new GridLayoutManager(requireContext(), 2);
         rvSearchResults.setLayoutManager(layoutManager);
 
         productAdapter = new ProductAdapter(searchResults, product -> {
-            // Handle product click
             Intent intent = new Intent(requireContext(), ProductDetailActivity.class);
             intent.putExtra("product_id", product.getId());
             startActivity(intent);
@@ -134,7 +132,7 @@ public class SearchFragment extends Fragment {
     }
 
     private void setupListeners() {
-        // ✅ FIX: Search text watcher with debouncing
+        // Search text watcher with debouncing
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -170,14 +168,12 @@ public class SearchFragment extends Fragment {
         tvSortOption.setOnClickListener(v -> showSortOptions());
     }
 
-    // ✅ FIX: Show initial state with popular products
     private void showInitialState() {
         if (TextUtils.isEmpty(currentQuery)) {
             loadPopularProducts();
         }
     }
 
-    // ✅ FIX: Load popular products when search is empty
     private void loadPopularProducts() {
         Log.d(TAG, "Loading popular products...");
 
@@ -213,30 +209,32 @@ public class SearchFragment extends Fragment {
                         popularProducts.clear();
                         searchResults.clear();
 
-                        for (Map<String, Object> productMap : productMaps) {
-                            Product product = Product.fromMap(productMap);
-                            popularProducts.add(product);
-                            searchResults.add(product); // Add to search results for display
+                        if (productMaps != null) {
+                            for (Map<String, Object> productMap : productMaps) {
+                                try {
+                                    // ✅ FIX: Use Product.fromMap method
+                                    Product product = Product.fromMap(productMap);
+                                    popularProducts.add(product);
+                                    searchResults.add(product); // Also add to search results for display
+                                } catch (Exception e) {
+                                    Log.w(TAG, "Error parsing popular product", e);
+                                }
+                            }
                         }
 
                         productAdapter.notifyDataSetChanged();
 
-                        // Show results or empty state
                         if (searchResults.isEmpty()) {
                             showEmptyState(true);
                         } else {
                             showEmptyState(false);
-                            Log.d(TAG, "✅ Loaded " + searchResults.size() + " popular products");
                         }
 
-                    } else {
-                        showError("Failed to load popular products: " + standardResponse.getMessage());
-                        showEmptyState(true);
+                        Log.d(TAG, "✅ Popular products loaded: " + popularProducts.size());
                     }
                 } else {
-                    showError("Failed to load popular products");
+                    Log.e(TAG, "Failed to load popular products");
                     showEmptyState(true);
-                    Log.e(TAG, "Popular products response not successful: " + response.code());
                 }
             }
 
@@ -244,24 +242,24 @@ public class SearchFragment extends Fragment {
             public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
                 showLoadingState(false);
                 showEmptyState(true);
-                Log.e(TAG, "❌ Failed to load popular products", t);
-                showError("Network error while loading popular products");
+                Log.e(TAG, "Error loading popular products", t);
             }
         });
     }
 
     private void performSearch(String query) {
-        Log.d(TAG, "Performing search: " + query);
-
         if (TextUtils.isEmpty(query)) {
-            // ✅ FIX: Show popular products when search is empty
             loadPopularProducts();
             return;
         }
 
-        showLoadingState(true);
+        if (isSearching) return;
+
+        Log.d(TAG, "Performing search: " + query);
+
         isSearching = true;
         isShowingPopularProducts = false;
+        showLoadingState(true);
 
         // Update UI for search results
         if (tvPopularProductsTitle != null) {
@@ -273,6 +271,7 @@ public class SearchFragment extends Fragment {
         }
 
         ApiService apiService = ApiClient.getApiService();
+        // ✅ FIX: Use searchProductsAdvanced method
         Call<StandardResponse<Map<String, Object>>> call = apiService.searchProductsAdvanced(
                 query, selectedCategoryId, minPrice, maxPrice, selectedCondition,
                 searchLatitude, searchLongitude, searchRadiusKm, sortBy, 0, 20
@@ -298,8 +297,13 @@ public class SearchFragment extends Fragment {
 
                         if (productMaps != null) {
                             for (Map<String, Object> productMap : productMaps) {
-                                Product product = Product.fromMap(productMap);
-                                searchResults.add(product);
+                                try {
+                                    // ✅ FIX: Use Product.fromMap method
+                                    Product product = Product.fromMap(productMap);
+                                    searchResults.add(product);
+                                } catch (Exception e) {
+                                    Log.w(TAG, "Error parsing search result", e);
+                                }
                             }
                         }
 
@@ -308,59 +312,48 @@ public class SearchFragment extends Fragment {
                         // Update results count
                         if (tvResultsCount != null) {
                             tvResultsCount.setText(totalCount != null ?
-                                    totalCount + " results found" :
-                                    searchResults.size() + " results found");
+                                    totalCount + " results found" : searchResults.size() + " results found");
                         }
 
-                        // Show results or empty state
                         if (searchResults.isEmpty()) {
                             showEmptyState(true);
                         } else {
                             showEmptyState(false);
-                            Log.d(TAG, "✅ Search completed: " + searchResults.size() + " results");
                         }
 
-                    } else {
-                        showError("Search failed: " + standardResponse.getMessage());
-                        showEmptyState(true);
+                        Log.d(TAG, "✅ Search completed: " + searchResults.size() + " results");
                     }
                 } else {
-                    showError("Search failed");
+                    Log.e(TAG, "Search failed: " + response.code());
                     showEmptyState(true);
-                    Log.e(TAG, "Search response not successful: " + response.code());
                 }
             }
 
             @Override
             public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                 showLoadingState(false);
-                showEmptyState(true);
                 isSearching = false;
-                Log.e(TAG, "❌ Search failed", t);
-                showError("Network error during search");
+                showEmptyState(true);
+                showError("Search failed: " + t.getMessage());
+                Log.e(TAG, "Search request failed", t);
             }
         });
     }
 
-    // ===== FILTER METHODS =====
-
+    // Filter methods (placeholder implementations)
     private void showCategoryFilter() {
-        // TODO: Implement category filter dialog
         Toast.makeText(requireContext(), "Category filter coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void showPriceFilter() {
-        // TODO: Implement price filter dialog
         Toast.makeText(requireContext(), "Price filter coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void showLocationFilter() {
-        // TODO: Implement location filter dialog
         Toast.makeText(requireContext(), "Location filter coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void showConditionFilter() {
-        // TODO: Implement condition filter dialog
         Toast.makeText(requireContext(), "Condition filter coming soon", Toast.LENGTH_SHORT).show();
     }
 
@@ -384,8 +377,7 @@ public class SearchFragment extends Fragment {
         builder.show();
     }
 
-    // ===== UI STATE METHODS =====
-
+    // UI State methods
     private void showLoadingState(boolean show) {
         if (llLoadingState != null) {
             llLoadingState.setVisibility(show ? View.VISIBLE : View.GONE);

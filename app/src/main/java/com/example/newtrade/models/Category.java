@@ -5,19 +5,18 @@ public class Category {
     private Long id;
     private String name;
     private String description;
-    private String icon;
-    private boolean isActive;
+    private String iconUrl;
+    private Integer productCount;
+    private String createdAt;
+    private String updatedAt;
 
-    // Default constructor
+    // Constructors
     public Category() {}
 
-    // Constructor để sử dụng trong HomeFragment
-    public Category(Long id, String name, String description, String icon, boolean isActive) {
+    public Category(Long id, String name, String description) {
         this.id = id;
         this.name = name;
         this.description = description;
-        this.icon = icon;
-        this.isActive = isActive;
     }
 
     // Getters and Setters
@@ -30,13 +29,27 @@ public class Category {
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
 
-    public String getIcon() { return icon; }
-    public void setIcon(String icon) { this.icon = icon; }
+    // ✅ FIX: Add missing setIconUrl method
+    public String getIconUrl() { return iconUrl; }
+    public void setIconUrl(String iconUrl) { this.iconUrl = iconUrl; }
 
-    public boolean isActive() { return isActive; }
-    public void setActive(boolean active) { isActive = active; }
+    public Integer getProductCount() { return productCount; }
+    public void setProductCount(Integer productCount) { this.productCount = productCount; }
 
-    // Alias for backward compatibility
-    public boolean getIsActive() { return isActive; }
-    public void setIsActive(boolean active) { this.isActive = active; }
+    public String getCreatedAt() { return createdAt; }
+    public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+
+    public String getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
+
+    @Override
+    public String toString() {
+        return "Category{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", description='" + description + '\'' +
+                ", iconUrl='" + iconUrl + '\'' +
+                ", productCount=" + productCount +
+                '}';
+    }
 }

@@ -1,4 +1,4 @@
-// File: app/src/main/java/com/example/newtrade/ui/search/AllProductsActivity.java
+// app/src/main/java/com/example/newtrade/ui/search/AllProductsActivity.java
 package com.example.newtrade.ui.search;
 
 import android.content.Intent;
@@ -8,8 +8,8 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -20,6 +20,7 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
+import com.google.android.material.appbar.MaterialToolbar;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -35,16 +36,16 @@ public class AllProductsActivity extends AppCompatActivity {
     private static final String TAG = "AllProductsActivity";
 
     // UI Components
-    private Toolbar toolbar;
-    private TextView tvEmptyState;
-    private SwipeRefreshLayout swipeRefresh;
+    private MaterialToolbar toolbar;
     private RecyclerView rvProducts;
+    private SwipeRefreshLayout swipeRefresh;
+    private TextView tvEmptyState;
 
     // Data
     private ProductAdapter productAdapter;
     private final List<Product> products = new ArrayList<>();
-    private int currentPage = 0;
     private boolean isLoading = false;
+    private int currentPage = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,13 +57,15 @@ public class AllProductsActivity extends AppCompatActivity {
         setupRecyclerView();
         setupListeners();
         loadProducts();
+
+        Log.d(TAG, "AllProductsActivity created");
     }
 
     private void initViews() {
         toolbar = findViewById(R.id.toolbar);
-        tvEmptyState = findViewById(R.id.tv_empty_state);
-        swipeRefresh = findViewById(R.id.swipe_refresh);
         rvProducts = findViewById(R.id.rv_products);
+        swipeRefresh = findViewById(R.id.swipe_refresh);
+        tvEmptyState = findViewById(R.id.tv_empty_state);
     }
 
     private void setupToolbar() {
@@ -116,57 +119,25 @@ public class AllProductsActivity extends AppCompatActivity {
 
                                 if (apiResponse.isSuccess() && apiResponse.getData() != null) {
                                     Map<String, Object> data = apiResponse.getData();
-                                    List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
+                                    List<Map<String, Object>> productList =
+                                            (List<Map<String, Object>>) data.get("products");
 
                                     if (productList != null) {
-                                        for (Map<String, Object> productData : productList) {
-                                            Product product = new Product();
-                                            product.setId(((Number) productData.get("id")).longValue());
-                                            product.setTitle((String) productData.get("title"));
-                                            product.setDescription((String) productData.get("description"));
-
-                                            // Handle price conversion - SỬA LỖI TẠI ĐÂY
-                                            Object priceObj = productData.get("price");
-                                            if (priceObj instanceof Number) {
-                                                product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
-                                            }
-
-                                            product.setLocation((String) productData.get("location"));
-
-                                            // Handle imageUrls - SỬA LỖI TẠI ĐÂY
-                                            Object imageUrlsObj = productData.get("imageUrls");
-                                            if (imageUrlsObj instanceof List) {
-                                                product.setImageUrls((List<String>) imageUrlsObj);
-                                            } else if (imageUrlsObj instanceof String) {
-                                                product.setImageUrl((String) imageUrlsObj);
-                                            }
-
-                                            // Handle condition - SỬA LỖI TẠI ĐÂY
-                                            String condition = (String) productData.get("condition");
-                                            if (condition != null) {
-                                                try {
-                                                    product.setCondition(Product.ProductCondition.valueOf(condition));
-                                                } catch (IllegalArgumentException e) {
-                                                    product.setCondition(Product.ProductCondition.GOOD);
-                                                }
-                                            }
-
-                                            products.add(product);
-                                        }
-
-                                        productAdapter.notifyDataSetChanged();
-                                        updateEmptyView();
-
-                                        Log.d(TAG, "✅ Loaded " + productList.size() + " products");
+                                        updateProducts(productList);
+                                    } else {
+                                        showEmptyState();
                                     }
                                 } else {
-                                    Log.w(TAG, "❌ Products response unsuccessful");
+                                    Log.e(TAG, "API error: " + apiResponse.getMessage());
+                                    showEmptyState();
                                 }
                             } else {
-                                Log.w(TAG, "❌ Products response failed");
+                                Log.e(TAG, "Request failed: " + response.code());
+                                showEmptyState();
                             }
                         } catch (Exception e) {
-                            Log.e(TAG, "❌ Error parsing products", e);
+                            Log.e(TAG, "Error processing response", e);
+                            showEmptyState();
                         }
                     }
 
@@ -174,23 +145,119 @@ public class AllProductsActivity extends AppCompatActivity {
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                         isLoading = false;
                         swipeRefresh.setRefreshing(false);
-                        Log.e(TAG, "❌ Products API call failed", t);
+                        Log.e(TAG, "Request failed", t);
+                        showEmptyState();
                     }
                 });
     }
 
-    private void updateEmptyView() {
-        if (products.isEmpty()) {
-            tvEmptyState.setVisibility(View.VISIBLE);
-            rvProducts.setVisibility(View.GONE);
+    // ✅ FIX: Handle BigDecimal and ProductCondition conversion properly
+    private void updateProducts(List<Map<String, Object>> productMaps) {
+        if (currentPage == 0) {
+            products.clear();
+        }
+
+        if (productMaps != null && !productMaps.isEmpty()) {
+            for (Map<String, Object> productMap : productMaps) {
+                try {
+                    Product product = parseProductFromMap(productMap);
+                    products.add(product);
+                } catch (Exception e) {
+                    Log.w(TAG, "Error parsing product: " + productMap, e);
+                }
+            }
+
+            if (products.isEmpty()) {
+                showEmptyState();
+            } else {
+                showProducts();
+            }
         } else {
-            tvEmptyState.setVisibility(View.GONE);
-            rvProducts.setVisibility(View.VISIBLE);
+            showEmptyState();
+        }
+
+        productAdapter.notifyDataSetChanged();
+        Log.d(TAG, "✅ Products updated: " + products.size());
+    }
+
+    // ✅ FIX: Parse product with proper BigDecimal and ProductCondition conversion
+    private Product parseProductFromMap(Map<String, Object> productMap) {
+        Product product = new Product();
+
+        try {
+            // Parse ID
+            if (productMap.get("id") instanceof Number) {
+                product.setId(((Number) productMap.get("id")).longValue());
+            }
+
+            // Parse basic fields
+            product.setTitle((String) productMap.get("title"));
+            product.setDescription((String) productMap.get("description"));
+            product.setLocation((String) productMap.get("location"));
+            product.setImageUrl((String) productMap.get("primaryImageUrl"));
+            product.setPrimaryImageUrl((String) productMap.get("primaryImageUrl"));
+
+            // ✅ FIX: Handle BigDecimal to Double conversion
+            Object priceObj = productMap.get("price");
+            if (priceObj != null) {
+                if (priceObj instanceof BigDecimal) {
+                    product.setPriceFromBigDecimal((BigDecimal) priceObj);
+                } else if (priceObj instanceof Number) {
+                    product.setPrice(((Number) priceObj).doubleValue());
+                }
+            }
+
+            // ✅ FIX: Handle ProductCondition to String conversion
+            Object conditionObj = productMap.get("condition");
+            if (conditionObj != null) {
+                if (conditionObj instanceof Product.ProductCondition) {
+                    product.setCondition(((Product.ProductCondition) conditionObj).getDisplayName());
+                } else {
+                    product.setCondition(conditionObj.toString());
+                }
+            }
+
+            // Parse other fields
+            product.setStatus((String) productMap.get("status"));
+            product.setCreatedAt((String) productMap.get("createdAt"));
+            product.setUpdatedAt((String) productMap.get("updatedAt"));
+
+            if (productMap.get("userId") instanceof Number) {
+                product.setUserId(((Number) productMap.get("userId")).longValue());
+            }
+
+            if (productMap.get("categoryId") instanceof Number) {
+                product.setCategoryId(((Number) productMap.get("categoryId")).longValue());
+            }
+
+            product.setCategoryName((String) productMap.get("categoryName"));
+
+            if (productMap.get("viewCount") instanceof Number) {
+                product.setViewCount(((Number) productMap.get("viewCount")).intValue());
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing product from map", e);
+        }
+
+        return product;
+    }
+
+    private void showProducts() {
+        if (rvProducts != null) rvProducts.setVisibility(View.VISIBLE);
+        if (tvEmptyState != null) tvEmptyState.setVisibility(View.GONE);
+    }
+
+    private void showEmptyState() {
+        if (rvProducts != null) rvProducts.setVisibility(View.GONE);
+        if (tvEmptyState != null) {
+            tvEmptyState.setVisibility(View.VISIBLE);
+            tvEmptyState.setText("No products found");
         }
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
             onBackPressed();
             return true;

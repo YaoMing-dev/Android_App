@@ -108,69 +108,30 @@ public class LoginActivity extends AppCompatActivity {
     private void initGoogleSignIn() {
         Log.d(TAG, "=== GOOGLE SIGN-IN DEBUG INFO ===");
 
-        // ✅ DEBUG THÔNG TIN QUAN TRỌNG
-        Log.d(TAG, "🔍 App Package: " + getPackageName());
-        Log.d(TAG, "🔍 Client ID: " + Constants.GOOGLE_CLIENT_ID);
-        Log.d(TAG, "🔍 Backend URL: " + Constants.BASE_URL);
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestIdToken(Constants.GOOGLE_CLIENT_ID)
+                .requestEmail()
+                .requestProfile()
+                .build();
 
-        // ✅ KIỂM TRA SHA-1 HIỆN TẠI
-        try {
-            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_SIGNATURES);
-            for (Signature signature : info.signatures) {
-                MessageDigest md = MessageDigest.getInstance("SHA1");
-                md.update(signature.toByteArray());
-                byte[] digest = md.digest();
-                StringBuilder sha1 = new StringBuilder();
-                for (byte b : digest) {
-                    sha1.append(String.format("%02X:", b & 0xFF));
-                }
-                if (sha1.length() > 0) {
-                    sha1.deleteCharAt(sha1.length() - 1); // Remove last ':'
-                }
-                Log.d(TAG, "🔍 Current SHA-1: " + sha1.toString());
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error getting SHA-1", e);
-        }
+        googleSignInClient = GoogleSignIn.getClient(this, gso);
 
-        Log.d(TAG, "=== END DEBUG INFO ===");
-
-        // ✅ CLEAR PREVIOUS SIGN-IN STATE
-        googleSignInClient = GoogleSignIn.getClient(this, GoogleSignInOptions.DEFAULT_SIGN_IN);
-        googleSignInClient.signOut().addOnCompleteListener(this, task -> {
-            Log.d(TAG, "✅ Previous Google sign-in state cleared");
-
-            // Create new GoogleSignInOptions after clearing
-            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                    .requestIdToken(Constants.GOOGLE_CLIENT_ID)
-                    .requestEmail()
-                    .requestProfile()
-                    .build();
-
-            googleSignInClient = GoogleSignIn.getClient(this, gso);
-            Log.d(TAG, "✅ Google Sign-In client created successfully");
-        });
+        Log.d(TAG, "✅ Google Sign-In configured");
     }
 
     private void initUtils() {
         prefsManager = SharedPrefsManager.getInstance(this);
-
-        // Test backend connectivity
-        Constants.checkNetworkAndLog(this);
-        Constants.testBackendConnectivity(this);
-
-        Log.d(TAG, "✅ Utils initialized successfully");
     }
 
     private void setupListeners() {
-        // Text change listeners for validation
+        // Text watchers for enabling/disabling login button
         TextWatcher textWatcher = new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                updateFormValidation();
+                updateLoginButtonState();
             }
 
             @Override
@@ -180,275 +141,219 @@ public class LoginActivity extends AppCompatActivity {
         etEmail.addTextChangedListener(textWatcher);
         etPassword.addTextChangedListener(textWatcher);
 
-        // Click listeners
-        btnLogin.setOnClickListener(v -> attemptLogin());
+        // Button listeners
+        btnLogin.setOnClickListener(v -> performLogin());
         btnGoogleSignIn.setOnClickListener(v -> signInWithGoogle());
         tvRegister.setOnClickListener(v -> navigateToRegister());
         tvForgotPassword.setOnClickListener(v -> navigateToForgotPassword());
-
-        Log.d(TAG, "✅ Event listeners set up successfully");
     }
 
-    private void updateFormValidation() {
+    private void updateLoginButtonState() {
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
 
-        boolean isValid = ValidationUtils.isValidEmail(email) && ValidationUtils.isValidPassword(password);
-        btnLogin.setEnabled(isValid && !isLoading);
+        boolean isFormValid = !email.isEmpty() && !password.isEmpty() && !isLoading;
+        btnLogin.setEnabled(isFormValid);
     }
 
-    private void attemptLogin() {
+    private void performLogin() {
+        if (isLoading) return;
+
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
 
-        // Validate email
-        String emailError = ValidationUtils.getEmailError(email);
-        if (emailError != null) {
-            etEmail.setError(emailError);
+        if (!validateLoginForm(email, password)) {
             return;
         }
 
-        // Validate password
-        String passwordError = ValidationUtils.getPasswordError(password);
-        if (passwordError != null) {
-            etPassword.setError(passwordError);
-            return;
-        }
+        setLoading(true);
 
-        performLogin(email, password);
-    }
+        Map<String, Object> loginRequest = new HashMap<>();
+        loginRequest.put("email", email);
+        loginRequest.put("password", password);
 
-    private void performLogin(String email, String password) {
-        Log.d(TAG, "🔍 Attempting login for: " + email);
-        Log.d(TAG, "🔍 Backend URL: " + Constants.BASE_URL);
+        ApiClient.getAuthService().login(loginRequest)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        setLoading(false);
 
-        showLoading(true);
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
 
-        Map<String, String> request = new HashMap<>();
-        request.put("email", email);
-        request.put("password", password);
-
-        ApiClient.getAuthService().login(request).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                showLoading(false);
-
-                Log.d(TAG, "🔍 Login response code: " + response.code());
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> apiResponse = response.body();
-                    Log.d(TAG, "🔍 Login response: " + new Gson().toJson(apiResponse));
-
-                    if (apiResponse.isSuccess() && apiResponse.hasData()) {
-                        handleLoginSuccess(apiResponse.getData());
-                    } else {
-                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Đăng nhập thất bại");
+                            if (apiResponse.isSuccess()) {
+                                handleLoginSuccess(apiResponse.getData());
+                            } else {
+                                showError(apiResponse.getMessage());
+                            }
+                        } else {
+                            showError("Login failed. Please check your credentials.");
+                        }
                     }
-                } else {
-                    Log.e(TAG, "❌ Login failed - Response code: " + response.code());
-                    handleErrorResponse(response);
-                    showError("Đăng nhập thất bại. Kiểm tra email và mật khẩu.");
-                }
-            }
 
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                showLoading(false);
-                Log.e(TAG, "❌ Login network error", t);
-                Log.e(TAG, "❌ Error type: " + t.getClass().getSimpleName());
-                Log.e(TAG, "❌ Error message: " + t.getMessage());
-
-                showError("Lỗi mạng: " + Constants.getNetworkErrorMessage(t));
-            }
-        });
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        setLoading(false);
+                        String errorMessage = getNetworkErrorMessage(t);
+                        showError(errorMessage);
+                        Log.e(TAG, "Login request failed", t);
+                    }
+                });
     }
 
     private void signInWithGoogle() {
         if (isLoading) return;
 
-        Log.d(TAG, "🔍 Starting Google Sign-In...");
-        Log.d(TAG, "🔍 App Package: " + getPackageName());
-        Log.d(TAG, "🔍 Using Client ID: " + Constants.GOOGLE_CLIENT_ID);
-
         Intent signInIntent = googleSignInClient.getSignInIntent();
-        startActivityForResult(signInIntent, Constants.RC_GOOGLE_SIGN_IN);
+        startActivityForResult(signInIntent, 1001);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        Log.d(TAG, "🔍 onActivityResult - requestCode: " + requestCode + ", resultCode: " + resultCode);
-
-        if (requestCode == Constants.RC_GOOGLE_SIGN_IN) {
+        if (requestCode == 1001) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
-                Log.d(TAG, "✅ Google sign-in successful!");
-                Log.d(TAG, "🔍 Email: " + account.getEmail());
-                Log.d(TAG, "🔍 Name: " + account.getDisplayName());
-                Log.d(TAG, "🔍 ID Token length: " + (account.getIdToken() != null ? account.getIdToken().length() : 0));
-
-                if (account.getIdToken() != null) {
-                    performGoogleSignIn(account.getIdToken());
-                } else {
-                    Log.e(TAG, "❌ ID Token is null!");
-                    showError("Google đăng nhập thất bại - không nhận được ID token");
-                }
+                handleGoogleSignIn(account);
             } catch (ApiException e) {
-                Log.e(TAG, "❌ Google sign-in failed with code: " + e.getStatusCode(), e);
-                Log.e(TAG, "❌ Status message: " + e.getStatus());
-                Log.e(TAG, "❌ Status code meaning: " + getStatusCodeMeaning(e.getStatusCode()));
-                showError("Google đăng nhập thất bại: " + getStatusCodeMeaning(e.getStatusCode()));
+                String errorMessage = getNetworkErrorMessage(e);
+                showError("Google Sign-In failed: " + errorMessage);
+                Log.e(TAG, "Google Sign-In failed", e);
             }
         }
     }
 
-    private String getStatusCodeMeaning(int statusCode) {
-        switch (statusCode) {
-            case 10: return "DEVELOPER_ERROR - Cấu hình OAuth không đúng";
-            case 12: return "CANCELLED - Người dùng hủy đăng nhập";
-            case 7: return "NETWORK_ERROR - Lỗi mạng";
-            case 8: return "INTERNAL_ERROR - Lỗi nội bộ";
-            default: return "Error code: " + statusCode;
-        }
-    }
+    private void handleGoogleSignIn(GoogleSignInAccount account) {
+        if (account == null) return;
 
-    private void performGoogleSignIn(String idToken) {
-        if (idToken == null || idToken.isEmpty()) {
-            Log.e(TAG, "❌ Google ID Token is null or empty");
-            showError("Google đăng nhập thất bại - không nhận được token");
-            return;
-        }
+        setLoading(true);
 
-        Log.d(TAG, "🔍 Sending Google Sign-In request to backend");
-        Log.d(TAG, "🔍 Backend URL: " + Constants.BASE_URL + "api/auth/google-signin");
-        Log.d(TAG, "🔍 ID Token length: " + idToken.length());
-        Log.d(TAG, "🔍 ID Token preview: " + idToken.substring(0, Math.min(50, idToken.length())) + "...");
+        Map<String, Object> googleRequest = new HashMap<>();
+        googleRequest.put("idToken", account.getIdToken());
+        googleRequest.put("email", account.getEmail());
+        googleRequest.put("displayName", account.getDisplayName());
 
-        showLoading(true);
+        ApiClient.getAuthService().googleSignIn(googleRequest)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        setLoading(false);
 
-        Map<String, String> request = new HashMap<>();
-        request.put("idToken", idToken);
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
 
-        ApiClient.getAuthService().googleSignIn(request).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                showLoading(false);
-
-                Log.d(TAG, "🔍 Google Sign-In response code: " + response.code());
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> apiResponse = response.body();
-                    Log.d(TAG, "🔍 Google Sign-In response: " + new Gson().toJson(apiResponse));
-
-                    if (apiResponse.isSuccess() && apiResponse.hasData()) {
-                        handleLoginSuccess(apiResponse.getData());
-                    } else {
-                        showError(apiResponse.getMessage() != null ?
-                                apiResponse.getMessage() : "Google đăng nhập thất bại");
+                            if (apiResponse.isSuccess()) {
+                                handleLoginSuccess(apiResponse.getData());
+                            } else {
+                                showError(apiResponse.getMessage());
+                            }
+                        } else {
+                            showError("Google Sign-In failed. Please try again.");
+                        }
                     }
-                } else {
-                    Log.e(TAG, "❌ Google Sign-In failed - Response code: " + response.code());
-                    handleErrorResponse(response);
-                    showError("Google đăng nhập thất bại - Server error");
-                }
-            }
 
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                showLoading(false);
-                Log.e(TAG, "❌ Google Sign-In network error", t);
-                Log.e(TAG, "❌ Error type: " + t.getClass().getSimpleName());
-                Log.e(TAG, "❌ Error message: " + t.getMessage());
-                showError("Lỗi mạng khi đăng nhập Google: " + Constants.getNetworkErrorMessage(t));
-            }
-        });
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        setLoading(false);
+                        String errorMessage = getNetworkErrorMessage(t);
+                        showError("Google Sign-In failed: " + errorMessage);
+                        Log.e(TAG, "Google Sign-In request failed", t);
+                    }
+                });
     }
 
-    private void handleLoginSuccess(Map<String, Object> data) {
+    private boolean validateLoginForm(String email, String password) {
+        if (email.isEmpty()) {
+            etEmail.setError("Email is required");
+            etEmail.requestFocus();
+            return false;
+        }
+
+        if (!ValidationUtils.isValidEmail(email)) {
+            etEmail.setError("Please enter a valid email");
+            etEmail.requestFocus();
+            return false;
+        }
+
+        if (password.isEmpty()) {
+            etPassword.setError("Password is required");
+            etPassword.requestFocus();
+            return false;
+        }
+
+        if (password.length() < 6) {
+            etPassword.setError("Password must be at least 6 characters");
+            etPassword.requestFocus();
+            return false;
+        }
+
+        return true;
+    }
+
+    // ✅ FIX: Handle login success with proper Map casting
+    private void handleLoginSuccess(Map<String, Object> userData) {
         try {
-            Log.d(TAG, "🔍 Processing login success data: " + new Gson().toJson(data));
+            // ✅ FIX: Proper casting for nested Map
+            @SuppressWarnings("unchecked")
+            Map<String, Object> user = (Map<String, Object>) userData.get("user");
 
-            // Parse user data from response
-            Object userObj = data.get("user");
-            if (userObj instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> userMap = (Map<String, Object>) userObj;
+            if (user != null) {
+                Long userId = Long.valueOf(user.get("id").toString());
+                String email = (String) user.get("email");
+                String name = (String) user.get("displayName");
+                boolean isEmailVerified = Boolean.TRUE.equals(user.get("isEmailVerified"));
 
-                // Extract user info
-                Long userId = null;
-                Object idObj = userMap.get("id");
-                if (idObj instanceof Number) {
-                    userId = ((Number) idObj).longValue();
-                } else if (idObj instanceof String) {
-                    try {
-                        userId = Long.parseLong((String) idObj);
-                    } catch (NumberFormatException e) {
-                        Log.e(TAG, "❌ Cannot parse user ID: " + idObj);
-                    }
-                }
+                // Save user session
+                prefsManager.saveUserSession(userId, email, name, isEmailVerified);
 
-                String email = (String) userMap.get("email");
-                String displayName = (String) userMap.get("displayName");
-                Boolean isEmailVerified = (Boolean) userMap.get("isEmailVerified");
+                Log.d(TAG, "✅ Login successful for user: " + email);
+                Toast.makeText(this, "Welcome back, " + name + "!", Toast.LENGTH_SHORT).show();
 
-                if (userId != null && email != null && displayName != null) {
-                    // Save user session
-                    prefsManager.saveUserSession(userId, email, displayName,
-                            isEmailVerified != null ? isEmailVerified : false);
-
-                    Log.d(TAG, "✅ User session saved successfully");
-
-                    // Check if OTP verification is required
-                    Boolean requiresOtp = (Boolean) data.get("requiresOtp");
-                    if (requiresOtp != null && requiresOtp && !Boolean.TRUE.equals(isEmailVerified)) {
-                        Log.d(TAG, "🔍 OTP verification required");
-                        navigateToOtpVerification(email);
-                    } else {
-                        Log.d(TAG, "🔍 Login complete, navigating to main");
-                        navigateToMain();
-                    }
-                } else {
-                    Log.e(TAG, "❌ Incomplete user data received");
-                    Log.e(TAG, "❌ UserID: " + userId + ", Email: " + email + ", DisplayName: " + displayName);
-                    showError("Dữ liệu người dùng không đầy đủ");
-                }
-            } else {
-                Log.e(TAG, "❌ Invalid user data format");
-                showError("Định dạng dữ liệu không hợp lệ");
+                navigateToMain();
             }
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error processing login success", e);
-            showError("Lỗi xử lý đăng nhập: " + e.getMessage());
+            Log.e(TAG, "Error processing login response", e);
+            showError("Login successful but failed to save user data");
         }
     }
 
-    private void handleErrorResponse(Response<?> response) {
-        try {
-            if (response.errorBody() != null) {
-                String errorBody = response.errorBody().string();
-                Log.e(TAG, "❌ Error body: " + errorBody);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Cannot read error body", e);
-        }
-    }
-
-    private void showLoading(boolean loading) {
+    private void setLoading(boolean loading) {
         isLoading = loading;
-        updateFormValidation();
+        btnLogin.setEnabled(!loading && !etEmail.getText().toString().trim().isEmpty()
+                && !etPassword.getText().toString().trim().isEmpty());
         btnGoogleSignIn.setEnabled(!loading);
+        btnLogin.setText(loading ? "Signing in..." : "Sign In");
+    }
 
-        if (loading) {
-            btnLogin.setText("Đang đăng nhập...");
-            btnGoogleSignIn.setText("Đang xử lý...");
-        } else {
-            btnLogin.setText("Sign In");
-            btnGoogleSignIn.setText("Continue with Google");
+    // ✅ FIX: Add missing getNetworkErrorMessage method
+    private String getNetworkErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown error occurred";
         }
+
+        String message = throwable.getMessage();
+        if (message == null || message.isEmpty()) {
+            return "Network error occurred";
+        }
+
+        // Handle specific error types
+        if (message.contains("timeout")) {
+            return "Connection timeout. Please try again.";
+        } else if (message.contains("connection")) {
+            return "Connection failed. Please check your internet.";
+        } else if (message.contains("401")) {
+            return "Invalid email or password";
+        } else if (message.contains("400")) {
+            return "Invalid request. Please check your input.";
+        } else if (message.contains("500")) {
+            return "Server error. Please try again later.";
+        }
+
+        return message;
     }
 
     private void showError(String message) {
@@ -464,10 +369,6 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void navigateToRegister() {
-        // ❌ XÓA DÒNG NÀY:
-        // showError("Chức năng đăng ký đang được phát triển");
-
-        // ✅ THÊM DÒNG NÀY:
         Intent intent = new Intent(this, RegisterActivity.class);
         startActivity(intent);
     }
@@ -480,7 +381,7 @@ public class LoginActivity extends AppCompatActivity {
     private void navigateToOtpVerification(String email) {
         Intent intent = new Intent(this, OtpVerificationActivity.class);
         intent.putExtra("email", email);
-        intent.putExtra("fromRegister", false); // false vì đến từ login
+        intent.putExtra("fromRegister", false);
         startActivity(intent);
     }
 }

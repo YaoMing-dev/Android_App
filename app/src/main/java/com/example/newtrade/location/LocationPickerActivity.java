@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/newtrade/ui/location/LocationPickerActivity.java
 package com.example.newtrade.ui.location;
 
 import android.app.Activity;

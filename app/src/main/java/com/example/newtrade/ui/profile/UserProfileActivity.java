@@ -28,6 +28,7 @@ import com.example.newtrade.utils.NavigationUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,19 +45,20 @@ public class UserProfileActivity extends AppCompatActivity {
     // UI Components
     private MaterialToolbar toolbar;
     private CircleImageView ivProfilePicture;
-    private TextView tvDisplayName, tvMemberSince, tvRating, tvBio, tvContactInfo;
-    private TextView tvListingsCount, tvSoldCount, tvResponseRate;
-    private Button btnContact, btnViewListings;
-    private LinearLayout llUserStats, llContactSection;
+    private TextView tvDisplayName, tvMemberSince, tvLocation;
+    private TextView tvListingsCount, tvRating, tvResponseRate;
+    private Button btnContact;
+    // ✅ FIX: Make btnViewReviews optional (may not exist in layout)
+    private Button btnViewReviews;
     private RecyclerView rvUserProducts;
-    private TextView tvEmptyProducts;
+    private LinearLayout llEmptyState;
 
     // Data
-    private Long userId;
-    private User userProfile;
-    private SharedPrefsManager prefsManager;
     private ProductAdapter productAdapter;
     private List<Product> userProducts = new ArrayList<>();
+    private SharedPrefsManager prefsManager;
+    private Long userId;
+    private User userProfile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,11 +77,13 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void getUserIdFromIntent() {
-        userId = getIntent().getLongExtra("user_id", -1L);
+        Intent intent = getIntent();
+        userId = intent.getLongExtra("user_id", -1L);
+
         if (userId <= 0) {
             Log.e(TAG, "Invalid user ID");
-            Toast.makeText(this, "Invalid user profile", Toast.LENGTH_SHORT).show();
             finish();
+            return;
         }
     }
 
@@ -88,223 +92,168 @@ public class UserProfileActivity extends AppCompatActivity {
         ivProfilePicture = findViewById(R.id.iv_profile_picture);
         tvDisplayName = findViewById(R.id.tv_display_name);
         tvMemberSince = findViewById(R.id.tv_member_since);
-        tvRating = findViewById(R.id.tv_rating);
-        tvBio = findViewById(R.id.tv_bio);
-        tvContactInfo = findViewById(R.id.tv_contact_info);
-
+        tvLocation = findViewById(R.id.tv_location);
         tvListingsCount = findViewById(R.id.tv_listings_count);
-        tvSoldCount = findViewById(R.id.tv_sold_count);
+        tvRating = findViewById(R.id.tv_rating);
         tvResponseRate = findViewById(R.id.tv_response_rate);
-
         btnContact = findViewById(R.id.btn_contact);
-        btnViewListings = findViewById(R.id.btn_view_listings);
 
-        llUserStats = findViewById(R.id.ll_user_stats);
-        llContactSection = findViewById(R.id.ll_contact_section);
+        // ✅ FIX: Check if btn_view_reviews exists in layout
+        btnViewReviews = findViewById(R.id.btn_view_reviews);
+        if (btnViewReviews == null) {
+            Log.w(TAG, "btn_view_reviews not found in layout - this is optional");
+        }
+
         rvUserProducts = findViewById(R.id.rv_user_products);
-        tvEmptyProducts = findViewById(R.id.tv_empty_products);
+        llEmptyState = findViewById(R.id.ll_empty_state);
 
         prefsManager = SharedPrefsManager.getInstance(this);
     }
 
     private void setupToolbar() {
-        NavigationUtils.setupToolbarWithBackButton(this, toolbar, "User Profile");
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("User Profile");
+        }
     }
 
     private void setupRecyclerView() {
-        productAdapter = new ProductAdapter(userProducts, product -> {
-            // Open product detail
-            Intent intent = new Intent(this, com.example.newtrade.ui.product.ProductDetailActivity.class);
-            intent.putExtra("product_id", product.getId());
-            startActivity(intent);
-        });
-
+        productAdapter = new ProductAdapter(userProducts, this::openProductDetail);
         rvUserProducts.setLayoutManager(new GridLayoutManager(this, 2));
         rvUserProducts.setAdapter(productAdapter);
     }
 
     private void setupListeners() {
         btnContact.setOnClickListener(v -> contactUser());
-        btnViewListings.setOnClickListener(v -> viewAllListings());
+
+        // ✅ FIX: Only set listener if button exists
+        if (btnViewReviews != null) {
+            btnViewReviews.setOnClickListener(v -> viewUserReviews());
+        }
     }
 
     private void loadUserProfile() {
-        Log.d(TAG, "Loading profile for user: " + userId);
-
-        // First load mock data
-        loadMockUserProfile();
-
-        // TODO: Load real profile from API
-        /*
-        ApiClient.getUserService().getUserProfile(userId).enqueue(new Callback<StandardResponse<User>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<User>> call, Response<StandardResponse<User>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    userProfile = response.body().getData();
-                    displayUserProfile(userProfile);
-                } else {
-                    Log.e(TAG, "Failed to load user profile");
-                    Toast.makeText(UserProfileActivity.this, "Failed to load profile", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<StandardResponse<User>> call, Throwable t) {
-                Log.e(TAG, "Error loading user profile", t);
-                Toast.makeText(UserProfileActivity.this, "Network error", Toast.LENGTH_SHORT).show();
-            }
-        });
-        */
+        // TODO: Replace with actual API call to get user profile
+        createMockUserProfile();
     }
 
-    private void loadMockUserProfile() {
-        // Create mock user profile
-        userProfile = new User();
-        userProfile.setId(userId);
-        userProfile.setDisplayName("John Seller");
-        userProfile.setEmail("john.seller@example.com");
-        userProfile.setBio("Experienced seller with quality items. Fast shipping and excellent customer service.");
-        userProfile.setContactInfo("+1 (555) 123-4567");
-        userProfile.setRating(4.5);
-        userProfile.setTotalTransactions(47);
-        // userProfile.setCreatedAt(new Date()); // Member since
+    private void createMockUserProfile() {
+        // Mock user profile data
+        tvDisplayName.setText("John Seller");
+        tvMemberSince.setText("Member since Jan 2023");
+        tvLocation.setText("Ho Chi Minh City, Vietnam");
+        tvListingsCount.setText("12 listings");
+        tvRating.setText("4.8 ★");
+        tvResponseRate.setText("95% response rate");
 
-        displayUserProfile(userProfile);
-    }
+        // Load profile picture
+        Glide.with(this)
+                .load("https://via.placeholder.com/150x150")
+                .centerCrop()
+                .placeholder(R.drawable.ic_person)
+                .into(ivProfilePicture);
 
-    private void displayUserProfile(User user) {
-        if (user == null) return;
-
-        // Basic info
-        tvDisplayName.setText(user.getDisplayName() != null ? user.getDisplayName() : "User");
-        tvMemberSince.setText("Member since 2023");
-
-        // Rating
-        if (user.getRating() != null && user.getRating() > 0) {
-            tvRating.setText(String.format("⭐ %.1f", user.getRating()));
-            tvRating.setVisibility(View.VISIBLE);
-        } else {
-            tvRating.setVisibility(View.GONE);
-        }
-
-        // Bio
-        if (user.getBio() != null && !user.getBio().trim().isEmpty()) {
-            tvBio.setText(user.getBio());
-            tvBio.setVisibility(View.VISIBLE);
-        } else {
-            tvBio.setVisibility(View.GONE);
-        }
-
-        // Contact info (only show if available)
-        if (user.getContactInfo() != null && !user.getContactInfo().trim().isEmpty()) {
-            tvContactInfo.setText(user.getContactInfo());
-            llContactSection.setVisibility(View.VISIBLE);
-        } else {
-            llContactSection.setVisibility(View.GONE);
-        }
-
-        // Profile picture
-        if (user.getProfilePicture() != null && !user.getProfilePicture().trim().isEmpty()) {
-            Glide.with(this)
-                    .load(user.getProfilePicture())
-                    .placeholder(R.drawable.placeholder_avatar)
-                    .error(R.drawable.placeholder_avatar)
-                    .into(ivProfilePicture);
-        } else {
-            ivProfilePicture.setImageResource(R.drawable.placeholder_avatar);
-        }
-
-        // Stats
-        tvListingsCount.setText(String.valueOf(userProducts.size()));
-        tvSoldCount.setText(user.getTotalTransactions() != null ?
-                String.valueOf(user.getTotalTransactions()) : "0");
-        tvResponseRate.setText("95%"); // Mock response rate
-
-        // Update toolbar title
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(user.getDisplayName());
-        }
+        Log.d(TAG, "✅ Mock user profile loaded");
     }
 
     private void loadUserProducts() {
-        // Load mock products for now
-        loadMockUserProducts();
-
-        // TODO: Load real products from API
-        /*
-        ApiClient.getProductService().getUserProducts(userId, 0, 20).enqueue(new Callback<...>() {
-            // Implementation here
-        });
-        */
+        // Create mock products for this user
+        createMockUserProducts();
     }
 
-    private void loadMockUserProducts() {
+    private void createMockUserProducts() {
         userProducts.clear();
 
         // Mock product 1
-        Product product1 = new Product();
-        product1.setId(1L);
-        product1.setTitle("iPhone 13 Pro Max");
-        product1.setPrice(new java.math.BigDecimal("25000000"));
-        product1.setImageUrl("https://example.com/iphone.jpg");
-        product1.setCondition(Product.ProductCondition.GOOD);
-        userProducts.add(product1);
+        Product product1 = createMockProduct(101L, "Vintage Camera",
+                "Canon AE-1 vintage film camera", 1500000.0,
+                "Ho Chi Minh City", "GOOD");
 
         // Mock product 2
-        Product product2 = new Product();
-        product2.setId(2L);
-        product2.setTitle("MacBook Air M2");
-        product2.setPrice(new java.math.BigDecimal("30000000"));
-        product2.setImageUrl("https://example.com/macbook.jpg");
-        product2.setCondition(Product.ProductCondition.LIKE_NEW);
+        Product product2 = createMockProduct(102L, "Gaming Laptop",
+                "ASUS ROG gaming laptop", 18000000.0,
+                "Ho Chi Minh City", "LIKE_NEW");
+
+        // Mock product 3
+        Product product3 = createMockProduct(103L, "Wireless Headphones",
+                "Sony WH-1000XM4 wireless headphones", 6500000.0,
+                "Ho Chi Minh City", "NEW");
+
+        userProducts.add(product1);
         userProducts.add(product2);
+        userProducts.add(product3);
 
-        productAdapter.notifyDataSetChanged();
-        updateProductsVisibility();
-    }
-
-    private void updateProductsVisibility() {
         if (userProducts.isEmpty()) {
-            rvUserProducts.setVisibility(View.GONE);
-            tvEmptyProducts.setVisibility(View.VISIBLE);
+            showEmptyState();
         } else {
-            rvUserProducts.setVisibility(View.VISIBLE);
-            tvEmptyProducts.setVisibility(View.GONE);
+            showProducts();
         }
 
-        // Update listings count
-        tvListingsCount.setText(String.valueOf(userProducts.size()));
+        productAdapter.notifyDataSetChanged();
+        Log.d(TAG, "✅ Mock user products created: " + userProducts.size());
+    }
+
+    private Product createMockProduct(Long id, String title, String description,
+                                      Double price, String location, String condition) {
+        Product product = new Product();
+
+        product.setId(id);
+        product.setTitle(title);
+        product.setDescription(description);
+        product.setPrice(price);
+        product.setLocation(location);
+        product.setCondition(condition);
+        product.setStatus("AVAILABLE");
+        product.setImageUrl("https://via.placeholder.com/300x300");
+        product.setPrimaryImageUrl("https://via.placeholder.com/300x300");
+        product.setCreatedAt("2024-01-10T15:30:00");
+        product.setUpdatedAt("2024-01-10T15:30:00");
+        product.setUserId(userId);
+        product.setCategoryId(1L);
+        product.setCategoryName("Electronics");
+        product.setViewCount(42);
+
+        return product;
+    }
+
+    private void openProductDetail(Product product) {
+        Intent intent = new Intent(this, com.example.newtrade.ui.product.ProductDetailActivity.class);
+        intent.putExtra("product_id", product.getId());
+        intent.putExtra("product_title", product.getTitle());
+        intent.putExtra("product_price", product.getFormattedPrice());
+        startActivity(intent);
     }
 
     private void contactUser() {
-        if (userProfile == null) {
-            Toast.makeText(this, "Profile not loaded", Toast.LENGTH_SHORT).show();
-            return;
+        if (userId != null && userId > 0) {
+            Intent intent = new Intent(this, ChatActivity.class);
+            intent.putExtra("other_user_id", userId);
+            intent.putExtra("other_user_name", tvDisplayName.getText().toString());
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, "Cannot contact user", Toast.LENGTH_SHORT).show();
         }
-
-        // Open chat with this user
-        Intent intent = new Intent(this, ChatActivity.class);
-        intent.putExtra("conversation_id", -1L); // Create new conversation
-        intent.putExtra("seller_id", userId);
-        intent.putExtra("other_user_name", userProfile.getDisplayName());
-        startActivity(intent);
-
-        Log.d(TAG, "Opening chat with user: " + userId);
     }
 
-    private void viewAllListings() {
-        if (userProducts.isEmpty()) {
-            Toast.makeText(this, "This user has no listings", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    private void viewUserReviews() {
+        Toast.makeText(this, "User reviews coming soon", Toast.LENGTH_SHORT).show();
+    }
 
-        // TODO: Open all listings activity
-        Toast.makeText(this, "View all " + userProducts.size() + " listings", Toast.LENGTH_SHORT).show();
+    private void showProducts() {
+        if (rvUserProducts != null) rvUserProducts.setVisibility(View.VISIBLE);
+        if (llEmptyState != null) llEmptyState.setVisibility(View.GONE);
+    }
+
+    private void showEmptyState() {
+        if (rvUserProducts != null) rvUserProducts.setVisibility(View.GONE);
+        if (llEmptyState != null) llEmptyState.setVisibility(View.VISIBLE);
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (NavigationUtils.handleBackButton(this, item)) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
