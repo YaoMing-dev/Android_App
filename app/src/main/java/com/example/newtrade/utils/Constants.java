@@ -13,6 +13,7 @@ public class Constants {
     // ===== API CONFIGURATION =====
     public static final String BASE_URL = "http://10.0.2.2:8080/";
     public static final String WS_BASE_URL = "ws://10.0.2.2:8080";
+    public static final String WS_HOST = "10.0.2.2:8080";
 
     // ===== SHARED PREFERENCES =====
     public static final String PREFS_NAME = "TradeUpPrefs";

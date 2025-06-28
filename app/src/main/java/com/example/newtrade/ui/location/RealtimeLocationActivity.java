@@ -1,16 +1,10 @@
 // app/src/main/java/com/example/newtrade/ui/location/RealtimeLocationActivity.java
-// ✅ GPS Realtime với WebSocket
 package com.example.newtrade.ui.location;
 
 import android.Manifest;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.util.Log;
 import android.view.MenuItem;
 import android.widget.TextView;
@@ -22,6 +16,7 @@ import androidx.core.app.ActivityCompat;
 
 import com.example.newtrade.R;
 import com.example.newtrade.utils.NavigationUtils;
+import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.websocket.RealtimeWebSocketService;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -53,39 +48,24 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
     private LocationCallback locationCallback;
     private Location lastKnownLocation;
 
-    // WebSocket Service
+    // WebSocket Service - SINGLETON PATTERN ONLY
     private RealtimeWebSocketService webSocketService;
-    private boolean isServiceBound = false;
-
-    private ServiceConnection serviceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            RealtimeWebSocketService.LocalBinder binder = (RealtimeWebSocketService.LocalBinder) service;
-            webSocketService = binder.getService();
-            isServiceBound = true;
-
-            webSocketService.addLocationListener(RealtimeLocationActivity.this);
-
-            Log.d(TAG, "✅ WebSocket service connected for location");
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            webSocketService = null;
-            isServiceBound = false;
-            Log.d(TAG, "❌ WebSocket service disconnected");
-        }
-    };
+    private SharedPrefsManager prefsManager;
+    private Long currentUserId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_realtime_location);
 
+        // Initialize
+        prefsManager = SharedPrefsManager.getInstance(this);
+        currentUserId = prefsManager.getUserId();
+
         initViews();
         setupToolbar();
         initLocationServices();
-        startAndBindWebSocketService();
+        initWebSocketService();
 
         Log.d(TAG, "✅ RealtimeLocationActivity created");
     }
@@ -132,10 +112,18 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
         }
     }
 
-    private void startAndBindWebSocketService() {
-        Intent serviceIntent = new Intent(this, RealtimeWebSocketService.class);
-        startService(serviceIntent);
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
+    private void initWebSocketService() {
+        webSocketService = RealtimeWebSocketService.getInstance();
+
+        // Add location listener
+        webSocketService.addLocationListener(this);
+
+        // Connect if not connected
+        if (!webSocketService.isConnected() && currentUserId != null) {
+            webSocketService.connect(currentUserId);
+        }
+
+        Log.d(TAG, "✅ WebSocket service initialized for location");
     }
 
     private boolean hasLocationPermission() {
@@ -166,9 +154,11 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
     }
 
     private void stopLocationUpdates() {
-        fusedLocationClient.removeLocationUpdates(locationCallback);
-        tvLocationStatus.setText("⏸️ Location tracking paused");
-        Log.d(TAG, "⏸️ Location updates stopped");
+        if (fusedLocationClient != null && locationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(locationCallback);
+            tvLocationStatus.setText("⏸️ Location tracking paused");
+            Log.d(TAG, "⏸️ Location updates stopped");
+        }
     }
 
     private void handleLocationUpdate(Location location) {
@@ -190,7 +180,7 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
         Log.d(TAG, "📍 Location updated: " + location.getLatitude() + ", " + location.getLongitude());
     }
 
-    // ===== Location Listener =====
+    // ===== LocationListener Implementation =====
 
     @Override
     public void onUserLocationUpdate(Long userId, double latitude, double longitude) {
@@ -262,12 +252,6 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
         // Remove location listener
         if (webSocketService != null) {
             webSocketService.removeLocationListener(this);
-        }
-
-        // Unbind service
-        if (isServiceBound) {
-            unbindService(serviceConnection);
-            isServiceBound = false;
         }
 
         Log.d(TAG, "🧹 RealtimeLocationActivity destroyed");

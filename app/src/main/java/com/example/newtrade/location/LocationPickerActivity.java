@@ -1,4 +1,4 @@
-package com.example.newtrade.ui.location;
+package com.example.newtrade.location;
 
 import android.app.Activity;
 import android.content.Intent;

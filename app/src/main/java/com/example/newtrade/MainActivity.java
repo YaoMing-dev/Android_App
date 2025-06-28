@@ -11,8 +11,6 @@ import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -42,41 +40,45 @@ public class MainActivity extends AppCompatActivity {
     private Fragment currentFragment;
     private String currentFragmentTag = "home";
 
-    // Data
+    // Utils
     private SharedPrefsManager prefsManager;
+    private RealtimeWebSocketService webSocketService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Initialize ApiClient FIRST
-        ApiClient.init(this);
-
         setContentView(R.layout.activity_main);
 
-        // Hide action bar
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().hide();
-        }
+        // Initialize utilities
+        prefsManager = SharedPrefsManager.getInstance(this);
+        fragmentManager = getSupportFragmentManager();
 
-        // Initialize components
+        // Set up window appearance
+        setupWindow();
+
+        // Initialize views
         initViews();
-        initData();
-        setupWindowInsets();
-        setupBottomNavigation();
-        setupListeners();
+        setupNavigation();
 
-        // Load initial fragment
-        if (savedInstanceState == null) {
-            loadFragment(new HomeFragment(), "home", R.id.nav_home);
-        } else {
-            currentFragmentTag = savedInstanceState.getString(CURRENT_FRAGMENT_TAG, "home");
+        // Load saved fragment or default
+        loadInitialFragment(savedInstanceState);
+
+        // Initialize WebSocket service
+        initWebSocketService();
+
+        Log.d(TAG, "MainActivity created successfully");
+    }
+
+    private void setupWindow() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+            }
         }
-
-        // Test backend connection
-        testBackendConnection();
-
-        Log.d(TAG, "✅ MainActivity created successfully");
     }
 
     private void initViews() {
@@ -84,109 +86,98 @@ public class MainActivity extends AppCompatActivity {
         fabQuickAdd = findViewById(R.id.fab_quick_add);
     }
 
-    private void initData() {
-        fragmentManager = getSupportFragmentManager();
-        prefsManager = new SharedPrefsManager(this);
-    }
-
-    private void setupWindowInsets() {
-        View rootView = findViewById(android.R.id.content);
-
-        if (rootView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-                androidx.core.graphics.Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-                return insets;
-            });
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setFlags(
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-            );
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
-        }
-    }
-
-    private void setupBottomNavigation() {
+    private void setupNavigation() {
         bottomNavigation.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
 
             if (itemId == R.id.nav_home) {
-                loadFragment(new HomeFragment(), "home", R.id.nav_home);
+                switchFragment(new HomeFragment(), "home");
                 return true;
             } else if (itemId == R.id.nav_search) {
-                loadFragment(new SearchFragment(), "search", R.id.nav_search);
-                return true;
-            } else if (itemId == R.id.nav_sell) {
-                loadFragment(new AddProductFragment(), "sell", R.id.nav_sell);
+                switchFragment(new SearchFragment(), "search");
                 return true;
             } else if (itemId == R.id.nav_messages) {
-                loadFragment(new MessagesFragment(), "messages", R.id.nav_messages);
+                switchFragment(new MessagesFragment(), "messages");
                 return true;
             } else if (itemId == R.id.nav_profile) {
-                loadFragment(new ProfileFragment(), "profile", R.id.nav_profile);
+                switchFragment(new ProfileFragment(), "profile");
                 return true;
             }
-
             return false;
+        });
+
+        // FAB click listener
+        fabQuickAdd.setOnClickListener(v -> {
+            switchFragment(new AddProductFragment(), "add_product");
+            // Optionally highlight the add tab or handle UI state
         });
     }
 
-    private void setupListeners() {
-        if (fabQuickAdd != null) {
-            fabQuickAdd.setOnClickListener(v -> {
-                bottomNavigation.setSelectedItemId(R.id.nav_sell);
-            });
+    // ✅ FIX: Use parameter properly instead of global variable
+    private void loadInitialFragment(Bundle savedInstanceState) {
+        // Restore fragment state or load default
+        if (savedInstanceState != null) {
+            currentFragmentTag = savedInstanceState.getString(CURRENT_FRAGMENT_TAG, "home");
+        }
+
+        // Load appropriate fragment
+        switch (currentFragmentTag) {
+            case "home":
+                currentFragment = new HomeFragment();
+                bottomNavigation.setSelectedItemId(R.id.nav_home);
+                break;
+            case "search":
+                currentFragment = new SearchFragment();
+                bottomNavigation.setSelectedItemId(R.id.nav_search);
+                break;
+            case "messages":
+                currentFragment = new MessagesFragment();
+                bottomNavigation.setSelectedItemId(R.id.nav_messages);
+                break;
+            case "profile":
+                currentFragment = new ProfileFragment();
+                bottomNavigation.setSelectedItemId(R.id.nav_profile);
+                break;
+            case "add_product":
+                currentFragment = new AddProductFragment();
+                break;
+            default:
+                currentFragment = new HomeFragment();
+                currentFragmentTag = "home";
+                bottomNavigation.setSelectedItemId(R.id.nav_home);
+                break;
+        }
+
+        if (currentFragment != null) {
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, currentFragment, currentFragmentTag);
+            transaction.commit();
         }
     }
 
-    private void loadFragment(Fragment fragment, String tag, int menuItemId) {
-        try {
-            if (currentFragment != null && currentFragment.getClass().equals(fragment.getClass())) {
-                Log.d(TAG, "Same fragment, skipping: " + tag);
-                return;
-            }
+    private void switchFragment(Fragment fragment, String tag) {
+        if (!tag.equals(currentFragmentTag)) {
+            currentFragmentTag = tag;
+            currentFragment = fragment;
 
             FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.setCustomAnimations(
-                    android.R.anim.fade_in,
-                    android.R.anim.fade_out
-            );
-            // ✅ FIX: Sử dụng container ID có sẵn trong layout
-            transaction.replace(R.id.nav_host_fragment, fragment, tag); // Hoặc R.id.container
+            transaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
+            transaction.replace(R.id.fragment_container, fragment, tag);
             transaction.commit();
 
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-
-            Log.d(TAG, "✅ Fragment loaded: " + tag);
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error loading fragment: " + tag, e);
+            Log.d(TAG, "Switched to fragment: " + tag);
         }
     }
 
-    private void testBackendConnection() {
-        if (ApiClient.isInitialized()) {
-            ApiClient.getApiService().healthCheck()
-                    .enqueue(new retrofit2.Callback<com.example.newtrade.models.StandardResponse<String>>() {
-                        @Override
-                        public void onResponse(retrofit2.Call<com.example.newtrade.models.StandardResponse<String>> call,
-                                               retrofit2.Response<com.example.newtrade.models.StandardResponse<String>> response) {
-                            if (response.isSuccessful()) {
-                                Log.d(TAG, "✅ Backend connection successful!");
-                            } else {
-                                Log.e(TAG, "❌ Backend connection failed: " + response.code());
-                            }
-                        }
+    private void initWebSocketService() {
+        Long currentUserId = prefsManager.getUserId();
+        if (currentUserId != null && currentUserId > 0) {
+            webSocketService = RealtimeWebSocketService.getInstance();
+            webSocketService.connect(currentUserId);
 
-                        @Override
-                        public void onFailure(retrofit2.Call<com.example.newtrade.models.StandardResponse<String>> call, Throwable t) {
-                            Log.e(TAG, "❌ Backend connection error: " + t.getMessage());
-                        }
-                    });
+            Log.d(TAG, "✅ WebSocket service initialized for user: " + currentUserId);
+        } else {
+            Log.w(TAG, "⚠️ No valid user ID found, WebSocket not initialized");
         }
     }
 
@@ -200,21 +191,29 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
-        Long userId = prefsManager.getUserId();
-        if (userId != null && userId > 0) {
-            // ✅ FIX: Sử dụng constructor thay vì getInstance()
-            RealtimeWebSocketService.getInstance().connect(userId, null);
+        // Reconnect WebSocket if needed
+        if (webSocketService != null && !webSocketService.isConnected()) {
+            Long currentUserId = prefsManager.getUserId();
+            if (currentUserId != null && currentUserId > 0) {
+                webSocketService.connect(currentUserId);
+            }
         }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        RealtimeWebSocketService.getInstance().disconnect();
+
+        // Disconnect WebSocket
+        if (webSocketService != null) {
+            webSocketService.disconnect();
+        }
+
+        Log.d(TAG, "MainActivity destroyed");
+    }
+
+    // Public method for fragments to access WebSocket service
+    public RealtimeWebSocketService getWebSocketService() {
+        return webSocketService;
     }
 }
