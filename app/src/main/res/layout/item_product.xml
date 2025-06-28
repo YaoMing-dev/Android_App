@@ -15,8 +15,9 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- ✅ FIX: Đổi ID từ iv_product thành iv_product_image -->
         <ImageView
-            android:id="@+id/iv_product"
+            android:id="@+id/iv_product_image"
             android:layout_width="match_parent"
             android:layout_height="120dp"
             android:scaleType="centerCrop"
@@ -55,26 +56,26 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:drawablePadding="4dp"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp"
-                app:drawableStartCompat="@drawable/ic_location"
-                app:drawableTint="@color/text_secondary"
-                tools:text="New York, NY" />
+                tools:text="District 1, Ho Chi Minh City" />
 
+            <!-- ✅ FIX: Thêm TextView condition nếu cần -->
             <TextView
                 android:id="@+id/tv_condition"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:background="@drawable/bg_chip"
+                android:background="@drawable/rounded_background_secondary"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="2dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="10sp"
-                tools:text="Like New" />
+                android:visibility="gone"
+                tools:text="Like New"
+                tools:visibility="visible" />
 
         </LinearLayout>
 

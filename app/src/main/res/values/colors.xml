@@ -5,6 +5,7 @@
     <color name="primary_dark">#1976D2</color>
     <color name="primary_light">#BBDEFB</color>
     <color name="primary_variant">#1565C0</color>
+    <color name="secondaryColor">#FF4081</color>
 
 
     <!-- Secondary Colors -->
