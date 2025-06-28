@@ -686,11 +686,68 @@ public class RealtimeWebSocketService extends Service {
         Log.d(TAG, "✅ WebSocket disconnected and cleaned up");
     }
 
-    public boolean isConnected() {
-        return isConnected && isStompConnected;
-    }
+
 
     public Long getCurrentUserId() {
         return currentUserId;
+    }
+
+
+    public void sendLocationUpdate(double latitude, double longitude) {
+        if (!isStompConnected) {
+            Log.w(TAG, "Cannot send location: not connected");
+            return;
+        }
+
+        try {
+            Map<String, Object> locationData = new HashMap<>();
+            locationData.put("userId", currentUserId);
+            locationData.put("latitude", latitude);
+            locationData.put("longitude", longitude);
+            locationData.put("timestamp", System.currentTimeMillis());
+            locationData.put("type", "location_update");
+
+            String locationJson = gson.toJson(locationData);
+            sendStompMessage("/app/location/update", locationJson);
+
+            Log.d(TAG, "📍 Location update sent: " + latitude + ", " + longitude);
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to send location update", e);
+        }
+    }
+
+    /**
+     * Request nearby users within radius
+     */
+    public void requestNearbyUsers(double latitude, double longitude, double radiusKm) {
+        if (!isStompConnected) {
+            Log.w(TAG, "Cannot request nearby users: not connected");
+            return;
+        }
+
+        try {
+            Map<String, Object> requestData = new HashMap<>();
+            requestData.put("userId", currentUserId);
+            requestData.put("latitude", latitude);
+            requestData.put("longitude", longitude);
+            requestData.put("radius", radiusKm);
+            requestData.put("type", "nearby_users_request");
+
+            String requestJson = gson.toJson(requestData);
+            sendStompMessage("/app/location/nearby", requestJson);
+
+            Log.d(TAG, "👥 Nearby users requested within " + radiusKm + "km");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to request nearby users", e);
+        }
+    }
+
+    /**
+     * Check if service is connected
+     */
+    public boolean isConnected() {
+        return isConnected && isStompConnected;
     }
 }

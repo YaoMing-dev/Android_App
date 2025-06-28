@@ -168,7 +168,8 @@ public class LoginActivity extends AppCompatActivity {
 
         setLoading(true);
 
-        Map<String, Object> loginRequest = new HashMap<>();
+        // ✅ FIX: Use Map<String, String> instead of Map<String, Object>
+        Map<String, String> loginRequest = new HashMap<>();
         loginRequest.put("email", email);
         loginRequest.put("password", password);
 
@@ -231,7 +232,8 @@ public class LoginActivity extends AppCompatActivity {
 
         setLoading(true);
 
-        Map<String, Object> googleRequest = new HashMap<>();
+        // ✅ FIX: Use Map<String, String> instead of Map<String, Object>
+        Map<String, String> googleRequest = new HashMap<>();
         googleRequest.put("idToken", account.getIdToken());
         googleRequest.put("email", account.getEmail());
         googleRequest.put("displayName", account.getDisplayName());
@@ -297,23 +299,28 @@ public class LoginActivity extends AppCompatActivity {
     // ✅ FIX: Handle login success with proper Map casting
     private void handleLoginSuccess(Map<String, Object> userData) {
         try {
-            // ✅ FIX: Proper casting for nested Map
-            @SuppressWarnings("unchecked")
-            Map<String, Object> user = (Map<String, Object>) userData.get("user");
+            // ✅ FIX: Safe casting with proper type checking
+            Object userObject = userData.get("user");
+            if (userObject instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> user = (Map<String, Object>) userObject;
 
-            if (user != null) {
-                Long userId = Long.valueOf(user.get("id").toString());
-                String email = (String) user.get("email");
-                String name = (String) user.get("displayName");
-                boolean isEmailVerified = Boolean.TRUE.equals(user.get("isEmailVerified"));
+                if (user != null) {
+                    Long userId = Long.valueOf(user.get("id").toString());
+                    String email = (String) user.get("email");
+                    String name = (String) user.get("displayName");
+                    Boolean isEmailVerifiedObj = (Boolean) user.get("isEmailVerified");
+                    boolean isEmailVerified = isEmailVerifiedObj != null ? isEmailVerifiedObj : false;
 
-                // Save user session
-                prefsManager.saveUserSession(userId, email, name, isEmailVerified);
+                    // Save user session
+                    prefsManager.saveUserSession(userId, email, name, isEmailVerified);
 
-                Log.d(TAG, "✅ Login successful for user: " + email);
-                Toast.makeText(this, "Welcome back, " + name + "!", Toast.LENGTH_SHORT).show();
-
-                navigateToMain();
+                    Log.d(TAG, "✅ Login successful for user: " + email);
+                    Toast.makeText(this, "Welcome back, " + name + "!", Toast.LENGTH_SHORT).show();
+                    navigateToMain();
+                }
+            } else {
+                throw new ClassCastException("User data is not a Map");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error processing login response", e);

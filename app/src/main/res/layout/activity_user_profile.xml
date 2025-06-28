@@ -247,6 +247,16 @@
                 android:layout_marginStart="8dp"
                 android:text="View All Listings" />
 
+            <!-- Thêm vào activity_user_profile.xml nếu muốn có button review -->
+            <Button
+                android:id="@+id/btn_view_reviews"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="View Reviews"
+                android:layout_marginEnd="8dp" />
+
         </LinearLayout>
 
         <!-- Recent Listings Section -->
