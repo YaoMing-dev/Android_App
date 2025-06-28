@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/newtrade/ui/home/HomeFragment.java
 package com.example.newtrade.ui.home;
 
 import android.content.Intent;
@@ -31,7 +32,6 @@ import com.example.newtrade.ui.search.CategoryProductsActivity;
 import com.example.newtrade.ui.search.AllProductsActivity;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +77,7 @@ public class HomeFragment extends Fragment {
         setupRecyclerViews();
         setupListeners();
 
-        // ✅ FIX: Only load data if not already loaded
+        // Only load data if not already loaded
         if (!isDataLoaded) {
             loadData();
         }
@@ -158,30 +158,28 @@ public class HomeFragment extends Fragment {
         loadRecentProducts();
     }
 
-    // ✅ FIX: Safe API call with proper error handling
+    // ✅ FIXED: Load categories from backend (no more forced mock)
     private void loadCategories() {
-        // ✅ FIX: Check if ApiClient is initialized
         if (!ApiClient.isInitialized()) {
             Log.w(TAG, "⚠️ ApiClient not initialized, showing mock categories");
             showMockCategories();
             return;
         }
 
-        // ✅ FIX: Check if context is available
         if (getContext() == null || !isAdded()) {
             Log.w(TAG, "⚠️ Fragment not attached, skipping categories load");
             return;
         }
 
+        Log.d(TAG, "🔄 Loading categories from backend...");
+
         try {
-            // ✅ FIX: Use diamond operator <> instead of full type
             ApiClient.getApiService().getCategories()
                     .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
                         @Override
                         public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
                                                @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
 
-                            // ✅ FIX: Check if fragment is still attached
                             if (!isAdded() || getContext() == null) {
                                 Log.w(TAG, "Fragment detached, ignoring categories response");
                                 return;
@@ -193,60 +191,253 @@ public class HomeFragment extends Fragment {
 
                                     if (apiResponse.isSuccess() && apiResponse.getData() != null) {
                                         updateCategories(apiResponse.getData());
-                                        Log.d(TAG, "✅ Categories loaded successfully: " + apiResponse.getData().size());
+                                        Log.d(TAG, "✅ Categories loaded from backend: " + apiResponse.getData().size());
                                     } else {
                                         Log.e(TAG, "Categories API error: " + apiResponse.getMessage());
-                                        showMockCategories(); // Fallback to mock
+                                        showMockCategories(); // Fallback only on API error
                                     }
                                 } else {
                                     Log.e(TAG, "Categories request failed: " + response.code());
-                                    showMockCategories(); // Fallback to mock
+                                    showMockCategories(); // Fallback on HTTP error
                                 }
                             } catch (Exception e) {
                                 Log.e(TAG, "Error processing categories response", e);
-                                showMockCategories(); // Fallback to mock
+                                showMockCategories(); // Fallback on parsing error
                             }
                         }
 
                         @Override
                         public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
-                            // ✅ FIX: Check if fragment is still attached
                             if (!isAdded() || getContext() == null) {
                                 Log.w(TAG, "Fragment detached, ignoring categories failure");
                                 return;
                             }
 
-                            Log.e(TAG, "Categories request failed", t);
-                            showMockCategories(); // Fallback to mock
+                            Log.e(TAG, "❌ Categories API request failed: " + t.getMessage());
+                            showMockCategories(); // Fallback on network error
                         }
                     });
 
         } catch (Exception e) {
             Log.e(TAG, "Error calling categories API", e);
-            showMockCategories(); // Fallback to mock
+            showMockCategories(); // Fallback on unexpected error
         }
     }
 
-    // ✅ FIX: Safe API call for recent products
+    // ✅ FIXED: Load products from backend (not forced mock anymore)
     private void loadRecentProducts() {
-        // ✅ FIX: Check if ApiClient is initialized
         if (!ApiClient.isInitialized()) {
             Log.w(TAG, "⚠️ ApiClient not initialized, showing mock products");
             showMockProducts();
             return;
         }
 
-        // ✅ FIX: Check if context is available
         if (getContext() == null || !isAdded()) {
             Log.w(TAG, "⚠️ Fragment not attached, skipping products load");
             return;
         }
 
-        // ✅ FIX: Show mock products for now (since getRecentProducts might not exist on backend)
-        showMockProducts();
+        Log.d(TAG, "🔄 Loading recent products from backend...");
+
+        try {
+            // ✅ FIXED: Use ProductService to get real products from backend
+            ApiClient.getProductService().getProducts()
+                    .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                               @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+
+                            if (!isAdded() || getContext() == null) {
+                                Log.w(TAG, "Fragment detached, ignoring products response");
+                                return;
+                            }
+
+                            try {
+                                if (response.isSuccessful() && response.body() != null) {
+                                    StandardResponse<Map<String, Object>> apiResponse = response.body();
+
+                                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                                        Map<String, Object> data = apiResponse.getData();
+                                        @SuppressWarnings("unchecked")
+                                        List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
+
+                                        if (productList != null && !productList.isEmpty()) {
+                                            updateProductsFromBackend(productList);
+                                            Log.d(TAG, "✅ Products loaded from backend: " + productList.size());
+                                        } else {
+                                            Log.w(TAG, "⚠️ No products found in backend, showing mock");
+                                            showMockProducts();
+                                        }
+                                    } else {
+                                        Log.e(TAG, "Products API error: " + apiResponse.getMessage());
+                                        showMockProducts(); // Fallback on API error
+                                    }
+                                } else {
+                                    Log.e(TAG, "Products request failed: " + response.code());
+                                    showMockProducts(); // Fallback on HTTP error
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error processing products response", e);
+                                showMockProducts(); // Fallback on parsing error
+                            }
+
+                            // Stop refreshing
+                            if (swipeRefresh != null) {
+                                swipeRefresh.setRefreshing(false);
+                            }
+                            isDataLoaded = true;
+                        }
+
+                        @Override
+                        public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                            if (!isAdded() || getContext() == null) {
+                                Log.w(TAG, "Fragment detached, ignoring products failure");
+                                return;
+                            }
+
+                            Log.e(TAG, "❌ Products API request failed: " + t.getMessage());
+                            showMockProducts(); // Fallback on network error
+
+                            if (swipeRefresh != null) {
+                                swipeRefresh.setRefreshing(false);
+                            }
+                            isDataLoaded = true;
+                        }
+                    });
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error calling products API", e);
+            showMockProducts(); // Fallback on unexpected error
+            if (swipeRefresh != null) {
+                swipeRefresh.setRefreshing(false);
+            }
+            isDataLoaded = true;
+        }
     }
 
-    // ✅ FIX: Mock categories as fallback
+    // ✅ NEW: Update products from backend data
+    private void updateProductsFromBackend(List<Map<String, Object>> productMaps) {
+        try {
+            products.clear();
+
+            if (productMaps != null && !productMaps.isEmpty()) {
+                for (Map<String, Object> productMap : productMaps) {
+                    try {
+                        Product product = parseProductFromBackendMap(productMap);
+                        products.add(product);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Error parsing product: " + productMap, e);
+                    }
+                }
+            }
+
+            if (productAdapter != null) {
+                productAdapter.notifyDataSetChanged();
+            }
+
+            if (products.isEmpty()) {
+                showEmptyState();
+            } else {
+                showProductsState();
+            }
+
+            Log.d(TAG, "✅ Products updated from backend: " + products.size());
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating products from backend", e);
+            showMockProducts();
+        }
+    }
+
+    // ✅ NEW: Parse product from backend response
+    private Product parseProductFromBackendMap(Map<String, Object> productMap) {
+        Product product = new Product();
+
+        // Parse ID
+        if (productMap.get("id") instanceof Number) {
+            product.setId(((Number) productMap.get("id")).longValue());
+        }
+
+        // Parse basic fields
+        product.setTitle((String) productMap.get("title"));
+        product.setDescription((String) productMap.get("description"));
+        product.setLocation((String) productMap.get("location"));
+        product.setCondition((String) productMap.get("condition"));
+        product.setStatus((String) productMap.get("status"));
+        product.setCreatedAt((String) productMap.get("createdAt"));
+
+        // Parse images
+        String primaryImageUrl = (String) productMap.get("primaryImageUrl");
+        if (primaryImageUrl != null && !primaryImageUrl.isEmpty()) {
+            // Convert relative URL to full URL using Constants
+            product.setImageUrl(primaryImageUrl);
+            product.setPrimaryImageUrl(primaryImageUrl);
+        } else {
+            product.setImageUrl("https://via.placeholder.com/300x300");
+            product.setPrimaryImageUrl("https://via.placeholder.com/300x300");
+        }
+
+        // Parse price (handle BigDecimal from backend)
+        Object priceObj = productMap.get("price");
+        if (priceObj instanceof Number) {
+            product.setPrice(((Number) priceObj).doubleValue());
+        } else {
+            product.setPrice(0.0);
+        }
+
+        // Parse view count
+        Object viewCountObj = productMap.get("viewCount");
+        if (viewCountObj instanceof Number) {
+            product.setViewCount(((Number) viewCountObj).intValue());
+        } else {
+            product.setViewCount(0);
+        }
+
+        return product;
+    }
+
+    // ✅ FIXED: Update categories from backend
+    private void updateCategories(List<Map<String, Object>> categoryMaps) {
+        try {
+            categories.clear();
+
+            if (categoryMaps != null && !categoryMaps.isEmpty()) {
+                for (Map<String, Object> categoryMap : categoryMaps) {
+                    try {
+                        Category category = new Category();
+
+                        if (categoryMap.get("id") instanceof Number) {
+                            category.setId(((Number) categoryMap.get("id")).longValue());
+                        }
+
+                        category.setName((String) categoryMap.get("name"));
+                        category.setDescription((String) categoryMap.get("description"));
+                        category.setIconUrl((String) categoryMap.get("iconUrl"));
+
+                        categories.add(category);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Error parsing category: " + categoryMap, e);
+                    }
+                }
+            } else {
+                // Show mock categories if API returns empty
+                showMockCategories();
+                return;
+            }
+
+            if (categoryAdapter != null) {
+                categoryAdapter.notifyDataSetChanged();
+            }
+
+            Log.d(TAG, "✅ Categories updated from backend: " + categories.size());
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating categories from backend", e);
+            showMockCategories();
+        }
+    }
+
+    // ✅ FALLBACK: Mock categories (only used when backend fails)
     private void showMockCategories() {
         try {
             categories.clear();
@@ -273,7 +464,7 @@ public class HomeFragment extends Fragment {
         }
     }
 
-    // ✅ FIX: Mock products as fallback
+    // ✅ FALLBACK: Mock products (only used when backend fails)
     private void showMockProducts() {
         try {
             products.clear();
@@ -285,7 +476,6 @@ public class HomeFragment extends Fragment {
                 product.setTitle("Sample Product " + i);
                 product.setDescription("This is a sample product description for item " + i);
 
-                // ✅ FIX: Use Double instead of BigDecimal for setPrice
                 double price = 100000.0 + (i * 50000.0);
                 product.setPrice(price);
 
@@ -315,46 +505,6 @@ public class HomeFragment extends Fragment {
             if (swipeRefresh != null) {
                 swipeRefresh.setRefreshing(false);
             }
-        }
-    }
-
-    private void updateCategories(List<Map<String, Object>> categoryMaps) {
-        try {
-            categories.clear();
-
-            if (categoryMaps != null && !categoryMaps.isEmpty()) {
-                for (Map<String, Object> categoryMap : categoryMaps) {
-                    try {
-                        Category category = new Category();
-
-                        if (categoryMap.get("id") instanceof Number) {
-                            category.setId(((Number) categoryMap.get("id")).longValue());
-                        }
-
-                        category.setName((String) categoryMap.get("name"));
-                        category.setDescription((String) categoryMap.get("description"));
-                        category.setIconUrl((String) categoryMap.get("iconUrl"));
-
-                        categories.add(category);
-                    } catch (Exception e) {
-                        Log.w(TAG, "Error parsing category: " + categoryMap, e);
-                    }
-                }
-            } else {
-                // ✅ FIX: Show mock categories if API returns empty
-                showMockCategories();
-                return;
-            }
-
-            if (categoryAdapter != null) {
-                categoryAdapter.notifyDataSetChanged();
-            }
-
-            Log.d(TAG, "✅ Categories updated: " + categories.size());
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating categories", e);
-            showMockCategories();
         }
     }
 
@@ -392,7 +542,7 @@ public class HomeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // ✅ FIX: Don't reload data every time, only refresh if needed
+        // Don't reload data every time, only refresh if needed
         if (!isDataLoaded) {
             loadData();
         }
@@ -401,7 +551,7 @@ public class HomeFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        // ✅ FIX: Clear references to prevent memory leaks
+        // Clear references to prevent memory leaks
         categoryAdapter = null;
         productAdapter = null;
     }

@@ -26,6 +26,7 @@ import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.auth.LoginActivity;
+import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
@@ -53,7 +54,7 @@ public class ProfileFragment extends Fragment {
     private SharedPrefsManager prefsManager;
     private Map<String, Object> userProfile;
 
-    // ✅ FIX: Modern Activity Result API
+    // ✅ FIX: Modern Activity Result API for Edit Profile
     private ActivityResultLauncher<Intent> editProfileLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -103,16 +104,16 @@ public class ProfileFragment extends Fragment {
         llAbout = view.findViewById(R.id.ll_about);
         llLogout = view.findViewById(R.id.ll_logout);
 
-        // FAB
+        // ✅ FIX: FAB for Edit Profile (NOT Add Product)
         fabEditProfile = view.findViewById(R.id.fab_edit_profile);
     }
 
-    private void initData() {
-        prefsManager = SharedPrefsManager.getInstance(requireContext());
+   private void initData() {
+        prefsManager = new SharedPrefsManager(requireContext()); // ✅ FIX: Sử dụng constructor
     }
 
     private void setupListeners() {
-        // ✅ FIX: Edit Profile FAB with proper error handling
+        // ✅ FIX: FAB CHỈ DÀNH CHO EDIT PROFILE, KHÔNG PHẢI ĐĂNG BÀI
         if (fabEditProfile != null) {
             fabEditProfile.setOnClickListener(v -> {
                 try {
@@ -220,21 +221,26 @@ public class ProfileFragment extends Fragment {
             tvMemberSince.setText("Member since 2024");
         }
 
-        // Set profile picture
+        // ✅ FIX: Use Constants.getFullImageUrl() instead of duplicate method
         if (ivProfilePicture != null) {
             if (profilePicture != null && !profilePicture.isEmpty()) {
+                String fullImageUrl = Constants.getFullImageUrl(profilePicture);
+
                 Glide.with(this)
-                        .load(profilePicture)
+                        .load(fullImageUrl)
                         .placeholder(R.drawable.ic_person)
                         .error(R.drawable.ic_person)
+                        .circleCrop()
                         .into(ivProfilePicture);
+
+                Log.d(TAG, "Loading profile picture: " + fullImageUrl);
             } else {
                 ivProfilePicture.setImageResource(R.drawable.ic_person);
             }
         }
 
         // Set mock stats for now
-        updateStatsUI(5, 3, 2); // 5 listings, 3 sold, 2 bought
+        updateStatsUI(5, 3, 2);
 
         Log.d(TAG, "✅ Profile loaded from SharedPrefs");
     }
@@ -246,80 +252,73 @@ public class ProfileFragment extends Fragment {
             return;
         }
 
-        Log.d(TAG, "📋 Loading profile from API for user: " + userId);
+        if (!ApiClient.isInitialized()) {
+            Log.w(TAG, "ApiClient not initialized, skipping API call");
+            return;
+        }
 
-        // TODO: Implement when API is ready
-        // For now, just populate with mock data
-        populateMockProfile();
-
-        /*
-        ApiClient.getUserService().getCurrentUserProfile()
-                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                         Response<StandardResponse<Map<String, Object>>> response) {
-
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            Map<String, Object> profile = response.body().getData();
-                            populateProfile(profile);
-                            Log.d(TAG, "✅ Profile loaded from API");
-                        } else {
-                            Log.w(TAG, "⚠️ Failed to load profile from API");
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        Log.e(TAG, "❌ Failed to load profile", t);
-                    }
-                });
-        */
+        // TODO: Implement when UserService.getCurrentUserProfile() is ready
+        Log.d(TAG, "API profile loading not implemented yet");
     }
 
-    private void populateMockProfile() {
-        // Mock data for testing
-        updateStatsUI(8, 5, 3); // 8 listings, 5 sold, 3 bought
+    // ✅ HELPER: Convert relative URL to full URL
+    private String getFullImageUrl(String relativePath) {
+        if (relativePath == null || relativePath.isEmpty()) {
+            return "";
+        }
+
+        if (relativePath.startsWith("http://") || relativePath.startsWith("https://")) {
+            return relativePath; // Already full URL
+        }
+
+        // Convert relative path to full URL
+        if (relativePath.startsWith("/")) {
+            return Constants.BASE_URL.substring(0, Constants.BASE_URL.length() - 1) + relativePath;
+        } else {
+            return Constants.BASE_URL + relativePath;
+        }
     }
 
     private void updateStatsUI(int listings, int sold, int bought) {
-        if (tvListingsCount != null) tvListingsCount.setText(String.valueOf(listings));
-        if (tvSoldCount != null) tvSoldCount.setText(String.valueOf(sold));
-        if (tvBoughtCount != null) tvBoughtCount.setText(String.valueOf(bought));
+        if (tvListingsCount != null) {
+            tvListingsCount.setText(String.valueOf(listings));
+        }
+        if (tvSoldCount != null) {
+            tvSoldCount.setText(String.valueOf(sold));
+        }
+        if (tvBoughtCount != null) {
+            tvBoughtCount.setText(String.valueOf(bought));
+        }
     }
 
     private void showLogoutDialog() {
         new AlertDialog.Builder(requireContext())
-                .setTitle("Logout")
-                .setMessage("Are you sure you want to logout?")
-                .setPositiveButton("Logout", (dialog, which) -> {
-                    performLogout();
+                .setTitle("Sign Out")
+                .setMessage("Are you sure you want to sign out?")
+                .setPositiveButton("Sign Out", (dialog, which) -> {
+                    // ✅ FIX: Sửa clearUserData() method
+                    prefsManager.setLoggedIn(false);
+                    prefsManager.setUserId(null);
+                    prefsManager.setUserEmail("");
+                    prefsManager.setUserName("");
+                    prefsManager.setUserProfilePicture("");
+
+                    // Navigate to login
+                    Intent intent = new Intent(requireContext(), LoginActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(intent);
+
+                    requireActivity().finish();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void performLogout() {
-        Log.d(TAG, "🚪 Performing logout...");
-
-        // Clear user data
-        prefsManager.clearUserSession();
-
-        // Navigate to login
-        Intent intent = new Intent(requireContext(), LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-
-        if (getActivity() != null) {
-            getActivity().finish();
-        }
-
-        Log.d(TAG, "✅ Logout completed");
-    }
 
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh profile when fragment becomes visible
+        // Refresh profile when returning from edit
         loadProfileFromPrefs();
     }
 }

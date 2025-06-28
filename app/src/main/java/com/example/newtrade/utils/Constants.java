@@ -56,24 +56,29 @@ public class Constants {
     public static final String ERROR_SERVER = "Lỗi server, vui lòng thử lại sau";
     public static final String ERROR_UNKNOWN = "Đã có lỗi xảy ra";
 
-    // ===== HELPER METHODS - ✅ ADD: getImageUrl method =====
-
+    // ✅ FIX: CENTRALIZED IMAGE URL HELPER METHOD
     /**
-     * ✅ FIX: getImageUrl method (used in EditProfileActivity)
+     * Convert relative image path to full URL
+     * @param relativePath - relative path from backend or full URL
+     * @return full image URL or placeholder if empty
      */
-    public static String getImageUrl(String relativePath) {
+    public static String getFullImageUrl(String relativePath) {
         if (relativePath == null || relativePath.isEmpty()) {
-            return "";
+            return "https://via.placeholder.com/300x300?text=No+Image";
         }
 
+        // If already a full URL, return as is
         if (relativePath.startsWith("http://") || relativePath.startsWith("https://")) {
-            return relativePath; // Already full URL
+            return relativePath;
         }
 
         // Convert relative path to full URL
         if (relativePath.startsWith("/")) {
-            return BASE_URL.substring(0, BASE_URL.length() - 1) + relativePath;
+            // Remove trailing slash from BASE_URL and add relative path
+            String baseUrl = BASE_URL.endsWith("/") ? BASE_URL.substring(0, BASE_URL.length() - 1) : BASE_URL;
+            return baseUrl + relativePath;
         } else {
+            // Add relative path to BASE_URL
             return BASE_URL + relativePath;
         }
     }

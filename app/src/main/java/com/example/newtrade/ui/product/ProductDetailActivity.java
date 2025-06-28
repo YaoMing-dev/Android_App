@@ -16,7 +16,7 @@ import android.widget.Toast;
 import com.example.newtrade.ui.profile.UserProfileActivity;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
+import com.example.newtrade.utils.Constants;
 import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
@@ -162,6 +162,23 @@ public class ProductDetailActivity extends AppCompatActivity {
             tvLocation.setText((String) productData.get("location"));
             tvCondition.setText((String) productData.get("condition"));
 
+            // ✅ FIX: Load real product image thay vì placeholder
+            String imageUrl = (String) productData.get("primaryImageUrl");
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                String fullImageUrl = getFullImageUrl(imageUrl);
+
+                Glide.with(this)
+                        .load(fullImageUrl)
+                        .placeholder(R.drawable.placeholder_product)
+                        .error(R.drawable.placeholder_product)
+                        .centerCrop()
+                        .into(ivProductImage);
+
+                Log.d(TAG, "Loading product image: " + fullImageUrl);
+            } else {
+                ivProductImage.setImageResource(R.drawable.placeholder_product);
+            }
+
             // Seller info
             @SuppressWarnings("unchecked")
             Map<String, Object> seller = (Map<String, Object>) productData.get("seller");
@@ -170,6 +187,23 @@ public class ProductDetailActivity extends AppCompatActivity {
                 tvSellerRating.setText("★ " + seller.get("rating"));
                 tvMemberSince.setText("Member since 2023");
             }
+        }
+    }
+
+    private String getFullImageUrl(String relativePath) {
+        if (relativePath == null || relativePath.isEmpty()) {
+            return "";
+        }
+
+        if (relativePath.startsWith("http://") || relativePath.startsWith("https://")) {
+            return relativePath; // Already full URL
+        }
+
+        // Convert relative path to full URL
+        if (relativePath.startsWith("/")) {
+            return Constants.BASE_URL.substring(0, Constants.BASE_URL.length() - 1) + relativePath;
+        } else {
+            return Constants.BASE_URL + relativePath;
         }
     }
 

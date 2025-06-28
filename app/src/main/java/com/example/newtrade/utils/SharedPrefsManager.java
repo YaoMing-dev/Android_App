@@ -5,131 +5,139 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 public class SharedPrefsManager {
-    private static SharedPrefsManager instance;
-    private SharedPreferences prefs;
 
-    private SharedPrefsManager(Context context) {
-        prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
+    private static final String PREF_NAME = "TradeUpPrefs";
+    private SharedPreferences sharedPreferences;
+    private SharedPreferences.Editor editor;
+
+    // Constructor
+    public SharedPrefsManager(Context context) {
+        sharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        editor = sharedPreferences.edit();
     }
 
-    public static synchronized SharedPrefsManager getInstance(Context context) {
-        if (instance == null) {
-            instance = new SharedPrefsManager(context.getApplicationContext());
+    // Static getInstance method
+    public static SharedPrefsManager getInstance(Context context) {
+        return new SharedPrefsManager(context);
+    }
+
+    // ✅ FIX: User ID methods
+    public void setUserId(Long userId) {
+        if (userId != null) {
+            editor.putLong(Constants.PREF_USER_ID, userId);
+        } else {
+            editor.remove(Constants.PREF_USER_ID);
         }
-        return instance;
-    }
-
-    // ===== USER DATA =====
-
-    public void setUserData(Long userId, String email, String name) {
-        prefs.edit()
-                .putLong(Constants.PREF_USER_ID, userId)
-                .putString(Constants.PREF_USER_EMAIL, email)
-                .putString(Constants.PREF_USER_NAME, name)
-                .putBoolean(Constants.PREF_IS_LOGGED_IN, true)
-                .apply();
-    }
-
-    public void saveUserSession(Long userId, String email, String name, boolean isEmailVerified) {
-        prefs.edit()
-                .putLong(Constants.PREF_USER_ID, userId)
-                .putString(Constants.PREF_USER_EMAIL, email)
-                .putString(Constants.PREF_USER_NAME, name)
-                .putBoolean(Constants.PREF_IS_LOGGED_IN, true)
-                .putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, isEmailVerified)
-                .apply();
+        editor.apply();
     }
 
     public Long getUserId() {
-        long id = prefs.getLong(Constants.PREF_USER_ID, -1L);
-        return id == -1L ? null : id;
+        long id = sharedPreferences.getLong(Constants.PREF_USER_ID, -1);
+        return id != -1 ? id : null;
     }
 
-    public String getUserEmail() {
-        return prefs.getString(Constants.PREF_USER_EMAIL, "");
+    // ✅ FIX: User name methods
+    public void setUserName(String userName) {
+        editor.putString(Constants.PREF_USER_NAME, userName);
+        editor.apply();
     }
 
     public String getUserName() {
-        return prefs.getString(Constants.PREF_USER_NAME, "");
+        return sharedPreferences.getString(Constants.PREF_USER_NAME, "");
     }
 
-    // ✅ FIX: Add missing methods for EditProfileActivity
-    public void saveUserName(String name) {
-        prefs.edit()
-                .putString(Constants.PREF_USER_NAME, name)
-                .apply();
+    // ✅ FIX: saveUserName method for EditProfileActivity
+    public void saveUserName(String userName) {
+        setUserName(userName);
     }
 
+    // ✅ FIX: User email methods
+    public void setUserEmail(String email) {
+        editor.putString(Constants.PREF_USER_EMAIL, email);
+        editor.apply();
+    }
+
+    public String getUserEmail() {
+        return sharedPreferences.getString(Constants.PREF_USER_EMAIL, "");
+    }
+
+    // ✅ FIX: saveUserEmail method for EditProfileActivity
     public void saveUserEmail(String email) {
-        prefs.edit()
-                .putString(Constants.PREF_USER_EMAIL, email)
-                .apply();
+        setUserEmail(email);
     }
 
-    public void saveUserProfilePicture(String profilePictureUrl) {
-        prefs.edit()
-                .putString(Constants.PREF_USER_PROFILE_PICTURE, profilePictureUrl)
-                .apply();
-    }
-
-    // ===== PROFILE PICTURE SUPPORT =====
-    public void setUserProfilePicture(String profilePictureUrl) {
-        prefs.edit()
-                .putString(Constants.PREF_USER_PROFILE_PICTURE, profilePictureUrl)
-                .apply();
+    // ✅ FIX: Profile picture methods
+    public void setUserProfilePicture(String profilePicture) {
+        editor.putString(Constants.PREF_USER_PROFILE_PICTURE, profilePicture);
+        editor.apply();
     }
 
     public String getUserProfilePicture() {
-        return prefs.getString(Constants.PREF_USER_PROFILE_PICTURE, "");
+        return sharedPreferences.getString(Constants.PREF_USER_PROFILE_PICTURE, "");
     }
 
-    // ===== LOGIN STATE =====
+    // ✅ FIX: saveUserProfilePicture method for EditProfileActivity
+    public void saveUserProfilePicture(String profilePicture) {
+        setUserProfilePicture(profilePicture);
+    }
+
+    // ✅ FIX: Login status methods
+    public void setLoggedIn(boolean isLoggedIn) {
+        editor.putBoolean(Constants.PREF_IS_LOGGED_IN, isLoggedIn);
+        editor.apply();
+    }
 
     public boolean isLoggedIn() {
-        return prefs.getBoolean(Constants.PREF_IS_LOGGED_IN, false);
+        return sharedPreferences.getBoolean(Constants.PREF_IS_LOGGED_IN, false);
     }
 
-    public void setLoggedIn(boolean loggedIn) {
-        prefs.edit()
-                .putBoolean(Constants.PREF_IS_LOGGED_IN, loggedIn)
-                .apply();
-    }
-
-    // ===== EMAIL VERIFICATION =====
-
-    public void setEmailVerified(boolean verified) {
-        prefs.edit()
-                .putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, verified)
-                .apply();
-    }
-
-    public boolean isEmailVerified() {
-        return prefs.getBoolean(Constants.PREF_IS_EMAIL_VERIFIED, false);
-    }
-
-    // ===== FCM TOKEN =====
-
+    // ✅ FIX: FCM Token methods
     public void setFcmToken(String token) {
-        prefs.edit()
-                .putString(Constants.PREF_FCM_TOKEN, token)
-                .apply();
+        editor.putString(Constants.PREF_FCM_TOKEN, token);
+        editor.apply();
     }
 
     public String getFcmToken() {
-        return prefs.getString(Constants.PREF_FCM_TOKEN, "");
+        return sharedPreferences.getString(Constants.PREF_FCM_TOKEN, "");
     }
 
+    // ✅ FIX: saveFcmToken method for FirebaseMessagingService
     public void saveFcmToken(String token) {
         setFcmToken(token);
     }
 
-    // ===== LOGOUT =====
-
-    public void logout() {
-        prefs.edit().clear().apply();
+    // ✅ FIX: Email verification status
+    public void setEmailVerified(boolean isVerified) {
+        editor.putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, isVerified);
+        editor.apply();
     }
 
+    public boolean isEmailVerified() {
+        return sharedPreferences.getBoolean(Constants.PREF_IS_EMAIL_VERIFIED, false);
+    }
+
+    // ✅ FIX: saveUserSession method for LoginActivity and OtpVerificationActivity
+    public void saveUserSession(Long userId, String email, String name, boolean isEmailVerified) {
+        setUserId(userId);
+        setUserEmail(email);
+        setUserName(name);
+        setEmailVerified(isEmailVerified);
+        setLoggedIn(true);
+    }
+
+    // ✅ FIX: clearUserSession method for SettingsActivity
     public void clearUserSession() {
-        logout();
+        setLoggedIn(false);
+        setUserId(null);
+        setUserEmail("");
+        setUserName("");
+        setUserProfilePicture("");
+        setFcmToken("");
+        setEmailVerified(false);
+    }
+
+    // ✅ FIX: clearUserData method for ProfileFragment
+    public void clearUserData() {
+        clearUserSession();
     }
 }

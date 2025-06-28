@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/newtrade/MainActivity.java
 package com.example.newtrade;
 
 import android.content.Intent;
@@ -48,179 +49,144 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // ✅ FIX 1: Initialize ApiClient FIRST THING
-        Log.d(TAG, "🔄 Initializing ApiClient...");
-        try {
-            ApiClient.init(this);
-            Log.d(TAG, "✅ ApiClient initialized successfully");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to initialize ApiClient", e);
-            // Continue anyway, fragments will handle this gracefully
-        }
-
-        // ✅ FIX 2: Initialize SharedPrefsManager
-        prefsManager = SharedPrefsManager.getInstance(this);
-
-        // ✅ FIX 3: Check authentication and redirect if needed
-        if (!prefsManager.isLoggedIn()) {
-            Log.d(TAG, "User not logged in, redirecting to LoginActivity");
-            Intent intent = new Intent(this, com.example.newtrade.ui.auth.LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
-            return;
-        }
-
-        // ✅ FIX 4: Setup window for camera cutout
-        setupWindowForCameraCutout();
+        // Initialize ApiClient FIRST
+        ApiClient.init(this);
 
         setContentView(R.layout.activity_main);
 
+        // Hide action bar
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
+
         // Initialize components
         initViews();
+        initData();
+        setupWindowInsets();
         setupBottomNavigation();
-        setupFloatingActionButton();
+        setupListeners();
 
-        // Restore fragment state or load default
-        if (savedInstanceState != null) {
+        // Load initial fragment
+        if (savedInstanceState == null) {
+            loadFragment(new HomeFragment(), "home", R.id.nav_home);
+        } else {
             currentFragmentTag = savedInstanceState.getString(CURRENT_FRAGMENT_TAG, "home");
         }
 
-        // Load default fragment
-        switchToFragment(currentFragmentTag);
+        // Test backend connection
+        testBackendConnection();
 
-        // Start WebSocket service for real-time features
-        startWebSocketService();
-
-        Log.d(TAG, "✅ MainActivity created successfully for user: " + prefsManager.getUserEmail());
-    }
-
-    private void setupWindowForCameraCutout() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                getWindow().getAttributes().layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-            }
-
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
-            getWindow().setNavigationBarColor(Color.TRANSPARENT);
-
-            ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content),
-                    (v, insets) -> {
-                        return insets;
-                    });
-
-            Log.d(TAG, "✅ Window setup completed");
-        } catch (Exception e) {
-            Log.w(TAG, "⚠️ Window setup failed: " + e.getMessage());
-        }
+        Log.d(TAG, "✅ MainActivity created successfully");
     }
 
     private void initViews() {
         bottomNavigation = findViewById(R.id.bottom_navigation);
         fabQuickAdd = findViewById(R.id.fab_quick_add);
-        fragmentManager = getSupportFragmentManager();
+    }
 
-        // Check if views are found
-        if (bottomNavigation == null) {
-            Log.e(TAG, "❌ BottomNavigation not found in layout");
-            return;
+    private void initData() {
+        fragmentManager = getSupportFragmentManager();
+        prefsManager = new SharedPrefsManager(this);
+    }
+
+    private void setupWindowInsets() {
+        View rootView = findViewById(android.R.id.content);
+
+        if (rootView != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
+                androidx.core.graphics.Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+                return insets;
+            });
         }
 
-        Log.d(TAG, "✅ Views initialized successfully");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setFlags(
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            );
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+        }
     }
 
     private void setupBottomNavigation() {
-        if (bottomNavigation == null) return;
-
         bottomNavigation.setOnItemSelectedListener(item -> {
-            String tag = getFragmentTagFromMenuItem(item.getItemId());
-            if (tag != null && !tag.equals(currentFragmentTag)) {
-                switchToFragment(tag);
+            int itemId = item.getItemId();
+
+            if (itemId == R.id.nav_home) {
+                loadFragment(new HomeFragment(), "home", R.id.nav_home);
+                return true;
+            } else if (itemId == R.id.nav_search) {
+                loadFragment(new SearchFragment(), "search", R.id.nav_search);
+                return true;
+            } else if (itemId == R.id.nav_sell) {
+                loadFragment(new AddProductFragment(), "sell", R.id.nav_sell);
+                return true;
+            } else if (itemId == R.id.nav_messages) {
+                loadFragment(new MessagesFragment(), "messages", R.id.nav_messages);
+                return true;
+            } else if (itemId == R.id.nav_profile) {
+                loadFragment(new ProfileFragment(), "profile", R.id.nav_profile);
                 return true;
             }
+
             return false;
         });
-
-        Log.d(TAG, "✅ Bottom navigation setup completed");
     }
 
-    private void setupFloatingActionButton() {
+    private void setupListeners() {
         if (fabQuickAdd != null) {
             fabQuickAdd.setOnClickListener(v -> {
-                // Quick add product action
-                switchToFragment("add_product");
                 bottomNavigation.setSelectedItemId(R.id.nav_sell);
             });
         }
     }
 
-    private String getFragmentTagFromMenuItem(int itemId) {
-        if (itemId == R.id.nav_home) return "home";
-        else if (itemId == R.id.nav_search) return "search";
-        else if (itemId == R.id.nav_sell) return "add_product";
-        else if (itemId == R.id.nav_messages) return "messages";
-        else if (itemId == R.id.nav_profile) return "profile";
-        return null;
-    }
-
-    private void switchToFragment(String tag) {
+    private void loadFragment(Fragment fragment, String tag, int menuItemId) {
         try {
-            Fragment newFragment = getFragmentByTag(tag);
-            if (newFragment == null) {
-                Log.e(TAG, "❌ Failed to create fragment for tag: " + tag);
+            if (currentFragment != null && currentFragment.getClass().equals(fragment.getClass())) {
+                Log.d(TAG, "Same fragment, skipping: " + tag);
                 return;
             }
 
             FragmentTransaction transaction = fragmentManager.beginTransaction();
-
-            if (currentFragment != null) {
-                transaction.hide(currentFragment);
-            }
-
-            Fragment existingFragment = fragmentManager.findFragmentByTag(tag);
-            if (existingFragment != null) {
-                transaction.show(existingFragment);
-                currentFragment = existingFragment;
-            } else {
-                transaction.add(R.id.nav_host_fragment, newFragment, tag);
-                currentFragment = newFragment;
-            }
-
+            transaction.setCustomAnimations(
+                    android.R.anim.fade_in,
+                    android.R.anim.fade_out
+            );
+            // ✅ FIX: Sử dụng container ID có sẵn trong layout
+            transaction.replace(R.id.nav_host_fragment, fragment, tag); // Hoặc R.id.container
             transaction.commit();
+
+            currentFragment = fragment;
             currentFragmentTag = tag;
 
-            Log.d(TAG, "✅ Switched to fragment: " + tag);
+            Log.d(TAG, "✅ Fragment loaded: " + tag);
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error switching fragment: " + tag, e);
+            Log.e(TAG, "❌ Error loading fragment: " + tag, e);
         }
     }
 
-    private Fragment getFragmentByTag(String tag) {
-        switch (tag) {
-            case "home":
-                return new HomeFragment();
-            case "search":
-                return new SearchFragment();
-            case "add_product":
-                return new AddProductFragment();
-            case "messages":
-                return new MessagesFragment();
-            case "profile":
-                return new ProfileFragment();
-            default:
-                return new HomeFragment();
-        }
-    }
+    private void testBackendConnection() {
+        if (ApiClient.isInitialized()) {
+            ApiClient.getApiService().healthCheck()
+                    .enqueue(new retrofit2.Callback<com.example.newtrade.models.StandardResponse<String>>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<com.example.newtrade.models.StandardResponse<String>> call,
+                                               retrofit2.Response<com.example.newtrade.models.StandardResponse<String>> response) {
+                            if (response.isSuccessful()) {
+                                Log.d(TAG, "✅ Backend connection successful!");
+                            } else {
+                                Log.e(TAG, "❌ Backend connection failed: " + response.code());
+                            }
+                        }
 
-    private void startWebSocketService() {
-        try {
-            Intent serviceIntent = new Intent(this, RealtimeWebSocketService.class);
-            startService(serviceIntent);
-            Log.d(TAG, "✅ WebSocket service started");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to start WebSocket service", e);
+                        @Override
+                        public void onFailure(retrofit2.Call<com.example.newtrade.models.StandardResponse<String>> call, Throwable t) {
+                            Log.e(TAG, "❌ Backend connection error: " + t.getMessage());
+                        }
+                    });
         }
     }
 
@@ -234,31 +200,21 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
-        // ✅ FIX: Re-check authentication on resume
-        if (!prefsManager.isLoggedIn()) {
-            Log.d(TAG, "User logged out, redirecting to LoginActivity");
-            Intent intent = new Intent(this, com.example.newtrade.ui.auth.LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
+        Long userId = prefsManager.getUserId();
+        if (userId != null && userId > 0) {
+            // ✅ FIX: Sử dụng constructor thay vì getInstance()
+            RealtimeWebSocketService.getInstance().connect(userId, null);
         }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        Log.d(TAG, "🧹 MainActivity destroyed");
-    }
-
-    @Override
-    public void onBackPressed() {
-        // ✅ FIX: Handle back button properly
-        if (currentFragmentTag.equals("home")) {
-            super.onBackPressed(); // Exit app
-        } else {
-            // Navigate to home
-            switchToFragment("home");
-            bottomNavigation.setSelectedItemId(R.id.nav_home);
-        }
+        RealtimeWebSocketService.getInstance().disconnect();
     }
 }

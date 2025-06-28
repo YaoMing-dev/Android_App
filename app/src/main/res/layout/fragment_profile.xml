@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_light">
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -27,52 +27,42 @@
                 <!-- Profile Picture -->
                 <de.hdodenhof.circleimageview.CircleImageView
                     android:id="@+id/iv_profile_picture"
-                    android:layout_width="80dp"
-                    android:layout_height="80dp"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
                     android:src="@drawable/ic_person"
                     app:civ_border_color="@color/primary_color"
                     app:civ_border_width="2dp" />
 
-                <!-- User Info -->
+                <!-- Name -->
                 <TextView
                     android:id="@+id/tv_display_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="Lý Mi"
+                    android:text="User Name"
                     android:textColor="@color/text_primary"
                     android:textSize="20sp"
                     android:textStyle="bold" />
 
+                <!-- Email -->
                 <TextView
                     android:id="@+id/tv_email"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="miyamoth129@gmail.com"
+                    android:text="user@example.com"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp" />
 
+                <!-- Member Since -->
                 <TextView
                     android:id="@+id/tv_member_since"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Member since 2023"
+                    android:text="Member since 2024"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
-
-                <!-- Menu Icon -->
-                <ImageView
-                    android:id="@+id/iv_profile_menu"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="end"
-                    android:layout_marginTop="-60dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="4dp"
-                    android:src="@drawable/ic_more_vert"
-                    app:tint="@color/text_secondary" />
 
             </LinearLayout>
 
@@ -83,7 +73,7 @@
                 android:layout_marginTop="8dp"
                 android:background="@color/white"
                 android:orientation="horizontal"
-                android:paddingVertical="20dp">
+                android:paddingVertical="16dp">
 
                 <!-- Listings -->
                 <LinearLayout
@@ -187,7 +177,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_list"
-                        app:tint="@color/text_secondary" />
+                        app:tint="@color/text_primary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -219,8 +209,8 @@
                     <ImageView
                         android:layout_width="24dp"
                         android:layout_height="24dp"
-                        android:src="@drawable/ic_favorite_border"
-                        app:tint="@color/text_secondary" />
+                        android:src="@drawable/ic_favorite"
+                        app:tint="@color/text_primary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -253,7 +243,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_shopping_cart"
-                        app:tint="@color/text_secondary" />
+                        app:tint="@color/text_primary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -286,7 +276,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_star"
-                        app:tint="@color/text_secondary" />
+                        app:tint="@color/text_primary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -319,7 +309,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_settings"
-                        app:tint="@color/text_secondary" />
+                        app:tint="@color/text_primary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -352,7 +342,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_help"
-                        app:tint="@color/text_secondary" />
+                        app:tint="@color/text_primary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -385,7 +375,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_info"
-                        app:tint="@color/text_secondary" />
+                        app:tint="@color/text_primary" />
 
                     <TextView
                         android:layout_width="0dp"
@@ -442,7 +432,7 @@
 
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Edit Profile FAB -->
+    <!-- ✅ FIX: FAB CHỈ DÀNH CHO EDIT PROFILE -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_edit_profile"
         android:layout_width="wrap_content"
@@ -450,6 +440,8 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
         android:src="@drawable/ic_edit"
-        app:tint="@color/white" />
+        android:contentDescription="Edit Profile"
+        app:tint="@color/white"
+        app:backgroundTint="@color/primary_color" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
