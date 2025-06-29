@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tv_offer_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Offer Message"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/tv_counter_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Counter Amount"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/tv_counter_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Counter Message"
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/btn_view_product"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="View Product" />
+
+</LinearLayout>
