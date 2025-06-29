@@ -38,7 +38,6 @@ public class MainActivity extends AppCompatActivity {
     // Fragment Management
     private FragmentManager fragmentManager;
     private Fragment currentFragment;
-    private String currentFragmentTag = "home";
 
     // Utils
     private SharedPrefsManager prefsManager;
@@ -88,132 +87,133 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupNavigation() {
         bottomNavigation.setOnItemSelectedListener(item -> {
-            int itemId = item.getItemId();
+            Fragment fragment;
+            String tag;
 
+            int itemId = item.getItemId();
             if (itemId == R.id.nav_home) {
-                switchFragment(new HomeFragment(), "home");
-                return true;
+                fragment = new HomeFragment();
+                tag = "home";
             } else if (itemId == R.id.nav_search) {
-                switchFragment(new SearchFragment(), "search");
-                return true;
+                fragment = new SearchFragment();
+                tag = "search";
+            } else if (itemId == R.id.nav_add_product) {
+                fragment = new AddProductFragment();
+                tag = "add_product";
             } else if (itemId == R.id.nav_messages) {
-                switchFragment(new MessagesFragment(), "messages");
-                return true;
+                fragment = new MessagesFragment();
+                tag = "messages";
             } else if (itemId == R.id.nav_profile) {
-                switchFragment(new ProfileFragment(), "profile");
-                return true;
+                fragment = new ProfileFragment();
+                tag = "profile";
+            } else {
+                return false;
             }
-            return false;
+
+            return loadFragment(fragment, tag);
         });
 
         // FAB click listener
         fabQuickAdd.setOnClickListener(v -> {
-            switchFragment(new AddProductFragment(), "add_product");
-            // Optionally highlight the add tab or handle UI state
+            loadFragment(new AddProductFragment(), "add_product");
+            bottomNavigation.setSelectedItemId(R.id.nav_add_product);
         });
+
+        // Set default fragment
+        if (currentFragment == null) {
+            bottomNavigation.setSelectedItemId(R.id.nav_home);
+        }
     }
 
     // ✅ FIX: Use parameter properly instead of global variable
     private void loadInitialFragment(Bundle savedInstanceState) {
         // Restore fragment state or load default
         if (savedInstanceState != null) {
-            currentFragmentTag = savedInstanceState.getString(CURRENT_FRAGMENT_TAG, "home");
+            currentFragment = fragmentManager.findFragmentByTag(savedInstanceState.getString(CURRENT_FRAGMENT_TAG));
         }
 
         // Load appropriate fragment
-        switch (currentFragmentTag) {
-            case "home":
-                currentFragment = new HomeFragment();
-                bottomNavigation.setSelectedItemId(R.id.nav_home);
-                break;
-            case "search":
-                currentFragment = new SearchFragment();
-                bottomNavigation.setSelectedItemId(R.id.nav_search);
-                break;
-            case "messages":
-                currentFragment = new MessagesFragment();
-                bottomNavigation.setSelectedItemId(R.id.nav_messages);
-                break;
-            case "profile":
-                currentFragment = new ProfileFragment();
-                bottomNavigation.setSelectedItemId(R.id.nav_profile);
-                break;
-            case "add_product":
-                currentFragment = new AddProductFragment();
-                break;
-            default:
-                currentFragment = new HomeFragment();
-                currentFragmentTag = "home";
-                bottomNavigation.setSelectedItemId(R.id.nav_home);
-                break;
+        if (currentFragment == null) {
+            currentFragment = new HomeFragment();
         }
 
-        if (currentFragment != null) {
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.replace(R.id.fragment_container, currentFragment, currentFragmentTag);
-            transaction.commit();
-        }
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, currentFragment);
+        transaction.commit();
     }
 
-    private void switchFragment(Fragment fragment, String tag) {
-        if (!tag.equals(currentFragmentTag)) {
-            currentFragmentTag = tag;
-            currentFragment = fragment;
-
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_FADE);
-            transaction.replace(R.id.fragment_container, fragment, tag);
-            transaction.commit();
-
-            Log.d(TAG, "Switched to fragment: " + tag);
+    private boolean loadFragment(Fragment fragment, String tag) {
+        if (currentFragment != null && currentFragment.getClass() == fragment.getClass()) {
+            return false;
         }
+
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.setCustomAnimations(
+                R.anim.slide_in_right,
+                R.anim.slide_out_left,
+                R.anim.slide_in_left,
+                R.anim.slide_out_right
+        );
+        transaction.replace(R.id.fragment_container, fragment, tag);
+        transaction.commit();
+
+        currentFragment = fragment;
+        return true;
     }
 
     private void initWebSocketService() {
-        Long currentUserId = prefsManager.getUserId();
-        if (currentUserId != null && currentUserId > 0) {
-            webSocketService = RealtimeWebSocketService.getInstance();
-            webSocketService.connect(currentUserId);
-
-            Log.d(TAG, "✅ WebSocket service initialized for user: " + currentUserId);
-        } else {
-            Log.w(TAG, "⚠️ No valid user ID found, WebSocket not initialized");
+        try {
+            webSocketService = new RealtimeWebSocketService();
+            // Connect if user is logged in
+            if (prefsManager.isLoggedIn()) {
+                String token = prefsManager.getAuthToken();
+                if (token != null && !token.isEmpty()) {
+                    webSocketService.connect(token);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize WebSocket service", e);
         }
     }
 
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putString(CURRENT_FRAGMENT_TAG, currentFragmentTag);
+        if (currentFragment != null) {
+            outState.putString(CURRENT_FRAGMENT_TAG, currentFragment.getTag());
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (webSocketService != null && prefsManager.isLoggedIn()) {
+            webSocketService.reconnect();
+        }
+    }
 
-        // Reconnect WebSocket if needed
-        if (webSocketService != null && !webSocketService.isConnected()) {
-            Long currentUserId = prefsManager.getUserId();
-            if (currentUserId != null && currentUserId > 0) {
-                webSocketService.connect(currentUserId);
-            }
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (webSocketService != null) {
+            webSocketService.disconnect();
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        // Disconnect WebSocket
         if (webSocketService != null) {
-            webSocketService.disconnect();
+            webSocketService.cleanup();
         }
-
-        Log.d(TAG, "MainActivity destroyed");
     }
 
-    // Public method for fragments to access WebSocket service
-    public RealtimeWebSocketService getWebSocketService() {
-        return webSocketService;
+    @Override
+    public void onBackPressed() {
+        if (currentFragment instanceof HomeFragment) {
+            super.onBackPressed();
+        } else {
+            bottomNavigation.setSelectedItemId(R.id.nav_home);
+        }
     }
 }

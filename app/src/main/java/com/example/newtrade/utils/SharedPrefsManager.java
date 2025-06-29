@@ -1,143 +1,185 @@
-// app/src/main/java/com/example/newtrade/utils/SharedPrefsManager.java
 package com.example.newtrade.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 
 public class SharedPrefsManager {
+    private static final String PREF_NAME = "NewTradePrefs";
+    private static final String KEY_TOKEN = "token";
+    private static final String KEY_USER_ID = "user_id";
+    private static final String KEY_USER_NAME = "user_name";
+    private static final String KEY_USER_EMAIL = "user_email";
+    private static final String KEY_USER_PROFILE_PICTURE = "user_profile_picture";
+    private static final String KEY_IS_LOGGED_IN = "is_logged_in";
+    // FCM and Notifications
+    private static final String KEY_FCM_TOKEN = "fcm_token";
+    private static final String KEY_NOTIFICATIONS_ENABLED = "notifications_enabled";
+    private static final String KEY_MESSAGE_NOTIFICATIONS = "message_notifications";
+    private static final String KEY_OFFER_NOTIFICATIONS = "offer_notifications";
+    private static final String KEY_LISTING_NOTIFICATIONS = "listing_notifications";
+    private static final String KEY_PROMOTION_NOTIFICATIONS = "promotion_notifications";
+    private static SharedPrefsManager instance;
+    private final SharedPreferences prefs;
 
-    private static final String PREF_NAME = "TradeUpPrefs";
-    private SharedPreferences sharedPreferences;
-    private SharedPreferences.Editor editor;
-
-    // Constructor
+    // ✅ FIX: Make constructor public
     public SharedPrefsManager(Context context) {
-        sharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        editor = sharedPreferences.edit();
+        prefs = context.getApplicationContext()
+                .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
     }
 
-    // Static getInstance method
-    public static SharedPrefsManager getInstance(Context context) {
-        return new SharedPrefsManager(context);
-    }
-
-    // ✅ FIX: User ID methods
-    public void setUserId(Long userId) {
-        if (userId != null) {
-            editor.putLong(Constants.PREF_USER_ID, userId);
-        } else {
-            editor.remove(Constants.PREF_USER_ID);
+    public static synchronized SharedPrefsManager getInstance(Context context) {
+        if (instance == null) {
+            instance = new SharedPrefsManager(context);
         }
-        editor.apply();
+        return instance;
+    }
+
+    public static SharedPrefsManager getInstance() {
+        if (instance == null) {
+            throw new IllegalStateException("Call getInstance(Context) first");
+        }
+        return instance;
+    }
+
+    public void saveToken(String token) {
+        prefs.edit().putString(KEY_TOKEN, token).apply();
+    }
+
+    public String getToken() {
+        return prefs.getString(KEY_TOKEN, null);
+    }
+
+    // Add getAuthToken method for compatibility
+    public String getAuthToken() {
+        return getToken();
+    }
+
+    public void saveUserId(Long userId) {
+        prefs.edit().putLong(KEY_USER_ID, userId).apply();
     }
 
     public Long getUserId() {
-        long id = sharedPreferences.getLong(Constants.PREF_USER_ID, -1);
-        return id != -1 ? id : null;
+        if (!prefs.contains(KEY_USER_ID)) return null;
+        return prefs.getLong(KEY_USER_ID, -1);
     }
 
-    // ✅ FIX: User name methods
-    public void setUserName(String userName) {
-        editor.putString(Constants.PREF_USER_NAME, userName);
-        editor.apply();
+    public void saveUserName(String userName) {
+        prefs.edit().putString(KEY_USER_NAME, userName).apply();
     }
 
     public String getUserName() {
-        return sharedPreferences.getString(Constants.PREF_USER_NAME, "");
+        return prefs.getString(KEY_USER_NAME, null);
     }
 
-    // ✅ FIX: saveUserName method for EditProfileActivity
-    public void saveUserName(String userName) {
-        setUserName(userName);
-    }
-
-    // ✅ FIX: User email methods
-    public void setUserEmail(String email) {
-        editor.putString(Constants.PREF_USER_EMAIL, email);
-        editor.apply();
+    public void saveUserEmail(String email) {
+        prefs.edit().putString(KEY_USER_EMAIL, email).apply();
     }
 
     public String getUserEmail() {
-        return sharedPreferences.getString(Constants.PREF_USER_EMAIL, "");
+        return prefs.getString(KEY_USER_EMAIL, null);
     }
 
-    // ✅ FIX: saveUserEmail method for EditProfileActivity
-    public void saveUserEmail(String email) {
-        setUserEmail(email);
-    }
-
-    // ✅ FIX: Profile picture methods
-    public void setUserProfilePicture(String profilePicture) {
-        editor.putString(Constants.PREF_USER_PROFILE_PICTURE, profilePicture);
-        editor.apply();
-    }
-
-    public String getUserProfilePicture() {
-        return sharedPreferences.getString(Constants.PREF_USER_PROFILE_PICTURE, "");
-    }
-
-    // ✅ FIX: saveUserProfilePicture method for EditProfileActivity
-    public void saveUserProfilePicture(String profilePicture) {
-        setUserProfilePicture(profilePicture);
-    }
-
-    // ✅ FIX: Login status methods
-    public void setLoggedIn(boolean isLoggedIn) {
-        editor.putBoolean(Constants.PREF_IS_LOGGED_IN, isLoggedIn);
-        editor.apply();
+    public void clearSession() {
+        prefs.edit().clear().apply();
     }
 
     public boolean isLoggedIn() {
-        return sharedPreferences.getBoolean(Constants.PREF_IS_LOGGED_IN, false);
+        return getToken() != null && getUserId() != null;
     }
 
-    // ✅ FIX: FCM Token methods
-    public void setFcmToken(String token) {
-        editor.putString(Constants.PREF_FCM_TOKEN, token);
+    // ✅ FIX: Add missing methods
+    public void saveUserSession(Long userId, String email, String name, boolean isEmailVerified) {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putLong(KEY_USER_ID, userId);
+        editor.putString(KEY_USER_EMAIL, email);
+        editor.putString(KEY_USER_NAME, name);
+        editor.putBoolean(KEY_IS_LOGGED_IN, true);
         editor.apply();
+    }
+
+    public void setLoggedIn(boolean isLoggedIn) {
+        prefs.edit().putBoolean(KEY_IS_LOGGED_IN, isLoggedIn).apply();
+    }
+
+    public void setUserId(Long userId) {
+        if (userId == null) {
+            prefs.edit().remove(KEY_USER_ID).apply();
+        } else {
+            prefs.edit().putLong(KEY_USER_ID, userId).apply();
+        }
+    }
+
+    public void setUserEmail(String email) {
+        prefs.edit().putString(KEY_USER_EMAIL, email).apply();
+    }
+
+    public void setUserName(String name) {
+        prefs.edit().putString(KEY_USER_NAME, name).apply();
+    }
+
+    public void saveUserProfilePicture(String profilePictureUrl) {
+        prefs.edit().putString(KEY_USER_PROFILE_PICTURE, profilePictureUrl).apply();
+    }
+
+    public String getUserProfilePicture() {
+        return prefs.getString(KEY_USER_PROFILE_PICTURE, null);
+    }
+
+    public void setUserProfilePicture(String profilePictureUrl) {
+        saveUserProfilePicture(profilePictureUrl);
+    }
+
+    // FCM Token methods
+    public void saveFcmToken(String token) {
+        prefs.edit().putString(KEY_FCM_TOKEN, token).apply();
     }
 
     public String getFcmToken() {
-        return sharedPreferences.getString(Constants.PREF_FCM_TOKEN, "");
+        return prefs.getString(KEY_FCM_TOKEN, null);
     }
 
-    // ✅ FIX: saveFcmToken method for FirebaseMessagingService
-    public void saveFcmToken(String token) {
-        setFcmToken(token);
+    // Notification settings
+    public void setNotificationsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled).apply();
     }
 
-    // ✅ FIX: Email verification status
-    public void setEmailVerified(boolean isVerified) {
-        editor.putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, isVerified);
-        editor.apply();
+    public boolean areNotificationsEnabled() {
+        return prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true);
     }
 
-    public boolean isEmailVerified() {
-        return sharedPreferences.getBoolean(Constants.PREF_IS_EMAIL_VERIFIED, false);
+    public void setMessageNotificationsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_MESSAGE_NOTIFICATIONS, enabled).apply();
     }
 
-    // ✅ FIX: saveUserSession method for LoginActivity and OtpVerificationActivity
-    public void saveUserSession(Long userId, String email, String name, boolean isEmailVerified) {
-        setUserId(userId);
-        setUserEmail(email);
-        setUserName(name);
-        setEmailVerified(isEmailVerified);
-        setLoggedIn(true);
+    public boolean areMessageNotificationsEnabled() {
+        return prefs.getBoolean(KEY_MESSAGE_NOTIFICATIONS, true);
     }
 
-    // ✅ FIX: clearUserSession method for SettingsActivity
+    public void setOfferNotificationsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_OFFER_NOTIFICATIONS, enabled).apply();
+    }
+
+    public boolean areOfferNotificationsEnabled() {
+        return prefs.getBoolean(KEY_OFFER_NOTIFICATIONS, true);
+    }
+
+    public void setListingNotificationsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_LISTING_NOTIFICATIONS, enabled).apply();
+    }
+
+    public boolean areListingNotificationsEnabled() {
+        return prefs.getBoolean(KEY_LISTING_NOTIFICATIONS, true);
+    }
+
+    public void setPromotionNotificationsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_PROMOTION_NOTIFICATIONS, enabled).apply();
+    }
+
+    public boolean arePromotionNotificationsEnabled() {
+        return prefs.getBoolean(KEY_PROMOTION_NOTIFICATIONS, false); // Default false for promotions
+    }
+
     public void clearUserSession() {
-        setLoggedIn(false);
-        setUserId(null);
-        setUserEmail("");
-        setUserName("");
-        setUserProfilePicture("");
-        setFcmToken("");
-        setEmailVerified(false);
-    }
-
-    // ✅ FIX: clearUserData method for ProfileFragment
-    public void clearUserData() {
-        clearUserSession();
+        clearSession();
     }
 }

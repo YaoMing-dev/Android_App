@@ -1,23 +1,11 @@
-// app/src/main/java/com/example/newtrade/models/StandardResponse.java
 package com.example.newtrade.models;
 
-import com.google.gson.annotations.SerializedName;
-
 public class StandardResponse<T> {
-
-    @SerializedName("success")
     private boolean success;
-
-    @SerializedName("message")
     private String message;
-
-    @SerializedName("data")
     private T data;
+    private String error;
 
-    @SerializedName("timestamp")
-    private String timestamp;
-
-    // Constructors
     public StandardResponse() {}
 
     public StandardResponse(boolean success, String message, T data) {
@@ -26,7 +14,6 @@ public class StandardResponse<T> {
         this.data = data;
     }
 
-    // Getters and setters
     public boolean isSuccess() {
         return success;
     }
@@ -51,20 +38,15 @@ public class StandardResponse<T> {
         this.data = data;
     }
 
-    public String getTimestamp() {
-        return timestamp;
+    public String getError() {
+        return error;
     }
 
-    public void setTimestamp(String timestamp) {
-        this.timestamp = timestamp;
+    public void setError(String error) {
+        this.error = error;
     }
 
-    // Utility methods
     public boolean hasData() {
         return data != null;
-    }
-
-    public boolean isError() {
-        return !success;
     }
 }

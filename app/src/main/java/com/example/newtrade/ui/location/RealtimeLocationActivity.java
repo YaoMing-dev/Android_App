@@ -183,7 +183,7 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
     // ===== LocationListener Implementation =====
 
     @Override
-    public void onUserLocationUpdate(Long userId, double latitude, double longitude) {
+    public void onLocationUpdate(Long userId, double latitude, double longitude) {
         runOnUiThread(() -> {
             Log.d(TAG, "👤 User " + userId + " location: " + latitude + ", " + longitude);
             // TODO: Update map or list with user location
@@ -191,31 +191,20 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
     }
 
     @Override
-    public void onNearbyUsersUpdate(Map<Long, Map<String, Object>> nearbyUsers) {
+    public void onNearbyUsersUpdate(java.util.List<Long> userIds) {
         runOnUiThread(() -> {
             StringBuilder nearbyText = new StringBuilder("👥 Nearby Users:\n\n");
 
-            if (nearbyUsers.isEmpty()) {
+            if (userIds.isEmpty()) {
                 nearbyText.append("No users nearby");
             } else {
-                for (Map.Entry<Long, Map<String, Object>> entry : nearbyUsers.entrySet()) {
-                    Long userId = entry.getKey();
-                    Map<String, Object> userInfo = entry.getValue();
-
-                    String name = (String) userInfo.get("name");
-                    Double distance = (Double) userInfo.get("distance");
-
-                    nearbyText.append("• ")
-                            .append(name != null ? name : "User " + userId)
-                            .append(" (")
-                            .append(String.format("%.1f km", distance))
-                            .append(")\n");
+                for (Long userId : userIds) {
+                    nearbyText.append("• User ").append(userId).append("\n");
                 }
             }
 
             tvNearbyUsers.setText(nearbyText.toString());
-
-            Log.d(TAG, "👥 Updated nearby users: " + nearbyUsers.size());
+            Log.d(TAG, "👥 Updated nearby users: " + userIds.size());
         });
     }
 

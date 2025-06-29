@@ -1,78 +1,109 @@
-// app/src/main/java/com/example/newtrade/ui/product/AddProductActivity.java
 package com.example.newtrade.ui.product;
 
-import android.app.Activity;
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Log;
-import android.view.MenuItem;
+import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
+import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.Spinner;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
+import com.example.newtrade.adapters.ImageAdapter;
 import com.example.newtrade.api.ApiClient;
-import com.example.newtrade.api.ApiService;
+import com.example.newtrade.location.LocationService;
+import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.utils.SharedPrefsManager;
+import com.example.newtrade.utils.ImagePickerHelper;
 import com.example.newtrade.utils.NavigationUtils;
+import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.TextInputLayout;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import okhttp3.MediaType;
-import okhttp3.MultipartBody;
-import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class AddProductActivity extends AppCompatActivity {
+public class AddProductActivity extends AppCompatActivity implements
+    LocationService.LocationCallback, ImageAdapter.OnImageActionListener {
 
     private static final String TAG = "AddProductActivity";
-    private static final int REQUEST_IMAGE_PICK = 1001;
+    private static final int LOCATION_PERMISSION_REQUEST = 100;
+    private static final int IMAGE_PICK_REQUEST = 200;
 
     // UI Components
     private MaterialToolbar toolbar;
-    private EditText etTitle, etDescription, etPrice, etLocation;
-    private Spinner spCategory, spCondition;
-    private ImageView ivProductImage;
-    private Button btnSelectImage, btnPublish;
+    private EditText etTitle, etDescription, etPrice;
+    private AutoCompleteTextView etCategory, etCondition;
+    private TextInputLayout tilLocation;
+    private EditText etLocation;
+    private MaterialButton btnGetLocation, btnAddImages, btnPreview, btnPublish;
+    private RecyclerView rvImages;
+    private LinearLayout llImageSection;
 
     // Data
     private SharedPrefsManager prefsManager;
-    private Uri selectedImageUri;
-    private boolean isLoading = false;
-    private String uploadedImageUrl = null; // Store uploaded image URL
+    private LocationService locationService;
+    private ImagePickerHelper imagePickerHelper;
+    private ImageAdapter imageAdapter;
+    private List<Uri> selectedImages = new ArrayList<>();
+    private Double latitude, longitude;
+    private String locationAddress;
+    private boolean isEditMode = false;
+    private Long productId;
+
+    // Form data
+    private String[] categories = {"Electronics", "Furniture", "Clothing", "Books", "Sports", "Vehicles", "Home & Garden", "Toys", "Art & Crafts", "Other"};
+    private String[] conditions = {"New", "Like New", "Good", "Fair", "Poor"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_product);
 
+        prefsManager = SharedPrefsManager.getInstance(this);
+        locationService = new LocationService(this);
+        locationService.setLocationCallback(this);
+        imagePickerHelper = new ImagePickerHelper(this);
+
+        checkEditMode();
         initViews();
         setupToolbar();
-        setupSpinners();
+        setupDropdowns();
+        setupImageSection();
         setupListeners();
 
-        Log.d(TAG, "AddProductActivity created");
+        Log.d(TAG, "AddProductActivity created - Edit mode: " + isEditMode);
+    }
+
+    private void checkEditMode() {
+        Intent intent = getIntent();
+        productId = intent.getLongExtra("product_id", -1L);
+        isEditMode = productId != -1L;
+
+        if (isEditMode) {
+            loadProductData();
+        }
     }
 
     private void initViews() {
@@ -80,280 +111,177 @@ public class AddProductActivity extends AppCompatActivity {
         etTitle = findViewById(R.id.et_title);
         etDescription = findViewById(R.id.et_description);
         etPrice = findViewById(R.id.et_price);
+        etCategory = findViewById(R.id.et_category);
+        etCondition = findViewById(R.id.et_condition);
+        tilLocation = findViewById(R.id.til_location);
         etLocation = findViewById(R.id.et_location);
-        spCategory = findViewById(R.id.sp_category);
-        spCondition = findViewById(R.id.sp_condition);
-        ivProductImage = findViewById(R.id.iv_product_image);
-        btnSelectImage = findViewById(R.id.btn_select_image);
+        btnGetLocation = findViewById(R.id.btn_get_location);
+        btnAddImages = findViewById(R.id.btn_add_images);
+        btnPreview = findViewById(R.id.btn_preview);
         btnPublish = findViewById(R.id.btn_publish);
-
-        prefsManager = SharedPrefsManager.getInstance(this);
+        rvImages = findViewById(R.id.rv_images);
+        llImageSection = findViewById(R.id.ll_image_section);
     }
 
     private void setupToolbar() {
-        setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("Add Product");
-        }
+        String title = isEditMode ? "Edit Product" : "Add New Product";
+        NavigationUtils.setupToolbarWithBackButton(this, toolbar, title);
     }
 
-    private void setupSpinners() {
-        // Category spinner
-        List<String> categories = new ArrayList<>();
-        categories.add("Electronics");
-        categories.add("Fashion");
-        categories.add("Home & Garden");
-        categories.add("Sports");
-        categories.add("Books");
-        categories.add("Other");
-
+    private void setupDropdowns() {
+        // Category dropdown
         ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, categories);
-        categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spCategory.setAdapter(categoryAdapter);
+            android.R.layout.simple_dropdown_item_1line, categories);
+        etCategory.setAdapter(categoryAdapter);
 
-        // Condition spinner
-        List<String> conditions = new ArrayList<>();
-        conditions.add("New");
-        conditions.add("Like New");
-        conditions.add("Good");
-        conditions.add("Fair");
-        conditions.add("Poor");
-
+        // Condition dropdown
         ArrayAdapter<String> conditionAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, conditions);
-        conditionAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spCondition.setAdapter(conditionAdapter);
+            android.R.layout.simple_dropdown_item_1line, conditions);
+        etCondition.setAdapter(conditionAdapter);
+    }
+
+    private void setupImageSection() {
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false);
+        rvImages.setLayoutManager(layoutManager);
+
+        imageAdapter = new ImageAdapter(selectedImages, this);
+        rvImages.setAdapter(imageAdapter);
     }
 
     private void setupListeners() {
-        btnSelectImage.setOnClickListener(v -> selectImage());
+        btnGetLocation.setOnClickListener(v -> requestLocationPermissionAndGet());
+        btnAddImages.setOnClickListener(v -> openImagePicker());
+        btnPreview.setOnClickListener(v -> previewProduct());
         btnPublish.setOnClickListener(v -> publishProduct());
-
-        // Form validation
-        TextWatcher formWatcher = new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                updatePublishButton();
-            }
-        };
-
-        etTitle.addTextChangedListener(formWatcher);
-        etDescription.addTextChangedListener(formWatcher);
-        etPrice.addTextChangedListener(formWatcher);
-        etLocation.addTextChangedListener(formWatcher);
     }
 
-    private void selectImage() {
-        Intent intent = new Intent(Intent.ACTION_PICK);
-        intent.setType("image/*");
-        startActivityForResult(intent, REQUEST_IMAGE_PICK);
+    private void requestLocationPermissionAndGet() {
+        if (checkLocationPermission()) {
+            getCurrentLocation();
+        } else {
+            requestLocationPermission();
+        }
+    }
+
+    private boolean checkLocationPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+               ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestLocationPermission() {
+        ActivityCompat.requestPermissions(this,
+            new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            },
+            LOCATION_PERMISSION_REQUEST);
+    }
+
+    private void getCurrentLocation() {
+        btnGetLocation.setEnabled(false);
+        btnGetLocation.setText("Getting location...");
+        locationService.getCurrentLocation();
+    }
+
+    @Override
+    public void onLocationReceived(double latitude, double longitude, String address) {
+        runOnUiThread(() -> {
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.locationAddress = address;
+
+            etLocation.setText(address);
+            btnGetLocation.setText("📍 Location Found");
+            btnGetLocation.setEnabled(true);
+
+            Log.d(TAG, "✅ Location received: " + address);
+        });
+    }
+
+    @Override
+    public void onLocationError(String error) {
+        runOnUiThread(() -> {
+            btnGetLocation.setText("Get Location");
+            btnGetLocation.setEnabled(true);
+            Toast.makeText(this, "Failed to get location: " + error, Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "❌ Location error: " + error);
+        });
+    }
+
+    private void openImagePicker() {
+        if (selectedImages.size() >= 10) {
+            Toast.makeText(this, "Maximum 10 images allowed", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        imagePickerHelper.openImagePicker(IMAGE_PICK_REQUEST);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == REQUEST_IMAGE_PICK && resultCode == Activity.RESULT_OK && data != null) {
-            selectedImageUri = data.getData();
-            if (selectedImageUri != null) {
-                Glide.with(this)
-                        .load(selectedImageUri)
-                        .centerCrop()
-                        .into(ivProductImage);
+        if (requestCode == IMAGE_PICK_REQUEST && resultCode == RESULT_OK) {
+            List<Uri> newImages = imagePickerHelper.handleImagePickerResult(data);
 
-                // Reset uploaded image URL when new image selected
-                uploadedImageUrl = null;
-                updatePublishButton();
+            for (Uri imageUri : newImages) {
+                if (selectedImages.size() < 10) {
+                    selectedImages.add(imageUri);
+                }
             }
+
+            imageAdapter.notifyDataSetChanged();
+            updateImageSection();
+
+            Log.d(TAG, "✅ Images selected: " + selectedImages.size() + " total");
         }
+    }
+
+    @Override
+    public void onImageRemove(int position) {
+        if (position >= 0 && position < selectedImages.size()) {
+            selectedImages.remove(position);
+            imageAdapter.notifyItemRemoved(position);
+            updateImageSection();
+        }
+    }
+
+    private void updateImageSection() {
+        if (selectedImages.isEmpty()) {
+            llImageSection.setVisibility(View.GONE);
+        } else {
+            llImageSection.setVisibility(View.VISIBLE);
+            btnAddImages.setText("Add Images (" + selectedImages.size() + "/10)");
+        }
+    }
+
+    private void previewProduct() {
+        if (!validateForm()) return;
+
+        Product product = createProductFromForm();
+
+        Intent intent = new Intent(this, ProductPreviewActivity.class);
+        intent.putExtra("product", product);
+        intent.putStringArrayListExtra("image_uris", (ArrayList<String>) getImageUriStrings());
+        startActivity(intent);
     }
 
     private void publishProduct() {
-        if (isLoading) return;
-
         if (!validateForm()) return;
 
-        setLoading(true);
+        btnPublish.setEnabled(false);
+        btnPublish.setText("Publishing...");
 
-        // Step 1: Upload image first if selected
-        if (selectedImageUri != null && uploadedImageUrl == null) {
-            uploadImageToServer();
+        if (isEditMode) {
+            updateProduct();
         } else {
-            // Step 2: Create product with uploaded image URL
-            createProductOnServer();
+            createNewProduct();
         }
-    }
-
-    private void uploadImageToServer() {
-        Log.d(TAG, "Uploading image to server...");
-
-        try {
-            // Convert URI to File
-            File imageFile = createTempFileFromUri(selectedImageUri);
-
-            // Create RequestBody
-            RequestBody requestFile = RequestBody.create(
-                    MediaType.parse("image/*"), imageFile);
-
-            MultipartBody.Part imagePart = MultipartBody.Part.createFormData(
-                    "file", imageFile.getName(), requestFile);
-
-            // Upload to server
-            ApiService apiService = ApiClient.getApiService();
-            Call<StandardResponse<Map<String, String>>> call =
-                    apiService.uploadProductImage(imagePart);
-
-            call.enqueue(new Callback<StandardResponse<Map<String, String>>>() {
-                @Override
-                public void onResponse(Call<StandardResponse<Map<String, String>>> call,
-                                       Response<StandardResponse<Map<String, String>>> response) {
-
-                    if (response.isSuccessful() && response.body() != null) {
-                        StandardResponse<Map<String, String>> standardResponse = response.body();
-
-                        if (standardResponse.isSuccess()) {
-                            Map<String, String> data = standardResponse.getData();
-                            uploadedImageUrl = data.get("imageUrl");
-
-                            Log.d(TAG, "✅ Image uploaded successfully: " + uploadedImageUrl);
-
-                            // Now create product with uploaded image URL
-                            createProductOnServer();
-
-                        } else {
-                            setLoading(false);
-                            showError("Failed to upload image: " + standardResponse.getMessage());
-                        }
-                    } else {
-                        setLoading(false);
-                        showError("Failed to upload image to server");
-                    }
-                }
-
-                @Override
-                public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
-                    setLoading(false);
-                    Log.e(TAG, "❌ Image upload failed", t);
-                    showError("Network error while uploading image");
-                }
-            });
-
-        } catch (Exception e) {
-            setLoading(false);
-            Log.e(TAG, "❌ Error preparing image for upload", e);
-            showError("Error preparing image: " + e.getMessage());
-        }
-    }
-
-    private void createProductOnServer() {
-        Log.d(TAG, "Creating product on server...");
-
-        // Check if user is logged in
-        Long userId = prefsManager.getUserId();
-        if (userId == null || userId <= 0) {
-            setLoading(false);
-            showError("Please login to publish products");
-            return;
-        }
-
-        // Prepare product data
-        Map<String, Object> productRequest = new HashMap<>();
-        productRequest.put("title", etTitle.getText().toString().trim());
-        productRequest.put("description", etDescription.getText().toString().trim());
-
-        try {
-            BigDecimal price = new BigDecimal(etPrice.getText().toString().trim());
-            productRequest.put("price", price);
-        } catch (NumberFormatException e) {
-            setLoading(false);
-            showError("Invalid price format");
-            return;
-        }
-
-        // Category
-        int categoryIndex = spCategory.getSelectedItemPosition();
-        productRequest.put("categoryId", (long) (categoryIndex + 1)); // Categories start from 1
-
-        // Condition - Convert to backend enum format
-        String conditionText = spCondition.getSelectedItem().toString();
-        String condition = conditionText.toUpperCase().replace(" ", "_");
-        productRequest.put("condition", condition);
-
-        productRequest.put("location", etLocation.getText().toString().trim());
-
-        // Image URLs
-        List<String> imageUrls = new ArrayList<>();
-        if (uploadedImageUrl != null) {
-            imageUrls.add(uploadedImageUrl);
-        }
-        productRequest.put("imageUrls", imageUrls);
-
-        Log.d(TAG, "Product request: " + productRequest);
-
-        // Call API to create product
-        ApiService apiService = ApiClient.getApiService();
-        Call<StandardResponse<Map<String, Object>>> call =
-                apiService.createProduct(productRequest);
-
-        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-
-                setLoading(false);
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> standardResponse = response.body();
-
-                    if (standardResponse.isSuccess()) {
-                        Log.d(TAG, "✅ Product created successfully");
-                        Toast.makeText(AddProductActivity.this,
-                                "🎉 Product published successfully!", Toast.LENGTH_LONG).show();
-                        finish();
-
-                    } else {
-                        showError("Failed to create product: " + standardResponse.getMessage());
-                    }
-                } else {
-                    showError("Failed to create product on server");
-                }
-            }
-
-            @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                setLoading(false);
-                Log.e(TAG, "❌ Product creation failed", t);
-                showError("Network error while creating product");
-            }
-        });
-    }
-
-    private File createTempFileFromUri(Uri uri) throws Exception {
-        InputStream inputStream = getContentResolver().openInputStream(uri);
-        File tempFile = File.createTempFile("upload_image", ".jpg", getCacheDir());
-
-        FileOutputStream outputStream = new FileOutputStream(tempFile);
-        byte[] buffer = new byte[1024];
-        int length;
-        while ((length = inputStream.read(buffer)) > 0) {
-            outputStream.write(buffer, 0, length);
-        }
-
-        outputStream.close();
-        inputStream.close();
-
-        return tempFile;
     }
 
     private boolean validateForm() {
         boolean isValid = true;
 
+        // Required fields validation
         if (etTitle.getText().toString().trim().isEmpty()) {
             etTitle.setError("Title is required");
             isValid = false;
@@ -367,46 +295,229 @@ public class AddProductActivity extends AppCompatActivity {
         if (etPrice.getText().toString().trim().isEmpty()) {
             etPrice.setError("Price is required");
             isValid = false;
+        } else {
+            try {
+                double price = Double.parseDouble(etPrice.getText().toString().trim());
+                if (price <= 0) {
+                    etPrice.setError("Price must be greater than 0");
+                    isValid = false;
+                }
+            } catch (NumberFormatException e) {
+                etPrice.setError("Invalid price format");
+                isValid = false;
+            }
         }
 
-        if (etLocation.getText().toString().trim().isEmpty()) {
-            etLocation.setError("Location is required");
+        if (etCategory.getText().toString().trim().isEmpty()) {
+            etCategory.setError("Category is required");
             isValid = false;
         }
 
-        if (selectedImageUri == null) {
-            Toast.makeText(this, "Please select a product image", Toast.LENGTH_SHORT).show();
+        if (etCondition.getText().toString().trim().isEmpty()) {
+            etCondition.setError("Condition is required");
+            isValid = false;
+        }
+
+        if (etLocation.getText().toString().trim().isEmpty()) {
+            tilLocation.setError("Location is required");
+            isValid = false;
+        } else {
+            tilLocation.setError(null);
+        }
+
+        if (!isEditMode && selectedImages.isEmpty()) {
+            Toast.makeText(this, "At least 1 image is required", Toast.LENGTH_SHORT).show();
             isValid = false;
         }
 
         return isValid;
     }
 
-    private void setLoading(boolean loading) {
-        isLoading = loading;
-        btnPublish.setEnabled(!loading);
-        btnPublish.setText(loading ? "Publishing..." : "Publish Product");
+    private Product createProductFromForm() {
+        Product product = new Product();
+        product.setTitle(etTitle.getText().toString().trim());
+        product.setDescription(etDescription.getText().toString().trim());
+        product.setPrice(Double.parseDouble(etPrice.getText().toString().trim()));
+        product.setCategory(etCategory.getText().toString().trim());
+        product.setCondition(etCondition.getText().toString().trim());
+        product.setLocation(etLocation.getText().toString().trim());
+        product.setLatitude(latitude);
+        product.setLongitude(longitude);
+        product.setSellerId(prefsManager.getUserId());
+        product.setStatus("available");
+
+        if (isEditMode) {
+            product.setId(productId);
+        }
+
+        return product;
     }
 
-    private void updatePublishButton() {
-        boolean isFormValid = !etTitle.getText().toString().trim().isEmpty() &&
-                !etDescription.getText().toString().trim().isEmpty() &&
-                !etPrice.getText().toString().trim().isEmpty() &&
-                !etLocation.getText().toString().trim().isEmpty() &&
-                selectedImageUri != null;
+    private void createNewProduct() {
+        Product product = createProductFromForm();
 
-        btnPublish.setEnabled(!isLoading && isFormValid);
+        // Convert product to Map for API
+        Map<String, Object> productMap = new HashMap<>();
+        productMap.put("title", product.getTitle());
+        productMap.put("description", product.getDescription());
+        productMap.put("price", product.getPrice());
+        productMap.put("category", product.getCategory());
+        productMap.put("condition", product.getCondition());
+        productMap.put("location", product.getLocation());
+        productMap.put("latitude", product.getLatitude());
+        productMap.put("longitude", product.getLongitude());
+        productMap.put("sellerId", product.getSellerId());
+        productMap.put("status", product.getStatus());
+
+        // For now, call API without images (would need to implement image upload)
+        ApiClient.getApiService().createProduct(productMap, new ArrayList<>())
+            .enqueue(new Callback<StandardResponse<Product>>() {
+                @Override
+                public void onResponse(@NonNull Call<StandardResponse<Product>> call,
+                                       @NonNull Response<StandardResponse<Product>> response) {
+                    runOnUiThread(() -> {
+                        btnPublish.setEnabled(true);
+                        btnPublish.setText("Publish");
+
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Product> apiResponse = response.body();
+
+                            if (apiResponse.isSuccess()) {
+                                Product createdProduct = apiResponse.getData();
+                                Log.d(TAG, "✅ Product created: " + createdProduct.getId());
+
+                                Toast.makeText(AddProductActivity.this, "Product published successfully!", Toast.LENGTH_SHORT).show();
+
+                                // Go back to main activity or product detail
+                                setResult(RESULT_OK);
+                                finish();
+                            } else {
+                                showError("Failed to publish product");
+                            }
+                        } else {
+                            showError("Failed to publish product");
+                        }
+                    });
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<StandardResponse<Product>> call, @NonNull Throwable t) {
+                    runOnUiThread(() -> {
+                        btnPublish.setEnabled(true);
+                        btnPublish.setText("Publish");
+                        showError("Network error: " + t.getMessage());
+                        Log.e(TAG, "❌ Create product API error", t);
+                    });
+                }
+            });
+    }
+
+    private void updateProduct() {
+        Product product = createProductFromForm();
+
+        ApiClient.getApiService().updateProduct(productId, product)
+            .enqueue(new Callback<StandardResponse<Product>>() {
+                @Override
+                public void onResponse(@NonNull Call<StandardResponse<Product>> call,
+                                       @NonNull Response<StandardResponse<Product>> response) {
+                    runOnUiThread(() -> {
+                        btnPublish.setEnabled(true);
+                        btnPublish.setText("Update");
+
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Product> apiResponse = response.body();
+
+                            if (apiResponse.isSuccess()) {
+                                Log.d(TAG, "✅ Product updated: " + productId);
+
+                                Toast.makeText(AddProductActivity.this, "Product updated successfully!", Toast.LENGTH_SHORT).show();
+
+                                setResult(RESULT_OK);
+                                finish();
+                            } else {
+                                showError("Failed to update product");
+                            }
+                        } else {
+                            showError("Failed to update product");
+                        }
+                    });
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<StandardResponse<Product>> call, @NonNull Throwable t) {
+                    runOnUiThread(() -> {
+                        btnPublish.setEnabled(true);
+                        btnPublish.setText("Update");
+                        showError("Network error: " + t.getMessage());
+                        Log.e(TAG, "❌ Update product API error", t);
+                    });
+                }
+            });
+    }
+
+    private void loadProductData() {
+        // Load existing product data for editing
+        ApiClient.getApiService().getProductById(productId)
+            .enqueue(new Callback<StandardResponse<Product>>() {
+                @Override
+                public void onResponse(@NonNull Call<StandardResponse<Product>> call,
+                                       @NonNull Response<StandardResponse<Product>> response) {
+                    if (response.isSuccessful() && response.body() != null) {
+                        StandardResponse<Product> apiResponse = response.body();
+
+                        if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                            Product product = apiResponse.getData();
+                            populateFormWithProduct(product);
+                            Log.d(TAG, "✅ Product data loaded for editing");
+                        }
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<StandardResponse<Product>> call, @NonNull Throwable t) {
+                    Log.e(TAG, "❌ Failed to load product data", t);
+                    showError("Failed to load product data");
+                }
+            });
+    }
+
+    private void populateFormWithProduct(Product product) {
+        etTitle.setText(product.getTitle());
+        etDescription.setText(product.getDescription());
+        etPrice.setText(String.valueOf(product.getPrice()));
+        etCategory.setText(product.getCategory());
+        etCondition.setText(product.getCondition());
+        etLocation.setText(product.getLocation());
+
+        latitude = product.getLatitude();
+        longitude = product.getLongitude();
+        locationAddress = product.getLocation();
+
+        btnPublish.setText("Update Product");
+    }
+
+    private List<String> getImageUriStrings() {
+        List<String> uriStrings = new ArrayList<>();
+        for (Uri uri : selectedImages) {
+            uriStrings.add(uri.toString());
+        }
+        return uriStrings;
     }
 
     private void showError(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (NavigationUtils.handleBackButton(this, item)) {
-            return true;
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == LOCATION_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                getCurrentLocation();
+            } else {
+                Toast.makeText(this, "Location permission required for product location", Toast.LENGTH_SHORT).show();
+            }
         }
-        return super.onOptionsItemSelected(item);
     }
 }

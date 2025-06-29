@@ -108,34 +108,20 @@ public class CategoryProductsActivity extends AppCompatActivity {
     private void loadProducts() {
         swipeRefresh.setRefreshing(true);
 
+        // ✅ FIX: Updated to use StandardResponse
         ApiClient.getApiService().searchProducts("", 0, 20, categoryId, null, null, null)
-                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                .enqueue(new Callback<List<Product>>() {
                     @Override
-                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                           Response<StandardResponse<Map<String, Object>>> response) {
+                    public void onResponse(@NonNull Call<List<Product>> call,
+                                           @NonNull Response<List<Product>> response) {
                         swipeRefresh.setRefreshing(false);
 
                         try {
                             if (response.isSuccessful() && response.body() != null) {
-                                StandardResponse<Map<String, Object>> apiResponse = response.body();
-
-                                if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                                    Map<String, Object> data = apiResponse.getData();
-                                    List<Map<String, Object>> productList =
-                                            (List<Map<String, Object>>) data.get("products");
-
-                                    if (productList != null) {
-                                        updateProducts(productList);
-                                    } else {
-                                        showEmptyState();
-                                    }
-                                } else {
-                                    Log.e(TAG, "API error: " + apiResponse.getMessage());
-                                    showEmptyState();
-                                }
+                                List<Product> products = response.body();
+                                updateProductList(products);
                             } else {
-                                Log.e(TAG, "Request failed: " + response.code());
-                                showEmptyState();
+                                showError("Không thể tải sản phẩm");
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "Error processing response", e);
@@ -144,12 +130,25 @@ public class CategoryProductsActivity extends AppCompatActivity {
                     }
 
                     @Override
-                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                    public void onFailure(@NonNull Call<List<Product>> call, @NonNull Throwable t) {
                         swipeRefresh.setRefreshing(false);
-                        Log.e(TAG, "Request failed", t);
-                        showEmptyState();
+                        showError("Lỗi mạng: " + t.getMessage());
                     }
                 });
+    }
+
+    private void updateProductList(List<Product> newProducts) {
+        products.clear();
+
+        if (newProducts != null && !newProducts.isEmpty()) {
+            products.addAll(newProducts);
+            showProducts();
+        } else {
+            showEmptyState();
+        }
+
+        productAdapter.notifyDataSetChanged();
+        Log.d(TAG, "✅ Products updated: " + products.size());
     }
 
     // ✅ FIX: Handle BigDecimal conversion properly
@@ -251,6 +250,15 @@ public class CategoryProductsActivity extends AppCompatActivity {
         if (tvEmptyState != null) {
             tvEmptyState.setVisibility(View.VISIBLE);
             tvEmptyState.setText("No products found in " + categoryName);
+        }
+    }
+
+    private void showError(String message) {
+        swipeRefresh.setRefreshing(false);
+        Log.e(TAG, message);
+        if (tvEmptyState != null) {
+            tvEmptyState.setVisibility(View.VISIBLE);
+            tvEmptyState.setText(message);
         }
     }
 

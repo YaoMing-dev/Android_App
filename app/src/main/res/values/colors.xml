@@ -58,7 +58,7 @@
     <color name="status_sold">#9E9E9E</color>
     <color name="status_pending">#FF9800</color>
     <color name="status_paused">#FFC107</color>
-    <color name="status_expired">#F44336</color>
+
 
     <!-- Product Condition -->
     <color name="condition_new">#4CAF50</color>
@@ -74,6 +74,7 @@
     <color name="online_status">#4CAF50</color>
     <color name="offline_status">#9E9E9E</color>
     <color name="typing_indicator">#2196F3</color>
+    <color name="chat_background">#F5F5F5</color>
 
     <!-- Offer Colors -->
     <color name="offer_accepted">#4CAF50</color>
@@ -89,6 +90,8 @@
     <color name="rating_good">#8BC34A</color>
     <color name="rating_average">#FFC107</color>
     <color name="rating_poor">#FF5722</color>
+    <color name="rating_yellow">#FFC107</color>
+    <color name="rating_gray">#E0E0E0</color>
 
     <!-- Special UI Colors -->
     <color name="splash_gradient_start">#2196F3</color>
@@ -106,4 +109,23 @@
     <color name="category_automotive">#F44336</color>
     <color name="category_toys">#FF5722</color>
     <color name="category_beauty">#E91E63</color>
+
+    <!-- App Specific Colors -->
+    <color name="primary">#2196F3</color>
+    <color name="success">#4CAF50</color>
+    <color name="error">#F44336</color>
+    <color name="warning">#FF9800</color>
+    <color name="warning_light">#FFF3E0</color>
+    <color name="warning_dark">#E65100</color>
+
+    <!-- Border Colors -->
+    <color name="border_light">#E0E0E0</color>
+    <color name="border_dark">#BDBDBD</color>
+
+    <!-- Status Colors for Offers -->
+
+    <color name="status_accepted">#4CAF50</color>
+    <color name="status_rejected">#F44336</color>
+    <color name="status_countered">#FF9800</color>
+    <color name="status_expired">#9E9E9E</color>
 </resources>

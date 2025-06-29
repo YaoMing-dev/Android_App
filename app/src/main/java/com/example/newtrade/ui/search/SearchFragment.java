@@ -48,11 +48,11 @@ import retrofit2.Response;
 public class SearchFragment extends Fragment {
 
     private static final String TAG = "SearchFragment";
-    private static final int SEARCH_DELAY_MS = 300;
+    private static final int SEARCH_DELAY_MS = 200; // FR-3.1.2: 200ms debounce
 
     // UI Components
     private TextInputEditText etSearch;
-    private MaterialButton btnCategoryFilter, btnPriceFilter, btnLocationFilter, btnConditionFilter;
+    private MaterialButton btnCategoryFilter, btnPriceFilter, btnLocationFilter, btnConditionFilter, btnSortFilter;
     private ChipGroup chipGroupFilters;
     private RecyclerView rvSearchResults;
     private LinearLayout llEmptyState, llRecentSearches, llLoadingState;
@@ -67,18 +67,37 @@ public class SearchFragment extends Fragment {
     private final Handler searchHandler = new Handler(Looper.getMainLooper());
     private Runnable searchRunnable;
 
-    // Filters
+    // FR-3.1.1: Advanced Filters
     private Long selectedCategoryId = null;
     private String selectedCategoryName = null;
     private String selectedCondition = null;
     private Double minPrice = null;
     private Double maxPrice = null;
-    private String sortBy = "relevance";
+    private String sortBy = "relevance"; // FR-3.1.3: Default sort
     private boolean isSearching = false;
 
-    // Location Filter
+    // FR-6.1: Location Filter for radius search
     private Double searchLatitude = null;
     private Double searchLongitude = null;
+    private Integer searchRadius = 50; // Default 50km radius
+
+    // FR-3.1.3: Sort options
+    private static final String[] SORT_OPTIONS = {
+        "relevance", "newest", "price_low", "price_high", "distance"
+    };
+    private static final String[] SORT_LABELS = {
+        "Relevance", "Newest First", "Price: Low to High", "Price: High to Low", "Distance"
+    };
+
+    // FR-3.1.1: Condition options
+    private static final String[] CONDITION_OPTIONS = {
+        "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"
+    };
+    private static final String[] CONDITION_LABELS = {
+        "New", "Like New", "Good", "Fair", "Poor"
+    };
+
+    // Location Filter
     private String searchLocationName = "";
     private int searchRadiusKm = 10;
 
@@ -108,6 +127,7 @@ public class SearchFragment extends Fragment {
         btnPriceFilter = view.findViewById(R.id.btn_price_filter);
         btnLocationFilter = view.findViewById(R.id.btn_location_filter);
         btnConditionFilter = view.findViewById(R.id.btn_condition_filter);
+        btnSortFilter = view.findViewById(R.id.btn_sort_filter);
         chipGroupFilters = view.findViewById(R.id.chip_group_filters);
         rvSearchResults = view.findViewById(R.id.rv_search_results);
         llEmptyState = view.findViewById(R.id.ll_empty_state);
@@ -163,6 +183,7 @@ public class SearchFragment extends Fragment {
         btnPriceFilter.setOnClickListener(v -> showPriceFilter());
         btnLocationFilter.setOnClickListener(v -> showLocationFilter());
         btnConditionFilter.setOnClickListener(v -> showConditionFilter());
+        btnSortFilter.setOnClickListener(v -> showSortOptions());
 
         // Sort option
         tvSortOption.setOnClickListener(v -> showSortOptions());
@@ -274,7 +295,7 @@ public class SearchFragment extends Fragment {
         // ✅ FIX: Use searchProductsAdvanced method
         Call<StandardResponse<Map<String, Object>>> call = apiService.searchProductsAdvanced(
                 query, selectedCategoryId, minPrice, maxPrice, selectedCondition,
-                searchLatitude, searchLongitude, searchRadiusKm, sortBy, 0, 20
+                searchLatitude, searchLongitude, searchRadius, sortBy, 0, 20
         );
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
@@ -358,14 +379,11 @@ public class SearchFragment extends Fragment {
     }
 
     private void showSortOptions() {
-        String[] sortOptions = {"Relevance", "Price: Low to High", "Price: High to Low", "Newest First", "Oldest First"};
-        String[] sortValues = {"relevance", "price_asc", "price_desc", "newest", "oldest"};
-
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("Sort by");
-        builder.setItems(sortOptions, (dialog, which) -> {
-            sortBy = sortValues[which];
-            tvSortOption.setText(sortOptions[which]);
+        builder.setItems(SORT_LABELS, (dialog, which) -> {
+            sortBy = SORT_OPTIONS[which];
+            tvSortOption.setText(SORT_LABELS[which]);
 
             // Re-perform search with new sort
             if (!TextUtils.isEmpty(currentQuery)) {

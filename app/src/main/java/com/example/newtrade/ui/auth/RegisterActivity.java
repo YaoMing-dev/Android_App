@@ -188,66 +188,86 @@ public class RegisterActivity extends AppCompatActivity {
                     StandardResponse<User> apiResponse = response.body();
                     Log.d(TAG, "🔍 Register response: " + new Gson().toJson(apiResponse));
 
-                    if (apiResponse.isSuccess() && apiResponse.hasData()) {
-                        handleRegisterSuccess(apiResponse.getData(), email);
+                    if (apiResponse.isSuccess()) {
+                        // Registration successful - now navigate to OTP verification
+                        Log.d(TAG, "✅ Registration successful, navigating to OTP verification");
+                        Toast.makeText(RegisterActivity.this,
+                                "Registration successful! Please check your email for verification code.",
+                                Toast.LENGTH_LONG).show();
+                        navigateToOtpVerification(email);
                     } else {
                         showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Đăng ký thất bại");
                     }
                 } else {
-                    // Try to parse error response
-                    try {
-                        if (response.errorBody() != null) {
-                            String errorJson = response.errorBody().string();
-                            Log.e(TAG, "❌ Register error body: " + errorJson);
-
-                            // Try to parse as StandardResponse
-                            StandardResponse<?> errorResponse = new Gson().fromJson(errorJson, StandardResponse.class);
-                            if (errorResponse != null && errorResponse.getMessage() != null) {
-                                showError(errorResponse.getMessage());
-                            } else {
-                                showError("Đăng ký thất bại. Thử lại sau.");
-                            }
-                        } else {
-                            showError("Đăng ký thất bại. Thử lại sau.");
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error parsing error response", e);
-                        showError("Đăng ký thất bại. Thử lại sau.");
-                    }
+                    // Handle error response
+                    handleRegisterError(response);
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<User>> call, @NonNull Throwable t) {
                 showLoading(false);
-                Log.e(TAG, "❌ Register network error", t);
-
-                if (t instanceof java.net.ConnectException) {
-                    showError("Không thể kết nối đến server. Kiểm tra kết nối mạng.");
-                } else if (t instanceof java.net.SocketTimeoutException) {
-                    showError("Kết nối timeout. Thử lại sau.");
-                } else {
-                    showError("Lỗi mạng: " + t.getMessage());
-                }
+                String errorMessage = getNetworkErrorMessage(t);
+                showError("Registration failed: " + errorMessage);
+                Log.e(TAG, "❌ Registration request failed", t);
             }
         });
     }
 
-    private void handleRegisterSuccess(User user, String email) {
-        Log.d(TAG, "✅ Registration successful for user: " + user.getDisplayName());
+    private void handleRegisterError(Response<StandardResponse<User>> response) {
+        try {
+            if (response.errorBody() != null) {
+                String errorJson = response.errorBody().string();
+                Log.e(TAG, "❌ Register error body: " + errorJson);
 
-        Toast.makeText(this, "Đăng ký thành công! Vui lòng xác thực email.", Toast.LENGTH_LONG).show();
-
-        // Navigate to OTP verification
-        navigateToOtpVerification(email, true);
+                // Try to parse error message
+                StandardResponse<User> errorResponse = new Gson().fromJson(errorJson, StandardResponse.class);
+                if (errorResponse != null && errorResponse.getMessage() != null) {
+                    showError(errorResponse.getMessage());
+                } else {
+                    showError("Registration failed. Please try again.");
+                }
+            } else {
+                showError("Registration failed. Please try again.");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing error response", e);
+            showError("Registration failed. Please try again.");
+        }
     }
 
-    private void navigateToOtpVerification(String email, boolean fromRegister) {
+    private String getNetworkErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown error occurred";
+        }
+
+        String message = throwable.getMessage();
+        if (message == null || message.isEmpty()) {
+            return "Network error occurred";
+        }
+
+        // Handle specific error types
+        if (message.contains("timeout")) {
+            return "Connection timeout. Please try again.";
+        } else if (message.contains("connection")) {
+            return "Connection failed. Please check your internet.";
+        } else if (message.contains("409")) {
+            return "Email already exists. Please use a different email.";
+        } else if (message.contains("400")) {
+            return "Invalid registration data. Please check your input.";
+        } else if (message.contains("500")) {
+            return "Server error. Please try again later.";
+        }
+
+        return message;
+    }
+
+    private void navigateToOtpVerification(String email) {
         Intent intent = new Intent(this, OtpVerificationActivity.class);
         intent.putExtra("email", email);
-        intent.putExtra("fromRegister", fromRegister);
+        intent.putExtra("fromRegister", true);
         startActivity(intent);
-        finish(); // Don't allow back to register after successful registration
+        // Don't finish() here - user might want to go back if OTP fails
     }
 
     private void navigateToLogin() {

@@ -1,7 +1,9 @@
 // app/src/main/java/com/example/newtrade/ui/chat/ChatActivity.java
 package com.example.newtrade.ui.chat;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -17,11 +19,14 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.MessageAdapter;
+import com.example.newtrade.location.LocationService;
 import com.example.newtrade.models.Message;
 import com.example.newtrade.utils.NavigationUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
@@ -33,7 +38,8 @@ import java.util.List;
 
 public class ChatActivity extends AppCompatActivity implements
         RealtimeWebSocketService.WebSocketListener,
-        RealtimeWebSocketService.ChatListener {
+        RealtimeWebSocketService.ChatListener,
+        LocationService.LocationCallback {
 
     private static final String TAG = "ChatActivity";
 
@@ -45,6 +51,7 @@ public class ChatActivity extends AppCompatActivity implements
     private TextView tvProductInfo;
     private TextView tvConnectionStatus;
     private TextView tvTypingIndicator;
+    private ImageButton btnShareLocation;
 
     // Data
     private MessageAdapter messageAdapter;
@@ -66,6 +73,10 @@ public class ChatActivity extends AppCompatActivity implements
     private Handler typingHandler;
     private boolean isUserTyping = false;
     private static final long TYPING_TIMEOUT = 3000; // 3 seconds
+
+    // Location sharing
+    private LocationService locationService;
+    private static final int LOCATION_PERMISSION_REQUEST = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,6 +100,10 @@ public class ChatActivity extends AppCompatActivity implements
         // Initialize WebSocket service
         initWebSocketService();
 
+        // Initialize location service
+        locationService = new LocationService(this);
+        locationService.setLocationCallback(this);
+
         Log.d(TAG, "✅ ChatActivity created for conversation: " + conversationId);
     }
 
@@ -100,11 +115,15 @@ public class ChatActivity extends AppCompatActivity implements
         sellerId = intent.getLongExtra("seller_id", 0L);
         otherUserName = intent.getStringExtra("other_user_name");
 
-        if (conversationId <= 0) {
-            Log.e(TAG, "❌ Invalid conversation ID");
-            finish();
-            return;
+        // For creating new chat from user profile
+        Long otherUserId = intent.getLongExtra("other_user_id", 0L);
+        if (otherUserId > 0 && conversationId == 0L) {
+            // This is a new chat - we'll create the conversation when first message is sent
+            sellerId = otherUserId;
         }
+
+        Log.d(TAG, "Intent data - conversationId: " + conversationId + ", productId: " + productId +
+                ", sellerId: " + sellerId + ", otherUser: " + otherUserName);
     }
 
     private void initViews() {
@@ -115,228 +134,305 @@ public class ChatActivity extends AppCompatActivity implements
         tvProductInfo = findViewById(R.id.tv_product_info);
         tvConnectionStatus = findViewById(R.id.tv_connection_status);
         tvTypingIndicator = findViewById(R.id.tv_typing_indicator);
-
-        // Set product info if available
-        if (productTitle != null && !productTitle.isEmpty()) {
-            tvProductInfo.setText("Về: " + productTitle);
-            tvProductInfo.setVisibility(View.VISIBLE);
-        } else {
-            tvProductInfo.setVisibility(View.GONE);
-        }
-
-        // Initially hide typing indicator
-        tvTypingIndicator.setVisibility(View.GONE);
+        btnShareLocation = findViewById(R.id.btn_share_location);
     }
 
     private void setupToolbar() {
-        NavigationUtils.setupToolbarWithBackButton(this, toolbar,
-                otherUserName != null ? otherUserName : "Chat");
+        String title = otherUserName != null ? otherUserName : "Chat";
+        NavigationUtils.setupToolbarWithBackButton(this, toolbar, title);
     }
 
     private void setupRecyclerView() {
-        // ✅ FIX: Remove 'this' parameter - MessageAdapter constructor only needs messages and currentUserId
-        messageAdapter = new MessageAdapter(messages, currentUserId);
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setStackFromEnd(true); // Show latest messages at bottom
+        layoutManager.setStackFromEnd(true);
         rvMessages.setLayoutManager(layoutManager);
+
+        messageAdapter = new MessageAdapter(messages, currentUserId);
         rvMessages.setAdapter(messageAdapter);
     }
 
     private void setupListeners() {
         btnSend.setOnClickListener(v -> sendMessage());
 
-        // Typing indicator
         etMessage.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                handleTypingIndicator();
+                handleTyping();
             }
 
             @Override
             public void afterTextChanged(Editable s) {
-                // Enable/disable send button based on text content
-                boolean hasText = s.toString().trim().length() > 0;
-                btnSend.setEnabled(hasText);
-                btnSend.setAlpha(hasText ? 1.0f : 0.5f);
+                btnSend.setEnabled(!s.toString().trim().isEmpty());
             }
         });
+
+        btnShareLocation.setOnClickListener(v -> requestLocationAndShare());
     }
 
     private void initWebSocketService() {
         webSocketService = RealtimeWebSocketService.getInstance();
+        webSocketService.setWebSocketListener(this);
+        webSocketService.setChatListener(this);
 
-        // Add listeners
-        webSocketService.addWebSocketListener(TAG, this);
-        webSocketService.addChatListener(conversationId, this);
-
-        // Connect if not connected
-        if (!webSocketService.isConnected() && currentUserId != null) {
-            webSocketService.connect(currentUserId);
+        if (!webSocketService.isConnected()) {
+            String token = prefsManager.getToken();
+            webSocketService.connect(token);
         }
 
-        // Join conversation
-        if (conversationId != null && conversationId > 0) {
+        // Join conversation if exists
+        if (conversationId > 0) {
             webSocketService.joinConversation(conversationId);
+            loadChatHistory();
         }
+    }
 
-        // Update connection status
-        updateConnectionStatus(webSocketService.isConnected());
+    private void loadChatHistory() {
+        // Load existing messages from API
+        // This would typically be done via REST API call
+        Log.d(TAG, "Loading chat history for conversation: " + conversationId);
     }
 
     private void sendMessage() {
-        String content = etMessage.getText().toString().trim();
-        if (content.isEmpty() || webSocketService == null) {
-            return;
-        }
+        String messageText = etMessage.getText().toString().trim();
+        if (messageText.isEmpty()) return;
 
         // Clear input
         etMessage.setText("");
 
-        // Send via WebSocket
-        webSocketService.sendMessage(conversationId, content);
-
-        // Add message to UI immediately (optimistic update)
+        // Create message object
         Message message = new Message();
-        message.setConversationId(conversationId);
+        message.setContent(messageText);
         message.setSenderId(currentUserId);
-        message.setContent(content);
-        message.setMessageType("TEXT");
-        message.setTimestamp(getCurrentTimeString());
+        message.setConversationId(conversationId);
+        message.setMessageType("text");
+        message.setCreatedAt(System.currentTimeMillis());
 
-        addMessageToUI(message);
+        // Add to local list immediately for better UX
+        messages.add(message);
+        messageAdapter.notifyItemInserted(messages.size() - 1);
+        rvMessages.scrollToPosition(messages.size() - 1);
 
-        Log.d(TAG, "📤 Message sent: " + content);
-    }
-
-    private void handleTypingIndicator() {
-        if (webSocketService == null) {
-            return;
+        // Send via WebSocket
+        if (conversationId > 0) {
+            webSocketService.sendMessage(conversationId, messageText, "text");
+        } else {
+            // Create new conversation first
+            createConversationAndSendMessage(messageText);
         }
 
-        // Send typing start
+        Log.d(TAG, "✅ Message sent: " + messageText);
+    }
+
+    private void createConversationAndSendMessage(String messageText) {
+        // Create new conversation via API then send message
+        // This is a simplified version - in real app you'd call API
+        Log.d(TAG, "Creating new conversation with user: " + sellerId);
+        // For now, simulate conversation creation
+        conversationId = System.currentTimeMillis(); // Temporary ID
+        webSocketService.joinConversation(conversationId);
+        webSocketService.sendMessage(conversationId, messageText, "text");
+    }
+
+    private void handleTyping() {
         if (!isUserTyping) {
             isUserTyping = true;
-            webSocketService.sendTypingIndicator(conversationId, true);
+            if (conversationId > 0) {
+                webSocketService.sendTypingIndicator(conversationId, true);
+            }
         }
 
         // Reset typing timeout
         typingHandler.removeCallbacksAndMessages(null);
         typingHandler.postDelayed(() -> {
-            if (isUserTyping) {
-                isUserTyping = false;
+            isUserTyping = false;
+            if (conversationId > 0) {
                 webSocketService.sendTypingIndicator(conversationId, false);
             }
         }, TYPING_TIMEOUT);
     }
 
-    private void addMessageToUI(Message message) {
+    private void requestLocationAndShare() {
+        if (checkLocationPermission()) {
+            shareCurrentLocation();
+        } else {
+            requestLocationPermission();
+        }
+    }
+
+    private boolean checkLocationPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+               ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestLocationPermission() {
+        ActivityCompat.requestPermissions(this,
+            new String[]{
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            },
+            LOCATION_PERMISSION_REQUEST);
+    }
+
+    private void shareCurrentLocation() {
+        btnShareLocation.setEnabled(false);
+        Toast.makeText(this, "Getting your location...", Toast.LENGTH_SHORT).show();
+        locationService.getCurrentLocation();
+    }
+
+    // LocationService.LocationCallback implementation
+    @Override
+    public void onLocationReceived(double latitude, double longitude, String address) {
         runOnUiThread(() -> {
-            messages.add(message);
+            btnShareLocation.setEnabled(true);
+
+            // Create location message
+            Message locationMessage = Message.createLocationMessage(
+                currentUserId, conversationId, latitude, longitude, address);
+
+            // Add to local list
+            messages.add(locationMessage);
             messageAdapter.notifyItemInserted(messages.size() - 1);
             rvMessages.scrollToPosition(messages.size() - 1);
+
+            // Send via WebSocket
+            if (conversationId > 0) {
+                webSocketService.sendLocationMessage(conversationId, latitude, longitude, address);
+            }
+
+            Log.d(TAG, "✅ Location shared: " + latitude + ", " + longitude + " - " + address);
+            Toast.makeText(this, "Location shared!", Toast.LENGTH_SHORT).show();
         });
     }
 
-    private void updateConnectionStatus(boolean connected) {
+    @Override
+    public void onLocationError(String error) {
         runOnUiThread(() -> {
-            if (tvConnectionStatus != null) {
-                if (connected) {
-                    tvConnectionStatus.setText("🟢 Connected");
-                    tvConnectionStatus.setVisibility(View.VISIBLE);
+            btnShareLocation.setEnabled(true);
+            Toast.makeText(this, "Failed to get location: " + error, Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "❌ Location error: " + error);
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == LOCATION_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                shareCurrentLocation();
+            } else {
+                Toast.makeText(this, "Location permission required to share location", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    // WebSocket Listener Implementation
+    @Override
+    public void onWebSocketConnected() {
+        runOnUiThread(() -> {
+            tvConnectionStatus.setText("Connected");
+            tvConnectionStatus.setVisibility(View.GONE);
+            Log.d(TAG, "✅ WebSocket connected");
+        });
+    }
+
+    @Override
+    public void onWebSocketDisconnected() {
+        runOnUiThread(() -> {
+            tvConnectionStatus.setText("Disconnected - Reconnecting...");
+            tvConnectionStatus.setVisibility(View.VISIBLE);
+            Log.w(TAG, "⚠️ WebSocket disconnected");
+        });
+    }
+
+    @Override
+    public void onWebSocketError(String error) {
+        runOnUiThread(() -> {
+            tvConnectionStatus.setText("Connection Error");
+            tvConnectionStatus.setVisibility(View.VISIBLE);
+            Toast.makeText(this, "Connection error: " + error, Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "❌ WebSocket error: " + error);
+        });
+    }
+
+    // Chat Listener Implementation
+    @Override
+    public void onMessageReceived(Message message) {
+        runOnUiThread(() -> {
+            // Only add if not from current user and not duplicate
+            if (!message.getSenderId().equals(currentUserId)) {
+                messages.add(message);
+                messageAdapter.notifyItemInserted(messages.size() - 1);
+                rvMessages.scrollToPosition(messages.size() - 1);
+                Log.d(TAG, "✅ Message received: " + message.getContent());
+            }
+        });
+    }
+
+    @Override
+    public void onTypingIndicator(Long userId, boolean isTyping) {
+        runOnUiThread(() -> {
+            if (!userId.equals(currentUserId)) {
+                if (isTyping) {
+                    tvTypingIndicator.setText(otherUserName + " is typing...");
+                    tvTypingIndicator.setVisibility(View.VISIBLE);
                 } else {
-                    tvConnectionStatus.setText("🔴 Disconnected");
-                    tvConnectionStatus.setVisibility(View.VISIBLE);
+                    tvTypingIndicator.setVisibility(View.GONE);
                 }
             }
         });
     }
 
-    private String getCurrentTimeString() {
-        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault());
-        return sdf.format(new java.util.Date());
-    }
-
-    // ===== WebSocketListener Implementation =====
-
     @Override
-    public void onConnectionChanged(boolean connected) {
-        updateConnectionStatus(connected);
-        Log.d(TAG, connected ? "✅ Connected to WebSocket" : "❌ Disconnected from WebSocket");
-    }
-
-    @Override
-    public void onError(String error) {
+    public void onMessageStatusUpdated(Long messageId, String status) {
         runOnUiThread(() -> {
-            Toast.makeText(this, "Connection error: " + error, Toast.LENGTH_SHORT).show();
-            updateConnectionStatus(false);
-        });
-        Log.e(TAG, "❌ WebSocket error: " + error);
-    }
-
-    // ===== ChatListener Implementation =====
-
-    @Override
-    public void onMessageReceived(Message message) {
-        Log.d(TAG, "📨 Message received: " + message.getContent());
-        addMessageToUI(message);
-    }
-
-    @Override
-    public void onTypingIndicator(Long userId, boolean isTyping) {
-        // Only show if it's not the current user
-        if (!userId.equals(currentUserId)) {
-            runOnUiThread(() -> {
-                if (isTyping) {
-                    tvTypingIndicator.setText(otherUserName + " đang gõ...");
-                    tvTypingIndicator.setVisibility(View.VISIBLE);
-                } else {
-                    tvTypingIndicator.setVisibility(View.GONE);
+            // Update message status (sent, delivered, read)
+            for (Message message : messages) {
+                if (message.getId() != null && message.getId().equals(messageId)) {
+                    message.setStatus(status);
+                    messageAdapter.notifyDataSetChanged();
+                    break;
                 }
-            });
+            }
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webSocketService != null && conversationId > 0) {
+            webSocketService.joinConversation(conversationId);
         }
     }
 
     @Override
-    public void onMessageDelivered(Long messageId) {
-        Log.d(TAG, "✅ Message delivered: " + messageId);
-        // Update message status in UI if needed
-    }
-
-    @Override
-    public void onMessageRead(Long messageId) {
-        Log.d(TAG, "✅ Message read: " + messageId);
-        // Update message status in UI if needed
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (NavigationUtils.handleBackButton(this, item)) {
-            return true;
+    protected void onPause() {
+        super.onPause();
+        if (webSocketService != null && conversationId > 0) {
+            webSocketService.leaveConversation(conversationId);
         }
-        return super.onOptionsItemSelected(item);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        // Stop typing indicator
         if (typingHandler != null) {
             typingHandler.removeCallbacksAndMessages(null);
         }
-
-        // Remove listeners
-        if (webSocketService != null) {
-            webSocketService.removeWebSocketListener(TAG);
-            webSocketService.removeChatListener(conversationId, this);
-
-            // Leave conversation
+        if (webSocketService != null && conversationId > 0) {
             webSocketService.leaveConversation(conversationId);
         }
+    }
 
-        Log.d(TAG, "🧹 ChatActivity destroyed");
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

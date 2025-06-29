@@ -1,34 +1,28 @@
-// app/src/main/java/com/example/newtrade/websocket/WebSocketManager.java
 package com.example.newtrade.websocket;
 
 import android.util.Log;
-import com.example.newtrade.models.Message;
 import com.example.newtrade.utils.Constants;
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+import org.json.JSONObject;
 import java.net.URI;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 public class WebSocketManager {
     private static final String TAG = "WebSocketManager";
+    private static final String WS_URL = Constants.WS_BASE_URL + "/ws/chat";
     private static WebSocketManager instance;
-
     private WebSocketClient webSocketClient;
-    private WebSocketListener listener;
-    private Gson gson = new Gson();
-    private boolean isConnected = false;
-    private Long currentUserId;
+    private final List<WebSocketListener> listeners = new ArrayList<>();
+    private String authToken;
 
     public interface WebSocketListener {
-        void onMessageReceived(Message message);
-        void onTyping(Long userId, boolean isTyping);
-        void onUserStatusChanged(Long userId, boolean isOnline);
-        void onConnectionChanged(boolean connected);
-        void onError(String error);
+        void onMessage(String message);
+        void onConnectionStateChange(boolean connected);
     }
+
+    private WebSocketManager() {}
 
     public static synchronized WebSocketManager getInstance() {
         if (instance == null) {
@@ -37,191 +31,95 @@ public class WebSocketManager {
         return instance;
     }
 
-    public void connect(Long userId, WebSocketListener listener) {
-        this.currentUserId = userId;
-        this.listener = listener;
+    public void init(String token) {
+        this.authToken = token;
+        connect();
+    }
 
+    public void connect() {
         try {
-            String wsUrl = Constants.WS_BASE_URL + "/ws";
-            URI serverUri = URI.create(wsUrl);
-
-            webSocketClient = new WebSocketClient(serverUri) {
+            URI uri = URI.create(WS_URL);
+            webSocketClient = new WebSocketClient(uri) {
                 @Override
-                public void onOpen(ServerHandshake handshakedata) {
-                    Log.d(TAG, "✅ WebSocket connected");
-                    isConnected = true;
-                    if (listener != null) {
-                        listener.onConnectionChanged(true);
+                public void onOpen(ServerHandshake handshake) {
+                    Log.d(TAG, "WebSocket Connected");
+                    // Send authentication message
+                    try {
+                        JSONObject auth = new JSONObject();
+                        auth.put("type", "AUTH");
+                        auth.put("token", authToken);
+                        send(auth.toString());
+                    } catch (Exception e) {
+                        Log.e(TAG, "Auth error", e);
                     }
-
-                    // Subscribe to user's conversations
-                    subscribeToUserChannels();
+                    notifyConnectionChange(true);
                 }
 
                 @Override
                 public void onMessage(String message) {
-                    Log.d(TAG, "📨 WebSocket message: " + message);
-                    handleIncomingMessage(message);
+                    Log.d(TAG, "Received message: " + message);
+                    notifyMessage(message);
                 }
 
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
-                    Log.d(TAG, "❌ WebSocket closed: " + reason);
-                    isConnected = false;
-                    if (listener != null) {
-                        listener.onConnectionChanged(false);
-                    }
+                    Log.d(TAG, "WebSocket Closed: " + reason);
+                    notifyConnectionChange(false);
                 }
 
                 @Override
                 public void onError(Exception ex) {
-                    Log.e(TAG, "❌ WebSocket error", ex);
-                    isConnected = false;
-                    if (listener != null) {
-                        listener.onError(ex.getMessage());
-                    }
+                    Log.e(TAG, "WebSocket Error", ex);
+                    notifyConnectionChange(false);
                 }
             };
-
             webSocketClient.connect();
-
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error connecting to WebSocket", e);
-            if (listener != null) {
-                listener.onError("Connection failed: " + e.getMessage());
-            }
-        }
-    }
-
-    private void subscribeToUserChannels() {
-        if (currentUserId != null) {
-            // Subscribe to user's personal channel
-            JsonObject subscribe = new JsonObject();
-            subscribe.addProperty("action", "subscribe");
-            subscribe.addProperty("channel", "/topic/user/" + currentUserId);
-            sendMessage(subscribe.toString());
-        }
-    }
-
-    public void subscribeToConversation(Long conversationId) {
-        if (isConnected && conversationId != null) {
-            JsonObject subscribe = new JsonObject();
-            subscribe.addProperty("action", "subscribe");
-            subscribe.addProperty("channel", "/topic/conversation/" + conversationId);
-            sendMessage(subscribe.toString());
-
-            Log.d(TAG, "📡 Subscribed to conversation: " + conversationId);
-        }
-    }
-
-    public void sendChatMessage(Long conversationId, String messageText) {
-        if (!isConnected || conversationId == null || currentUserId == null) {
-            Log.w(TAG, "⚠️ Cannot send message - not connected or missing data");
-            return;
-        }
-
-        JsonObject messageObj = new JsonObject();
-        messageObj.addProperty("action", "send_message");
-        messageObj.addProperty("conversationId", conversationId);
-        messageObj.addProperty("senderId", currentUserId);
-        messageObj.addProperty("content", messageText);
-        messageObj.addProperty("type", "TEXT");
-
-        sendMessage(messageObj.toString());
-        Log.d(TAG, "📤 Sent chat message to conversation: " + conversationId);
-    }
-
-    public void sendTypingIndicator(Long conversationId, boolean isTyping) {
-        if (!isConnected || conversationId == null || currentUserId == null) return;
-
-        JsonObject typing = new JsonObject();
-        typing.addProperty("action", "typing");
-        typing.addProperty("conversationId", conversationId);
-        typing.addProperty("senderId", currentUserId);
-        typing.addProperty("isTyping", isTyping);
-
-        sendMessage(typing.toString());
-    }
-
-    private void sendMessage(String message) {
-        if (webSocketClient != null && isConnected) {
-            webSocketClient.send(message);
-        }
-    }
-
-    private void handleIncomingMessage(String rawMessage) {
-        try {
-            JsonObject json = gson.fromJson(rawMessage, JsonObject.class);
-            String type = json.has("type") ? json.get("type").getAsString() : "";
-
-            switch (type) {
-                case "NEW_MESSAGE":
-                    handleNewMessage(json);
-                    break;
-                case "TYPING":
-                    handleTypingIndicator(json);
-                    break;
-                case "USER_STATUS":
-                    handleUserStatus(json);
-                    break;
-                default:
-                    Log.d(TAG, "⚠️ Unknown message type: " + type);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing WebSocket message", e);
-        }
-    }
-
-    private void handleNewMessage(JsonObject json) {
-        try {
-            Message message = gson.fromJson(json, Message.class);
-            if (listener != null) {
-                listener.onMessageReceived(message);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing new message", e);
-        }
-    }
-
-    private void handleTypingIndicator(JsonObject json) {
-        try {
-            Long userId = json.get("senderId").getAsLong();
-            boolean isTyping = json.get("isTyping").getAsBoolean();
-
-            if (listener != null) {
-                listener.onTyping(userId, isTyping);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing typing indicator", e);
-        }
-    }
-
-    private void handleUserStatus(JsonObject json) {
-        try {
-            Long userId = json.get("userId").getAsLong();
-            boolean isOnline = json.get("isOnline").getAsBoolean();
-
-            if (listener != null) {
-                listener.onUserStatusChanged(userId, isOnline);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing user status", e);
+            Log.e(TAG, "WebSocket Init Error", e);
         }
     }
 
     public void disconnect() {
-        if (webSocketClient != null) {
+        if (webSocketClient != null && webSocketClient.isOpen()) {
             webSocketClient.close();
-            webSocketClient = null;
         }
-        isConnected = false;
-        currentUserId = null;
-        listener = null;
-        Log.d(TAG, "🔌 WebSocket disconnected");
+    }
+
+    public void sendMessage(String chatId, String message) {
+        try {
+            JSONObject messageObj = new JSONObject();
+            messageObj.put("type", "MESSAGE");
+            messageObj.put("chatId", chatId);
+            messageObj.put("content", message);
+            webSocketClient.send(messageObj.toString());
+        } catch (Exception e) {
+            Log.e(TAG, "Send message error", e);
+        }
+    }
+
+    public void addListener(WebSocketListener listener) {
+        if (!listeners.contains(listener)) {
+            listeners.add(listener);
+        }
+    }
+
+    public void removeListener(WebSocketListener listener) {
+        listeners.remove(listener);
+    }
+
+    private void notifyMessage(String message) {
+        for (WebSocketListener listener : listeners) {
+            listener.onMessage(message);
+        }
+    }
+
+    private void notifyConnectionChange(boolean connected) {
+        for (WebSocketListener listener : listeners) {
+            listener.onConnectionStateChange(connected);
+        }
     }
 
     public boolean isConnected() {
-        return isConnected;
+        return webSocketClient != null && webSocketClient.isOpen();
     }
 }

@@ -24,14 +24,13 @@ import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.models.User;
 import com.example.newtrade.ui.chat.ChatActivity;
+import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.utils.NavigationUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 import retrofit2.Call;
@@ -80,8 +79,9 @@ public class UserProfileActivity extends AppCompatActivity {
         Intent intent = getIntent();
         userId = intent.getLongExtra("user_id", -1L);
 
-        if (userId <= 0) {
-            Log.e(TAG, "Invalid user ID");
+        if (userId == -1L) {
+            Log.e(TAG, "❌ No user ID provided");
+            Toast.makeText(this, "Invalid user profile", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
@@ -97,13 +97,7 @@ public class UserProfileActivity extends AppCompatActivity {
         tvRating = findViewById(R.id.tv_rating);
         tvResponseRate = findViewById(R.id.tv_response_rate);
         btnContact = findViewById(R.id.btn_contact);
-
-        // ✅ FIX: Check if btn_view_reviews exists in layout
-        btnViewReviews = findViewById(R.id.btn_view_reviews);
-        if (btnViewReviews == null) {
-            Log.w(TAG, "btn_view_reviews not found in layout - this is optional");
-        }
-
+        btnViewReviews = findViewById(R.id.btn_view_reviews); // May be null if not in layout
         rvUserProducts = findViewById(R.id.rv_user_products);
         llEmptyState = findViewById(R.id.ll_empty_state);
 
@@ -111,143 +105,208 @@ public class UserProfileActivity extends AppCompatActivity {
     }
 
     private void setupToolbar() {
-        setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("User Profile");
-        }
+        NavigationUtils.setupToolbarWithBackButton(this, toolbar, "User Profile");
     }
 
     private void setupRecyclerView() {
-        productAdapter = new ProductAdapter(userProducts, this::openProductDetail);
-        rvUserProducts.setLayoutManager(new GridLayoutManager(this, 2));
+        GridLayoutManager layoutManager = new GridLayoutManager(this, 2);
+        rvUserProducts.setLayoutManager(layoutManager);
+
+        productAdapter = new ProductAdapter(userProducts, product -> {
+            // Navigate to product details
+            Intent intent = new Intent(this, ProductDetailActivity.class);
+            intent.putExtra("product_id", product.getId());
+            startActivity(intent);
+        });
+
         rvUserProducts.setAdapter(productAdapter);
     }
 
     private void setupListeners() {
-        btnContact.setOnClickListener(v -> contactUser());
+        btnContact.setOnClickListener(v -> startChat());
 
-        // ✅ FIX: Only set listener if button exists
         if (btnViewReviews != null) {
             btnViewReviews.setOnClickListener(v -> viewUserReviews());
         }
     }
 
     private void loadUserProfile() {
-        // TODO: Replace with actual API call to get user profile
-        createMockUserProfile();
+        Log.d(TAG, "Loading profile for user: " + userId);
+
+        ApiClient.getApiService().getUserById(userId)
+            .enqueue(new Callback<StandardResponse<User>>() {
+                @Override
+                public void onResponse(@NonNull Call<StandardResponse<User>> call,
+                                       @NonNull Response<StandardResponse<User>> response) {
+                    if (response.isSuccessful() && response.body() != null) {
+                        StandardResponse<User> apiResponse = response.body();
+
+                        if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                            userProfile = apiResponse.getData();
+                            updateProfileUI();
+                            Log.d(TAG, "✅ User profile loaded: " + userProfile.getDisplayName());
+                        } else {
+                            showError("Failed to load user profile");
+                        }
+                    } else {
+                        showError("User not found");
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<StandardResponse<User>> call, @NonNull Throwable t) {
+                    showError("Network error: " + t.getMessage());
+                    Log.e(TAG, "Failed to load user profile", t);
+                }
+            });
     }
 
-    private void createMockUserProfile() {
-        // Mock user profile data
-        tvDisplayName.setText("John Seller");
-        tvMemberSince.setText("Member since Jan 2023");
-        tvLocation.setText("Ho Chi Minh City, Vietnam");
-        tvListingsCount.setText("12 listings");
-        tvRating.setText("4.8 ★");
-        tvResponseRate.setText("95% response rate");
+    private void updateProfileUI() {
+        if (userProfile == null) return;
 
-        // Load profile picture
-        Glide.with(this)
-                .load("https://via.placeholder.com/150x150")
-                .centerCrop()
-                .placeholder(R.drawable.ic_person)
+        // Profile picture
+        if (userProfile.getProfilePicture() != null && !userProfile.getProfilePicture().isEmpty()) {
+            Glide.with(this)
+                .load(userProfile.getProfilePicture())
+                .placeholder(R.drawable.ic_person_placeholder)
+                .error(R.drawable.ic_person_placeholder)
                 .into(ivProfilePicture);
+        }
 
-        Log.d(TAG, "✅ Mock user profile loaded");
+        // Basic info
+        tvDisplayName.setText(userProfile.getDisplayName());
+
+        // Member since (if available)
+        if (userProfile.getCreatedAt() != null) {
+            tvMemberSince.setText("Member since " + formatMemberSince(userProfile.getCreatedAt()));
+        }
+
+        // Location (if available in user model)
+        if (userProfile.getLocation() != null && !userProfile.getLocation().isEmpty()) {
+            tvLocation.setText(userProfile.getLocation());
+            tvLocation.setVisibility(View.VISIBLE);
+        } else {
+            tvLocation.setVisibility(View.GONE);
+        }
+
+        // Stats
+        updateUserStats();
+
+        // Check if this is current user's profile
+        Long currentUserId = prefsManager.getUserId();
+        if (currentUserId != null && currentUserId.equals(userId)) {
+            // Hide contact button for own profile
+            btnContact.setVisibility(View.GONE);
+        } else {
+            btnContact.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void updateUserStats() {
+        if (userProfile == null) return;
+
+        // Listings count (will be updated when products load)
+        tvListingsCount.setText(userProducts.size() + " listings");
+
+        // Rating
+        if (userProfile.getRating() != null && userProfile.getRating() > 0) {
+            tvRating.setText(String.format("%.1f ⭐", userProfile.getRating()));
+            tvRating.setVisibility(View.VISIBLE);
+        } else {
+            tvRating.setText("No ratings yet");
+        }
+
+        // Total transactions
+        if (userProfile.getTotalTransactions() != null) {
+            tvResponseRate.setText(userProfile.getTotalTransactions() + " transactions");
+        } else {
+            tvResponseRate.setText("0 transactions");
+        }
     }
 
     private void loadUserProducts() {
-        // Create mock products for this user
-        createMockUserProducts();
+        Log.d(TAG, "Loading products for user: " + userId);
+
+        ApiClient.getApiService().getUserProducts(userId, 0, 20)
+            .enqueue(new Callback<StandardResponse<List<Product>>>() {
+                @Override
+                public void onResponse(@NonNull Call<StandardResponse<List<Product>>> call,
+                                       @NonNull Response<StandardResponse<List<Product>>> response) {
+                    if (response.isSuccessful() && response.body() != null) {
+                        StandardResponse<List<Product>> apiResponse = response.body();
+
+                        if (apiResponse.isSuccess()) {
+                            List<Product> products = apiResponse.getData();
+
+                            userProducts.clear();
+                            if (products != null) {
+                                userProducts.addAll(products);
+                            }
+
+                            productAdapter.notifyDataSetChanged();
+                            updateListingsCount();
+                            updateEmptyState();
+
+                            Log.d(TAG, "✅ User products loaded: " + userProducts.size());
+                        }
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<StandardResponse<List<Product>>> call, @NonNull Throwable t) {
+                    Log.e(TAG, "Failed to load user products", t);
+                    updateEmptyState();
+                }
+            });
     }
 
-    private void createMockUserProducts() {
-        userProducts.clear();
+    private void startChat() {
+        if (userProfile == null) return;
 
-        // Mock product 1
-        Product product1 = createMockProduct(101L, "Vintage Camera",
-                "Canon AE-1 vintage film camera", 1500000.0,
-                "Ho Chi Minh City", "GOOD");
+        // Create or get conversation with this user
+        Intent chatIntent = new Intent(this, ChatActivity.class);
+        chatIntent.putExtra("other_user_id", userId);
+        chatIntent.putExtra("other_user_name", userProfile.getDisplayName());
+        startActivity(chatIntent);
 
-        // Mock product 2
-        Product product2 = createMockProduct(102L, "Gaming Laptop",
-                "ASUS ROG gaming laptop", 18000000.0,
-                "Ho Chi Minh City", "LIKE_NEW");
-
-        // Mock product 3
-        Product product3 = createMockProduct(103L, "Wireless Headphones",
-                "Sony WH-1000XM4 wireless headphones", 6500000.0,
-                "Ho Chi Minh City", "NEW");
-
-        userProducts.add(product1);
-        userProducts.add(product2);
-        userProducts.add(product3);
-
-        if (userProducts.isEmpty()) {
-            showEmptyState();
-        } else {
-            showProducts();
-        }
-
-        productAdapter.notifyDataSetChanged();
-        Log.d(TAG, "✅ Mock user products created: " + userProducts.size());
-    }
-
-    private Product createMockProduct(Long id, String title, String description,
-                                      Double price, String location, String condition) {
-        Product product = new Product();
-
-        product.setId(id);
-        product.setTitle(title);
-        product.setDescription(description);
-        product.setPrice(price);
-        product.setLocation(location);
-        product.setCondition(condition);
-        product.setStatus("AVAILABLE");
-        product.setImageUrl("https://via.placeholder.com/300x300");
-        product.setPrimaryImageUrl("https://via.placeholder.com/300x300");
-        product.setCreatedAt("2024-01-10T15:30:00");
-        product.setUpdatedAt("2024-01-10T15:30:00");
-        product.setUserId(userId);
-        product.setCategoryId(1L);
-        product.setCategoryName("Electronics");
-        product.setViewCount(42);
-
-        return product;
-    }
-
-    private void openProductDetail(Product product) {
-        Intent intent = new Intent(this, com.example.newtrade.ui.product.ProductDetailActivity.class);
-        intent.putExtra("product_id", product.getId());
-        intent.putExtra("product_title", product.getTitle());
-        intent.putExtra("product_price", product.getFormattedPrice());
-        startActivity(intent);
-    }
-
-    private void contactUser() {
-        if (userId != null && userId > 0) {
-            Intent intent = new Intent(this, ChatActivity.class);
-            intent.putExtra("other_user_id", userId);
-            intent.putExtra("other_user_name", tvDisplayName.getText().toString());
-            startActivity(intent);
-        } else {
-            Toast.makeText(this, "Cannot contact user", Toast.LENGTH_SHORT).show();
-        }
+        Log.d(TAG, "Starting chat with user: " + userProfile.getDisplayName());
     }
 
     private void viewUserReviews() {
-        Toast.makeText(this, "User reviews coming soon", Toast.LENGTH_SHORT).show();
+        // Navigate to user reviews activity
+        Intent intent = new Intent(this, UserReviewsActivity.class);
+        intent.putExtra("user_id", userId);
+        intent.putExtra("user_name", userProfile != null ? userProfile.getDisplayName() : "User");
+        startActivity(intent);
     }
 
-    private void showProducts() {
-        if (rvUserProducts != null) rvUserProducts.setVisibility(View.VISIBLE);
-        if (llEmptyState != null) llEmptyState.setVisibility(View.GONE);
+    private void updateListingsCount() {
+        tvListingsCount.setText(userProducts.size() + " listings");
     }
 
-    private void showEmptyState() {
-        if (rvUserProducts != null) rvUserProducts.setVisibility(View.GONE);
-        if (llEmptyState != null) llEmptyState.setVisibility(View.VISIBLE);
+    private void updateEmptyState() {
+        if (userProducts.isEmpty()) {
+            llEmptyState.setVisibility(View.VISIBLE);
+            rvUserProducts.setVisibility(View.GONE);
+        } else {
+            llEmptyState.setVisibility(View.GONE);
+            rvUserProducts.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private String formatMemberSince(String createdAt) {
+        // Simple format - you can improve this with proper date formatting
+        try {
+            // Assuming createdAt is in format "2025-06-27T14:16:56"
+            return createdAt.substring(0, 7); // Returns "2025-06"
+        } catch (Exception e) {
+            return "Recently";
+        }
+    }
+
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Log.e(TAG, "Error: " + message);
     }
 
     @Override

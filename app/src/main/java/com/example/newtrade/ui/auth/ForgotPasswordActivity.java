@@ -93,8 +93,8 @@ public class ForgotPasswordActivity extends AppCompatActivity {
 
     private void validateForm() {
         String email = etEmail.getText().toString().trim();
-        boolean isValid = ValidationUtils.isValidEmail(email);
-        btnReset.setEnabled(isValid && !isLoading);
+        boolean isValid = ValidationUtils.isValidEmail(email) && !isLoading;
+        btnReset.setEnabled(isValid);
     }
 
     private void attemptPasswordReset() {
@@ -104,6 +104,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         String emailError = ValidationUtils.getEmailError(email);
         if (emailError != null) {
             etEmail.setError(emailError);
+            etEmail.requestFocus();
             return;
         }
 
@@ -118,54 +119,99 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
 
-        ApiClient.getAuthService().forgotPassword(request).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, String>>> response) {
-                showLoading(false);
+        ApiClient.getAuthService().forgotPassword(request)
+                .enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                           @NonNull Response<StandardResponse<Map<String, String>>> response) {
+                        showLoading(false);
 
-                Log.d(TAG, "🔍 Password reset response code: " + response.code());
+                        Log.d(TAG, "🔍 Password reset response code: " + response.code());
 
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, String>> apiResponse = response.body();
-                    Log.d(TAG, "🔍 Password reset response: " + new Gson().toJson(apiResponse));
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, String>> apiResponse = response.body();
+                            Log.d(TAG, "🔍 Password reset response: " + new Gson().toJson(apiResponse));
 
-                    if (apiResponse.isSuccess()) {
-                        handlePasswordResetSuccess(email);
-                    } else {
-                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Gửi email khôi phục thất bại");
+                            if (apiResponse.isSuccess()) {
+                                // Password reset email sent successfully - navigate to OTP verification
+                                Log.d(TAG, "✅ Password reset email sent successfully");
+                                Toast.makeText(ForgotPasswordActivity.this,
+                                        "Password reset code sent! Please check your email.",
+                                        Toast.LENGTH_LONG).show();
+                                navigateToOtpVerification(email);
+                            } else {
+                                showError(apiResponse.getMessage() != null ?
+                                    apiResponse.getMessage() : "Failed to send reset email");
+                            }
+                        } else {
+                            handlePasswordResetError(response);
+                        }
                     }
-                } else {
-                    Log.e(TAG, "❌ Password reset failed - Response code: " + response.code());
-                    showError("Gửi email khôi phục thất bại. Thử lại sau.");
-                }
-            }
 
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
-                showLoading(false);
-                Log.e(TAG, "❌ Password reset network error", t);
-
-                if (t instanceof java.net.ConnectException) {
-                    showError("Không thể kết nối đến server. Kiểm tra kết nối mạng.");
-                } else if (t instanceof java.net.SocketTimeoutException) {
-                    showError("Kết nối timeout. Thử lại sau.");
-                } else {
-                    showError("Lỗi mạng: " + t.getMessage());
-                }
-            }
-        });
+                    @Override
+                    public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
+                        showLoading(false);
+                        String errorMessage = getNetworkErrorMessage(t);
+                        showError("Password reset failed: " + errorMessage);
+                        Log.e(TAG, "❌ Password reset request failed", t);
+                    }
+                });
     }
 
-    private void handlePasswordResetSuccess(String email) {
-        Log.d(TAG, "✅ Password reset email sent successfully");
+    private void handlePasswordResetError(Response<StandardResponse<Map<String, String>>> response) {
+        try {
+            if (response.errorBody() != null) {
+                String errorJson = response.errorBody().string();
+                Log.e(TAG, "❌ Password reset error body: " + errorJson);
 
-        Toast.makeText(this,
-                "Chúng tôi đã gửi hướng dẫn khôi phục mật khẩu đến email " + email + ". Vui lòng kiểm tra hộp thư.",
-                Toast.LENGTH_LONG).show();
+                // Try to parse error message
+                StandardResponse<?> errorResponse = new Gson().fromJson(errorJson, StandardResponse.class);
+                if (errorResponse != null && errorResponse.getMessage() != null) {
+                    showError(errorResponse.getMessage());
+                } else {
+                    showError("Failed to send reset email. Please try again.");
+                }
+            } else {
+                showError("Failed to send reset email. Please try again.");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing error response", e);
+            showError("Failed to send reset email. Please try again.");
+        }
+    }
 
-        // Navigate back to login after successful request
-        navigateToLogin();
+    private String getNetworkErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown error occurred";
+        }
+
+        String message = throwable.getMessage();
+        if (message == null || message.isEmpty()) {
+            return "Network error occurred";
+        }
+
+        // Handle specific error types
+        if (message.contains("timeout")) {
+            return "Connection timeout. Please try again.";
+        } else if (message.contains("connection")) {
+            return "Connection failed. Please check your internet.";
+        } else if (message.contains("404")) {
+            return "Email not found. Please check your email address.";
+        } else if (message.contains("400")) {
+            return "Invalid email address. Please check your input.";
+        } else if (message.contains("500")) {
+            return "Server error. Please try again later.";
+        }
+
+        return message;
+    }
+
+    private void navigateToOtpVerification(String email) {
+        Intent intent = new Intent(this, OtpVerificationActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("fromRegister", false); // This is for password reset
+        startActivity(intent);
+        // Don't finish() here - user might want to go back if OTP fails
     }
 
     private void navigateToLogin() {
@@ -177,9 +223,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
     private void showLoading(boolean show) {
         isLoading = show;
         btnReset.setEnabled(!show && ValidationUtils.isValidEmail(etEmail.getText().toString().trim()));
-        btnReset.setText(show ? "Đang gửi..." : "Gửi email khôi phục");
-
-        // Disable input during loading
+        btnReset.setText(show ? "Sending..." : "Send Reset Code");
         etEmail.setEnabled(!show);
     }
 

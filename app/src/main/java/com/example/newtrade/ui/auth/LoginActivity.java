@@ -219,7 +219,7 @@ public class LoginActivity extends AppCompatActivity {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
-                handleGoogleSignIn(account);
+                handleGoogleSignInResult(task);
             } catch (ApiException e) {
                 String errorMessage = getNetworkErrorMessage(e);
                 showError("Google Sign-In failed: " + errorMessage);
@@ -228,18 +228,40 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private void handleGoogleSignIn(GoogleSignInAccount account) {
-        if (account == null) return;
+    private void handleGoogleSignInResult(Task<GoogleSignInAccount> completedTask) {
+        try {
+            GoogleSignInAccount account = completedTask.getResult(ApiException.class);
+            if (account != null) {
+                setLoading(true);
 
-        setLoading(true);
+                // Get ID token from Google Sign-In account
+                String idToken = account.getIdToken();
+                String email = account.getEmail();
+                String name = account.getDisplayName();
 
-        // ✅ FIX: Use Map<String, String> instead of Map<String, Object>
-        Map<String, String> googleRequest = new HashMap<>();
-        googleRequest.put("idToken", account.getIdToken());
-        googleRequest.put("email", account.getEmail());
-        googleRequest.put("displayName", account.getDisplayName());
+                if (idToken != null) {
+                    // Send ID token to backend for verification
+                    sendGoogleIdTokenToBackend(idToken, email, name);
+                } else {
+                    Log.e(TAG, "❌ Google ID token is null");
+                    showError("Failed to get Google authentication token");
+                    setLoading(false);
+                }
+            }
+        } catch (ApiException e) {
+            Log.e(TAG, "Google sign in failed", e);
+            showError("Google Sign-In failed: " + e.getMessage());
+            setLoading(false);
+        }
+    }
 
-        ApiClient.getAuthService().googleSignIn(googleRequest)
+    private void sendGoogleIdTokenToBackend(String idToken, String email, String name) {
+        Map<String, String> googleSignInRequest = new HashMap<>();
+        googleSignInRequest.put("idToken", idToken);
+        googleSignInRequest.put("email", email);
+        googleSignInRequest.put("displayName", name);
+
+        ApiClient.getAuthService().googleSignIn(googleSignInRequest)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
@@ -250,6 +272,7 @@ public class LoginActivity extends AppCompatActivity {
                             StandardResponse<Map<String, Object>> apiResponse = response.body();
 
                             if (apiResponse.isSuccess()) {
+                                Log.d(TAG, "✅ Google Sign-In successful");
                                 handleLoginSuccess(apiResponse.getData());
                             } else {
                                 showError(apiResponse.getMessage());

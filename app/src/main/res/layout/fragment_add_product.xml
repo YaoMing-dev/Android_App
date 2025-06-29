@@ -3,296 +3,113 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:background="#F8F9FA">
+    android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="vertical">
 
-        <!-- Header -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="TradeUp"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="#1A1A1A"
-            android:gravity="center"
-            android:layout_marginBottom="24dp" />
-
-        <!-- Image Selection Area -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="#E5E7EB">
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#F9FAFB">
-
-                <ImageView
-                    android:id="@+id/iv_selected_image"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scaleType="centerCrop"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:id="@+id/layout_image_placeholder"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <ImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:src="@drawable/ic_add_photo"
-                        android:layout_marginBottom="8dp"
-                        android:alpha="0.6" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Tap to add photo"
-                        android:textColor="#6B7280"
-                        android:textSize="14sp" />
-
-                </LinearLayout>
-
-                <Button
-                    android:id="@+id/btn_select_image"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@android:color/transparent"
-                    android:text="" />
-
-            </RelativeLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Title Field -->
+        <!-- Title Input -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Title"
-            app:hintTextColor="#6B7280"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+            android:hint="Product Title">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_title"
+                android:id="@+id/etTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapSentences"
-                android:maxLines="1"
-                android:textSize="16sp" />
+                android:maxLines="2" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Description Field -->
+        <!-- Description Input -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Description"
-            app:hintTextColor="#6B7280"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+            android:hint="Description">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_description"
+                android:id="@+id/etDescription"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textMultiLine|textCapSentences"
-                android:minLines="3"
                 android:maxLines="5"
-                android:gravity="top"
-                android:textSize="16sp" />
+                android:gravity="top" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Price Field -->
+        <!-- Price Input -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Price (VND)"
-            app:hintTextColor="#6B7280"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+            android:hint="Price (VND)">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_price"
+                android:id="@+id/etPrice"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="number"
-                android:maxLines="1"
-                android:textSize="16sp" />
+                android:inputType="numberDecimal" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Category Spinner -->
+        <!-- Category Dropdown -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Category"
-            app:hintTextColor="#6B7280"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+            android:hint="Category">
 
             <AutoCompleteTextView
-                android:id="@+id/spinner_category"
+                android:id="@+id/spinnerCategory"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="none"
-                android:focusable="false"
-                android:text="Home &amp; Garden"
-                android:textSize="16sp" />
+                android:inputType="none" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Condition Spinner -->
+        <!-- Condition Dropdown -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Condition"
-            app:hintTextColor="#6B7280"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+            android:hint="Condition">
 
             <AutoCompleteTextView
-                android:id="@+id/spinner_condition"
+                android:id="@+id/spinnerCondition"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="none"
-                android:focusable="false"
-                android:text="New"
-                android:textSize="16sp" />
+                android:inputType="none" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Location Field with GPS Button -->
-        <LinearLayout
+        <!-- Add Images Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAddImages"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:orientation="horizontal">
+            android:text="Add Images"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:hint="Location"
-                app:hintTextColor="#6B7280"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/et_location"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textCapWords"
-                    android:maxLines="1"
-                    android:textSize="16sp" />
-
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <Button
-                android:id="@+id/btn_get_location"
-                android:layout_width="wrap_content"
-                android:layout_height="56dp"
-                android:text="GPS"
-                android:textSize="14sp"
-                android:minWidth="80dp"
-                style="@style/Widget.Material3.Button.OutlinedButton" />
-
-        </LinearLayout>
-
-        <!-- Tags Field -->
-        <com.google.android.material.textfield.TextInputLayout
+        <!-- Images RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvImages"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="120dp"
             android:layout_marginBottom="24dp"
-            android:hint="Tags (optional)"
-            app:hintTextColor="#6B7280"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+            android:orientation="horizontal" />
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_tags"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="text"
-                android:maxLines="1"
-                android:textSize="16sp" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Checkboxes -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/cb_negotiable"
+        <!-- Submit Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSubmit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="Price is negotiable"
-            android:textSize="16sp"
-            android:textColor="#374151" />
-
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/cb_terms_conditions"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="I agree to Terms &amp; Conditions"
-            android:textSize="16sp"
-            android:textColor="#374151" />
-
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/cb_data_processing"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="32dp"
-            android:text="I agree to Data Processing Policy"
-            android:textSize="16sp"
-            android:textColor="#374151" />
-
-        <!-- Action Buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
-            <Button
-                android:id="@+id/btn_preview"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:text="Preview"
-                android:textSize="16sp"
-                android:textAllCaps="false"
-                style="@style/Widget.Material3.Button.OutlinedButton" />
-
-            <Button
-                android:id="@+id/btn_publish"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="Publish Listing"
-                android:textSize="16sp"
-                android:textAllCaps="false"
-                android:enabled="false"
-                style="@style/Widget.Material3.Button" />
-
-        </LinearLayout>
+            android:text="Post Product"
+            style="@style/Widget.MaterialComponents.Button" />
 
     </LinearLayout>
 

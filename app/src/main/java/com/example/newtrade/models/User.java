@@ -14,13 +14,13 @@ public class User {
     @SerializedName("displayName")
     private String displayName;
 
-    @SerializedName("profilePicture")  // ✅ Sửa để match backend
+    @SerializedName("profilePicture")
     private String profilePicture;
 
-    @SerializedName("bio")  // ✅ Thêm missing field
+    @SerializedName("bio")
     private String bio;
 
-    @SerializedName("contactInfo")  // ✅ Thêm missing field
+    @SerializedName("contactInfo")
     private String contactInfo;
 
     @SerializedName("isEmailVerified")
@@ -35,6 +35,9 @@ public class User {
     @SerializedName("address")
     private String address;
 
+    @SerializedName("location")
+    private String location;
+
     @SerializedName("rating")
     private Double rating;
 
@@ -44,134 +47,66 @@ public class User {
     @SerializedName("createdAt")
     private String createdAt;
 
+    @SerializedName("updatedAt")
+    private String updatedAt;
+
     @SerializedName("lastSeen")
     private String lastSeen;
 
     // Constructors
     public User() {}
 
-    // Getters and setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
+    public User(String email, String displayName) {
         this.email = email;
-    }
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-    public void setDisplayName(String displayName) {
         this.displayName = displayName;
     }
 
-    // ✅ Sửa method name để match backend
-    public String getProfilePicture() {
-        return profilePicture;
-    }
+    // Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public void setProfilePicture(String profilePicture) {
-        this.profilePicture = profilePicture;
-    }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
-    // ✅ Legacy method để backward compatibility
-    public String getProfileImageUrl() {
-        return profilePicture;
-    }
+    public String getDisplayName() { return displayName; }
+    public void setDisplayName(String displayName) { this.displayName = displayName; }
 
-    public void setProfileImageUrl(String profileImageUrl) {
-        this.profilePicture = profileImageUrl;
-    }
+    public String getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
 
-    // ✅ Thêm Bio methods
-    public String getBio() {
-        return bio;
-    }
+    public String getBio() { return bio; }
+    public void setBio(String bio) { this.bio = bio; }
 
-    public void setBio(String bio) {
-        this.bio = bio;
-    }
+    public String getContactInfo() { return contactInfo; }
+    public void setContactInfo(String contactInfo) { this.contactInfo = contactInfo; }
 
-    // ✅ Thêm ContactInfo methods
-    public String getContactInfo() {
-        return contactInfo;
-    }
+    public Boolean getIsEmailVerified() { return isEmailVerified; }
+    public void setIsEmailVerified(Boolean isEmailVerified) { this.isEmailVerified = isEmailVerified; }
 
-    public void setContactInfo(String contactInfo) {
-        this.contactInfo = contactInfo;
-    }
+    public Boolean getIsActive() { return isActive; }
+    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
 
-    public Boolean getIsEmailVerified() {
-        return isEmailVerified != null ? isEmailVerified : false;
-    }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
 
-    public void setIsEmailVerified(Boolean isEmailVerified) {
-        this.isEmailVerified = isEmailVerified;
-    }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
 
-    public Boolean getIsActive() {
-        return isActive != null ? isActive : false;
-    }
+    public String getLocation() { return location; }
+    public void setLocation(String location) { this.location = location; }
 
-    public void setIsActive(Boolean isActive) {
-        this.isActive = isActive;
-    }
+    public Double getRating() { return rating; }
+    public void setRating(Double rating) { this.rating = rating; }
 
-    public String getPhone() {
-        return phone;
-    }
+    public Integer getTotalTransactions() { return totalTransactions; }
+    public void setTotalTransactions(Integer totalTransactions) { this.totalTransactions = totalTransactions; }
 
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
+    public String getCreatedAt() { return createdAt; }
+    public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 
-    public String getAddress() {
-        return address;
-    }
+    public String getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
 
-    public void setAddress(String address) {
-        this.address = address;
-    }
-
-    public Double getRating() {
-        return rating != null ? rating : 0.0;
-    }
-
-    public void setRating(Double rating) {
-        this.rating = rating;
-    }
-
-    public Integer getTotalTransactions() {
-        return totalTransactions != null ? totalTransactions : 0;
-    }
-
-    public void setTotalTransactions(Integer totalTransactions) {
-        this.totalTransactions = totalTransactions;
-    }
-
-    public String getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(String createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public String getLastSeen() {
-        return lastSeen;
-    }
-
-    public void setLastSeen(String lastSeen) {
-        this.lastSeen = lastSeen;
-    }
+    public String getLastSeen() { return lastSeen; }
+    public void setLastSeen(String lastSeen) { this.lastSeen = lastSeen; }
 }

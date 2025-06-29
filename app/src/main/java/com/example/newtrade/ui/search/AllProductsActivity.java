@@ -105,30 +105,24 @@ public class AllProductsActivity extends AppCompatActivity {
         isLoading = true;
         swipeRefresh.setRefreshing(true);
 
+        // ✅ FIX: Updated to use StandardResponse
         ApiClient.getApiService().getProducts(currentPage, 20, null, null)
-                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                .enqueue(new Callback<StandardResponse<List<Product>>>() {
                     @Override
-                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                           Response<StandardResponse<Map<String, Object>>> response) {
+                    public void onResponse(@NonNull Call<StandardResponse<List<Product>>> call,
+                                           @NonNull Response<StandardResponse<List<Product>>> response) {
                         isLoading = false;
                         swipeRefresh.setRefreshing(false);
 
                         try {
                             if (response.isSuccessful() && response.body() != null) {
-                                StandardResponse<Map<String, Object>> apiResponse = response.body();
+                                StandardResponse<List<Product>> standardResponse = response.body();
 
-                                if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                                    Map<String, Object> data = apiResponse.getData();
-                                    List<Map<String, Object>> productList =
-                                            (List<Map<String, Object>>) data.get("products");
-
-                                    if (productList != null) {
-                                        updateProducts(productList);
-                                    } else {
-                                        showEmptyState();
-                                    }
+                                if (standardResponse.isSuccess() && standardResponse.hasData()) {
+                                    List<Product> products = standardResponse.getData();
+                                    updateProductList(products);
                                 } else {
-                                    Log.e(TAG, "API error: " + apiResponse.getMessage());
+                                    Log.e(TAG, "API error: " + standardResponse.getMessage());
                                     showEmptyState();
                                 }
                             } else {
@@ -142,7 +136,7 @@ public class AllProductsActivity extends AppCompatActivity {
                     }
 
                     @Override
-                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                    public void onFailure(@NonNull Call<StandardResponse<List<Product>>> call, @NonNull Throwable t) {
                         isLoading = false;
                         swipeRefresh.setRefreshing(false);
                         Log.e(TAG, "Request failed", t);
@@ -241,6 +235,24 @@ public class AllProductsActivity extends AppCompatActivity {
         }
 
         return product;
+    }
+
+    private void updateProductList(List<Product> newProducts) {
+        if (currentPage == 0) {
+            products.clear();
+        }
+
+        if (newProducts != null && !newProducts.isEmpty()) {
+            products.addAll(newProducts);
+            showProducts();
+        } else {
+            if (products.isEmpty()) {
+                showEmptyState();
+            }
+        }
+
+        productAdapter.notifyDataSetChanged();
+        Log.d(TAG, "✅ Products updated: " + products.size());
     }
 
     private void showProducts() {

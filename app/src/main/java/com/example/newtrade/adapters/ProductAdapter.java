@@ -1,36 +1,29 @@
-// app/src/main/java/com/example/newtrade/adapters/ProductAdapter.java
 package com.example.newtrade.adapters;
 
-import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
-import com.bumptech.glide.request.RequestOptions;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
-import com.example.newtrade.utils.Constants;
 
 import java.util.List;
 
 public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductViewHolder> {
 
-    private static final String TAG = "ProductAdapter";
-
     private List<Product> products;
     private OnProductClickListener listener;
-    private Context context;
 
     public interface OnProductClickListener {
         void onProductClick(Product product);
+        default void onFavoriteClick(Product product) {}
     }
 
     public ProductAdapter(List<Product> products, OnProductClickListener listener) {
@@ -41,67 +34,26 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
     @NonNull
     @Override
     public ProductViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        context = parent.getContext();
-        View view = LayoutInflater.from(context).inflate(R.layout.item_product, parent, false);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_product_grid, parent, false);
         return new ProductViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ProductViewHolder holder, int position) {
         Product product = products.get(position);
-
-        // Set text data
-        holder.tvTitle.setText(product.getTitle());
-        holder.tvPrice.setText(product.getFormattedPrice());
-        holder.tvLocation.setText(product.getLocation());
-
-        // Set condition chip
-        if (holder.tvCondition != null) {
-            holder.tvCondition.setText(product.getCondition());
-        }
-
-        // Load image using Constants helper
-        String imageUrl = product.getPrimaryImageUrl();
-        if (imageUrl != null && !imageUrl.isEmpty()) {
-            String fullImageUrl = Constants.getFullImageUrl(imageUrl);
-
-            Log.d(TAG, "Loading image for product " + product.getId() + ": " + fullImageUrl);
-
-            Glide.with(context)
-                    .load(fullImageUrl)
-                    .apply(new RequestOptions()
-                            .placeholder(R.drawable.placeholder_product)
-                            .error(R.drawable.placeholder_product)
-                            .centerCrop()
-                            .transform(new RoundedCorners(16)))
-                    .into(holder.ivProductImage);
-        } else {
-            Log.d(TAG, "No image URL for product " + product.getId() + ", using placeholder");
-            holder.ivProductImage.setImageResource(R.drawable.placeholder_product);
-        }
-
-        // Set click listener
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onProductClick(product);
-            }
-        });
+        holder.bind(product);
     }
 
     @Override
     public int getItemCount() {
-        return products != null ? products.size() : 0;
+        return products.size();
     }
 
-    // ✅ FIX: XÓA override notifyDataSetChanged() vì nó là final method
-    // Sử dụng super.notifyDataSetChanged() trực tiếp từ bên ngoài
-
-    static class ProductViewHolder extends RecyclerView.ViewHolder {
-        ImageView ivProductImage;
-        TextView tvTitle;
-        TextView tvPrice;
-        TextView tvLocation;
-        TextView tvCondition;
+    class ProductViewHolder extends RecyclerView.ViewHolder {
+        private ImageView ivProductImage;
+        private TextView tvTitle, tvPrice, tvLocation, tvCondition;
+        private ImageButton btnFavorite;
 
         public ProductViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -110,6 +62,54 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
             tvPrice = itemView.findViewById(R.id.tv_price);
             tvLocation = itemView.findViewById(R.id.tv_location);
             tvCondition = itemView.findViewById(R.id.tv_condition);
+            btnFavorite = itemView.findViewById(R.id.btn_favorite);
+        }
+
+        public void bind(Product product) {
+            // Product image
+            String imageUrl = product.getDisplayImage();
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                Glide.with(itemView.getContext())
+                    .load(imageUrl)
+                    .placeholder(R.drawable.placeholder_image)
+                    .error(R.drawable.placeholder_image)
+                    .centerCrop()
+                    .into(ivProductImage);
+            } else {
+                ivProductImage.setImageResource(R.drawable.placeholder_image);
+            }
+
+            // Product details
+            tvTitle.setText(product.getTitle());
+            tvPrice.setText(product.getFormattedPrice());
+            tvLocation.setText(product.getLocation());
+            tvCondition.setText(product.getCondition());
+
+            // Favorite button
+            boolean isFavorited = product.getIsFavorited() != null && product.getIsFavorited();
+            btnFavorite.setImageResource(isFavorited ?
+                R.drawable.ic_favorite_filled : R.drawable.ic_favorite_outline);
+
+            // Click listeners
+            itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onProductClick(product);
+                }
+            });
+
+            btnFavorite.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onFavoriteClick(product);
+                }
+            });
+
+            // Show sold overlay if product is sold
+            if (product.isSold()) {
+                itemView.setAlpha(0.6f);
+                // Could add a "SOLD" overlay here
+            } else {
+                itemView.setAlpha(1.0f);
+            }
         }
     }
 }
