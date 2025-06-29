@@ -92,6 +92,9 @@ dependencies {
     implementation(libs.glide)
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
 
+    // ExifInterface for ImageUtils
+    implementation("androidx.exifinterface:exifinterface:1.3.6")
+
     // CircleImageView
     implementation("de.hdodenhof:circleimageview:3.1.0")
 

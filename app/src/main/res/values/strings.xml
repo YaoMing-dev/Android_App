@@ -139,6 +139,15 @@
     <string name="within_25km">Within 25km</string>
     <string name="within_50km">Within 50km</string>
 
+    <!-- Search Fragment -->
+    <string name="popular_products">Popular Products</string>
+    <string name="results_count">%d results found</string>
+    <string name="condition">Condition</string>
+    <string name="clear">Clear</string>
+    <string name="sort_format">Sort: %s</string>
+    <string name="condition_format">Condition: %s</string>
+    <string name="category_format">Category: %s</string>
+
     <!-- Chat & Messages -->
     <string name="messages">Messages</string>
     <string name="new_message">New Message</string>
