@@ -26,7 +26,6 @@ public class Product {
     private Boolean isLiked;
     private Boolean isSaved;
 
-    // Enums
     public enum ProductCondition {
         NEW("New"),
         LIKE_NEW("Like New"),
@@ -51,7 +50,7 @@ public class Product {
                     return condition;
                 }
             }
-            return NEW; // default
+            return NEW;
         }
     }
 
@@ -78,14 +77,12 @@ public class Product {
                     return status;
                 }
             }
-            return AVAILABLE; // default
+            return AVAILABLE;
         }
     }
 
-    // Constructors
     public Product() {}
 
-    // Helper methods
     public String getFormattedPrice() {
         if (price == null) return "Price not set";
         return "₫" + String.format("%,.0f", price);
@@ -130,17 +127,7 @@ public class Product {
         return category != null ? category.getName() : "Uncategorized";
     }
 
-    public String getViewCountText() {
-        if (viewCount == null || viewCount == 0) {
-            return "No views";
-        } else if (viewCount == 1) {
-            return "1 view";
-        } else {
-            return viewCount + " views";
-        }
-    }
-
-    // Getters and Setters
+    // Full getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -200,28 +187,4 @@ public class Product {
 
     public Boolean getIsSaved() { return isSaved; }
     public void setIsSaved(Boolean isSaved) { this.isSaved = isSaved; }
-
-    @Override
-    public String toString() {
-        return "Product{" +
-                "id=" + id +
-                ", title='" + title + '\'' +
-                ", price=" + price +
-                ", condition=" + condition +
-                ", status=" + status +
-                '}';
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Product product = (Product) o;
-        return id != null && id.equals(product.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return id != null ? id.hashCode() : 0;
-    }
 }

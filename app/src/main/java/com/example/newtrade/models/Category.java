@@ -12,7 +12,6 @@ public class Category {
     private String createdAt;
     private String updatedAt;
 
-    // Constructors
     public Category() {}
 
     public Category(Long id, String name) {
@@ -20,7 +19,6 @@ public class Category {
         this.name = name;
     }
 
-    // Helper methods
     public String getDisplayName() {
         return name != null ? name : "Unknown Category";
     }
@@ -66,16 +64,6 @@ public class Category {
 
     public String getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
-
-    @Override
-    public String toString() {
-        return "Category{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", isActive=" + isActive +
-                ", productCount=" + productCount +
-                '}';
-    }
 
     @Override
     public boolean equals(Object o) {

@@ -23,6 +23,7 @@
     <color name="background_card">#FFFFFF</color>
     <color name="background_card_dark">#1E1E1E</color>
     <color name="background_overlay">#80000000</color>
+    <color name="background_gray">#EEEEEE</color>
 
     <!-- ===== SURFACE COLORS ===== -->
     <color name="surface_light">#FFFFFF</color>
@@ -188,4 +189,24 @@
     <color name="shimmer_highlight">#FFFFFF</color>
     <color name="shimmer_base_dark">#2C2C2C</color>
     <color name="shimmer_highlight_dark">#3C3C3C</color>
+
+    <!-- ===== MISSING COLORS CAUSING BUILD ERRORS ===== -->
+    <color name="primary_light">@color/primary_color_light</color>
+    <color name="primary_dark">@color/primary_color_dark</color>
+    <color name="secondary_light">@color/secondary_color_light</color>
+    <color name="secondary_dark">@color/secondary_color_dark</color>
+    <color name="error_color">@color/error</color>
+    <color name="splash_gradient_start">#1976D2</color>
+    <color name="splash_gradient_end">#42A5F5</color>
+
+    <!-- ===== ADDITIONAL MISSING COLORS ===== -->
+    <color name="button_disabled">@color/btn_primary_disabled</color>
+    <color name="chat_received">@color/chat_bubble_received</color>
+    <color name="border_light">#DDDDDD</color>
+    <color name="background_white">@color/white</color>
+    <color name="warning_color">@color/warning</color>
+    <color name="primary">@color/primary_color</color>
+    <color name="overlay_color">#80000000</color>
+    <color name="secondaryColor">@color/secondary_color</color>
+    <color name="success_color">@color/success</color>
 </resources>

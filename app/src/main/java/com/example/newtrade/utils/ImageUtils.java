@@ -202,8 +202,10 @@ public class ImageUtils {
      */
     private static String getCompressedImagePath(String originalPath) {
         String fileName = "compressed_" + System.currentTimeMillis() + ".jpg";
-        String directory = originalPath.substring(0, originalPath.lastIndexOf("/"));
-        return directory + "/" + fileName;
+        // Handle both forward and backward slashes for cross-platform compatibility
+        String directory = originalPath.substring(0, Math.max(originalPath.lastIndexOf("/"),
+                                                             originalPath.lastIndexOf("\\")));
+        return directory + File.separator + fileName;
     }
 
     /**
@@ -288,8 +290,10 @@ public class ImageUtils {
 
     private static String getThumbnailPath(String originalPath) {
         String fileName = "thumb_" + System.currentTimeMillis() + ".jpg";
-        String directory = originalPath.substring(0, originalPath.lastIndexOf("/"));
-        return directory + "/" + fileName;
+        // Handle both forward and backward slashes for cross-platform compatibility
+        String directory = originalPath.substring(0, Math.max(originalPath.lastIndexOf("/"),
+                                                             originalPath.lastIndexOf("\\")));
+        return directory + File.separator + fileName;
     }
 
     /**

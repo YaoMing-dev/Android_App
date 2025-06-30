@@ -9,29 +9,20 @@ import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.http.*;
 
-import java.util.List;
 import java.util.Map;
 
 public interface ProductService {
 
-    // ===== CATEGORIES =====
-    @GET("categories")
-    Call<StandardResponse<List<Category>>> getCategories();
-
-    @GET("categories/{id}")
-    Call<StandardResponse<Category>> getCategoryById(@Path("id") Long id);
-
-    // ===== PRODUCTS =====
     @GET("products")
-    Call<StandardResponse<Map<String, Object>>> getProducts(
+    Call<StandardResponse<Map<String, Object>>> getAllProducts(
             @Query("page") int page,
             @Query("size") int size,
+            @Query("sortBy") String sortBy,
+            @Query("sortDir") String sortDir,
             @Query("categoryId") Long categoryId,
             @Query("condition") String condition,
             @Query("minPrice") Double minPrice,
-            @Query("maxPrice") Double maxPrice,
-            @Query("sortBy") String sortBy,
-            @Query("sortDir") String sortDir
+            @Query("maxPrice") Double maxPrice
     );
 
     @GET("products/search")
@@ -67,7 +58,19 @@ public interface ProductService {
             @Header("User-ID") Long userId
     );
 
-    // ===== USER PRODUCTS =====
+    @PUT("products/{id}/status")
+    Call<StandardResponse<Product>> updateProductStatus(
+            @Path("id") Long id,
+            @Body Map<String, String> statusData,
+            @Header("User-ID") Long userId
+    );
+
+    @PUT("products/{id}/sold")
+    Call<StandardResponse<Product>> markAsSold(
+            @Path("id") Long id,
+            @Header("User-ID") Long userId
+    );
+
     @GET("products/user/{userId}")
     Call<StandardResponse<Map<String, Object>>> getUserProducts(
             @Path("userId") Long userId,
@@ -75,26 +78,13 @@ public interface ProductService {
             @Query("size") int size
     );
 
-    @GET("products/my-products")
-    Call<StandardResponse<Map<String, Object>>> getMyProducts(
-            @Query("page") int page,
-            @Query("size") int size,
-            @Header("User-ID") Long userId
-    );
+    @GET("categories")
+    Call<StandardResponse<Map<String, Object>>> getCategories();
 
-    // ===== PRODUCT IMAGES =====
     @Multipart
-    @POST("products/{id}/images")
-    Call<StandardResponse<Map<String, Object>>> uploadProductImages(
-            @Path("id") Long productId,
-            @Part List<MultipartBody.Part> images,
-            @Header("User-ID") Long userId
-    );
-
-    @DELETE("products/{productId}/images/{imageId}")
-    Call<StandardResponse<Void>> deleteProductImage(
-            @Path("productId") Long productId,
-            @Path("imageId") Long imageId,
+    @POST("products/upload-image")
+    Call<StandardResponse<Map<String, String>>> uploadProductImage(
+            @Part MultipartBody.Part image,
             @Header("User-ID") Long userId
     );
 }

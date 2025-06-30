@@ -28,7 +28,6 @@ public class HomeSection {
     private String seeAllUrl;
     private boolean showSeeAll;
 
-    // Constructors
     public HomeSection() {}
 
     public HomeSection(String title, SectionType type, List<Product> products) {
@@ -45,20 +44,12 @@ public class HomeSection {
         this.showSeeAll = true;
     }
 
-    // Helper methods
     public boolean hasProducts() {
         return products != null && !products.isEmpty();
     }
 
     public int getProductCount() {
         return products != null ? products.size() : 0;
-    }
-
-    public String getProductCountText() {
-        int count = getProductCount();
-        if (count == 0) return "No items";
-        if (count == 1) return "1 item";
-        return count + " items";
     }
 
     // Getters and Setters
@@ -76,13 +67,4 @@ public class HomeSection {
 
     public boolean isShowSeeAll() { return showSeeAll; }
     public void setShowSeeAll(boolean showSeeAll) { this.showSeeAll = showSeeAll; }
-
-    @Override
-    public String toString() {
-        return "HomeSection{" +
-                "title='" + title + '\'' +
-                ", type=" + type +
-                ", products=" + getProductCount() +
-                '}';
-    }
 }

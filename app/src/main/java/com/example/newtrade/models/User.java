@@ -31,10 +31,8 @@ public class User {
     private Double latitude;
     private Double longitude;
 
-    // Constructors
     public User() {}
 
-    // Helper methods
     public String getDisplayNameOrFullName() {
         if (displayName != null && !displayName.trim().isEmpty()) {
             return displayName;
@@ -72,16 +70,12 @@ public class User {
         return null;
     }
 
-    public boolean hasLocation() {
-        return latitude != null && longitude != null;
-    }
-
     public String getFormattedRating() {
         if (rating == null) return "No rating";
         return String.format("%.1f", rating);
     }
 
-    // Getters and Setters
+    // Full getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -167,14 +161,4 @@ public class User {
 
     public Double getLongitude() { return longitude; }
     public void setLongitude(Double longitude) { this.longitude = longitude; }
-
-    @Override
-    public String toString() {
-        return "User{" +
-                "id=" + id +
-                ", displayName='" + displayName + '\'' +
-                ", email='" + email + '\'' +
-                ", isActive=" + isActive +
-                '}';
-    }
 }

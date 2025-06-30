@@ -8,7 +8,7 @@ public class Constants {
     // public static final String BASE_URL = "http://192.168.1.100:8080/api/"; // For physical device
 
     // ===== GOOGLE SIGN IN =====
-    public static final String GOOGLE_CLIENT_ID = "your_google_client_id_here";
+    public static final String GOOGLE_CLIENT_ID = "638175281882-lqsdj0iur1i079l0vlqni71gelshrdgj.apps.googleusercontent.com";
 
     // ===== SHARED PREFERENCES =====
     public static final String PREF_NAME = "NewTradePref";
@@ -71,13 +71,10 @@ public class Constants {
     public static final double DEFAULT_SEARCH_RADIUS_KM = 10.0;
     public static final double MAX_SEARCH_RADIUS_KM = 100.0;
 
-    // ===== FILE PATHS =====
-    public static final String IMAGE_CACHE_DIR = "images";
-    public static final String TEMP_IMAGE_DIR = "temp";
-
-    // ===== NETWORK =====
-    public static final int NETWORK_TIMEOUT_SECONDS = 30;
-    public static final int MAX_RETRY_ATTEMPTS = 3;
+    // ===== OTP =====
+    public static final int OTP_LENGTH = 6;
+    public static final long OTP_EXPIRE_TIME_MINUTES = 5;
+    public static final int MAX_OTP_ATTEMPTS = 3;
 
     // ===== VALIDATION =====
     public static final int MIN_PASSWORD_LENGTH = 6;
@@ -85,22 +82,13 @@ public class Constants {
     public static final int MIN_NAME_LENGTH = 2;
     public static final int MAX_NAME_LENGTH = 50;
 
-    // ===== OTP =====
-    public static final int OTP_LENGTH = 6;
-    public static final long OTP_EXPIRE_TIME_MINUTES = 5;
-    public static final int MAX_OTP_ATTEMPTS = 3;
-
     // ===== CHAT =====
     public static final int MAX_MESSAGE_LENGTH = 1000;
     public static final int CHAT_PAGE_SIZE = 50;
 
-    // ===== NOTIFICATIONS =====
-    public static final String NOTIFICATION_CHANNEL_ID = "newtrade_notifications";
-    public static final String NOTIFICATION_CHANNEL_NAME = "NewTrade Notifications";
-
-    // ===== WEBSOCKET =====
-    public static final String WEBSOCKET_URL = "ws://10.0.2.2:8080/ws";
-    public static final int WEBSOCKET_RECONNECT_INTERVAL = 5000; // 5 seconds
+    // ===== FILES =====
+    public static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    public static final String[] ALLOWED_IMAGE_TYPES = {".jpg", ".jpeg", ".png", ".gif", ".webp"};
 
     private Constants() {
         // Prevent instantiation
