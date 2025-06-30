@@ -13,13 +13,14 @@ import androidx.annotation.Nullable;
 
 import com.example.newtrade.R;
 import com.example.newtrade.ui.search.SearchFragment;
+import com.example.newtrade.utils.Constants;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
 public class SearchSortBottomSheet extends BottomSheetDialogFragment {
 
     // UI Components
     private RadioGroup rgSort;
-    private RadioButton rbRelevance, rbNewest, rbOldest, rbPriceLowHigh, rbPriceHighLow, rbNearby;
+    private RadioButton rbRelevance, rbNewest, rbOldest, rbPriceLowHigh, rbPriceHighLow, rbNearby, rbPopular;
 
     // Data
     private SearchFragment.SearchSort currentSort;
@@ -33,6 +34,10 @@ public class SearchSortBottomSheet extends BottomSheetDialogFragment {
         SearchSortBottomSheet fragment = new SearchSortBottomSheet();
         fragment.currentSort = sort;
         return fragment;
+    }
+
+    public void setOnSortAppliedListener(OnSortAppliedListener listener) {
+        this.listener = listener;
     }
 
     @Nullable
@@ -58,6 +63,7 @@ public class SearchSortBottomSheet extends BottomSheetDialogFragment {
         rbPriceLowHigh = view.findViewById(R.id.rb_price_low_high);
         rbPriceHighLow = view.findViewById(R.id.rb_price_high_low);
         rbNearby = view.findViewById(R.id.rb_nearby);
+        rbPopular = view.findViewById(R.id.rb_popular);
     }
 
     private void setCurrentSort() {
@@ -77,8 +83,10 @@ public class SearchSortBottomSheet extends BottomSheetDialogFragment {
             rbPriceLowHigh.setChecked(true);
         } else if ("price".equals(sortBy) && "desc".equals(sortDir)) {
             rbPriceHighLow.setChecked(true);
-        } else if ("distance".equals(sortBy)) {
+        } else if ("distance".equals(sortBy) && "asc".equals(sortDir)) {
             rbNearby.setChecked(true);
+        } else if ("viewCount".equals(sortBy) && "desc".equals(sortDir)) {
+            rbPopular.setChecked(true);
         } else {
             rbRelevance.setChecked(true);
         }
@@ -88,10 +96,7 @@ public class SearchSortBottomSheet extends BottomSheetDialogFragment {
         rgSort.setOnCheckedChangeListener((group, checkedId) -> {
             SearchFragment.SearchSort sort = new SearchFragment.SearchSort();
 
-            if (checkedId == R.id.rb_relevance) {
-                sort.sortBy = "relevance";
-                sort.sortDirection = "desc";
-            } else if (checkedId == R.id.rb_newest) {
+            if (checkedId == R.id.rb_newest) {
                 sort.sortBy = "createdAt";
                 sort.sortDirection = "desc";
             } else if (checkedId == R.id.rb_oldest) {
@@ -106,17 +111,22 @@ public class SearchSortBottomSheet extends BottomSheetDialogFragment {
             } else if (checkedId == R.id.rb_nearby) {
                 sort.sortBy = "distance";
                 sort.sortDirection = "asc";
+            } else if (checkedId == R.id.rb_popular) {
+                sort.sortBy = "viewCount";
+                sort.sortDirection = "desc";
+            } else {
+                // Relevance - default sorting
+                sort.sortBy = "relevance";
+                sort.sortDirection = "desc";
             }
 
+            // Apply sort immediately
             if (listener != null) {
                 listener.onSortApplied(sort);
             }
 
+            // Close bottom sheet after selection
             dismiss();
         });
-    }
-
-    public void setOnSortAppliedListener(OnSortAppliedListener listener) {
-        this.listener = listener;
     }
 }

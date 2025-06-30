@@ -19,8 +19,10 @@ import com.example.newtrade.R;
 import com.example.newtrade.models.Category;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.ui.search.SearchFragment;
+import com.example.newtrade.utils.Constants;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,6 +51,10 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         return fragment;
     }
 
+    public void setOnFilterAppliedListener(OnFilterAppliedListener listener) {
+        this.listener = listener;
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -60,9 +66,9 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
 
         initViews(view);
-        setupCategories();
-        setupConditions();
-        setupDistance();
+        setupCategorySpinner();
+        setupConditionSpinner();
+        setupDistanceSeekBar();
         populateCurrentFilter();
         setupListeners();
     }
@@ -78,7 +84,7 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         btnApply = view.findViewById(R.id.btn_apply);
     }
 
-    private void setupCategories() {
+    private void setupCategorySpinner() {
         List<String> categoryNames = new ArrayList<>();
         categoryNames.add("All Categories");
 
@@ -93,27 +99,27 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         actvCategory.setAdapter(adapter);
     }
 
-    private void setupConditions() {
-        List<String> conditionNames = new ArrayList<>();
-        conditionNames.add("Any Condition");
+    private void setupConditionSpinner() {
+        List<String> conditions = new ArrayList<>();
+        conditions.add("Any Condition");
 
         for (Product.ProductCondition condition : Product.ProductCondition.values()) {
-            conditionNames.add(condition.getDisplayName());
+            conditions.add(condition.getDisplayName());
         }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, conditionNames);
+                android.R.layout.simple_dropdown_item_1line, conditions);
         actvCondition.setAdapter(adapter);
     }
 
-    private void setupDistance() {
-        seekDistance.setMax(100); // 100km max
-        seekDistance.setProgress(50); // Default 50km
+    private void setupDistanceSeekBar() {
+        seekDistance.setMax((int) Constants.MAX_LOCATION_RADIUS);
+        seekDistance.setProgress((int) Constants.DEFAULT_LOCATION_RADIUS);
 
         seekDistance.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (progress < 1) progress = 1;
+                if (progress < 5) progress = 5; // Minimum 5km
                 tvDistanceValue.setText(progress + " km");
             }
 
@@ -123,6 +129,9 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
+
+        // Set initial value
+        tvDistanceValue.setText(seekDistance.getProgress() + " km");
     }
 
     private void populateCurrentFilter() {
@@ -130,43 +139,31 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
 
         // Category
         if (currentFilter.categoryId != null && categories != null) {
-            for (Category category : categories) {
-                if (category.getId().equals(currentFilter.categoryId)) {
-                    actvCategory.setText(category.getName());
+            for (int i = 0; i < categories.size(); i++) {
+                if (categories.get(i).getId().equals(currentFilter.categoryId)) {
+                    actvCategory.setText(categories.get(i).getName());
                     break;
                 }
             }
-        } else {
-            actvCategory.setText("All Categories");
         }
 
         // Condition
         if (currentFilter.condition != null) {
-            try {
-                Product.ProductCondition condition = Product.ProductCondition.valueOf(currentFilter.condition);
-                actvCondition.setText(condition.getDisplayName());
-            } catch (IllegalArgumentException e) {
-                actvCondition.setText("Any Condition");
-            }
-        } else {
-            actvCondition.setText("Any Condition");
+            actvCondition.setText(currentFilter.condition.getDisplayName());
         }
 
         // Price range
         if (currentFilter.minPrice != null) {
-            etMinPrice.setText(String.valueOf(currentFilter.minPrice.intValue()));
+            etMinPrice.setText(currentFilter.minPrice.toPlainString());
         }
         if (currentFilter.maxPrice != null) {
-            etMaxPrice.setText(String.valueOf(currentFilter.maxPrice.intValue()));
+            etMaxPrice.setText(currentFilter.maxPrice.toPlainString());
         }
 
         // Distance
         if (currentFilter.radius != null) {
             seekDistance.setProgress(currentFilter.radius);
             tvDistanceValue.setText(currentFilter.radius + " km");
-        } else {
-            seekDistance.setProgress(50);
-            tvDistanceValue.setText("50 km");
         }
     }
 
@@ -180,8 +177,8 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         actvCondition.setText("Any Condition");
         etMinPrice.setText("");
         etMaxPrice.setText("");
-        seekDistance.setProgress(50);
-        tvDistanceValue.setText("50 km");
+        seekDistance.setProgress((int) Constants.DEFAULT_LOCATION_RADIUS);
+        tvDistanceValue.setText(seekDistance.getProgress() + " km");
     }
 
     private void applyFilters() {
@@ -203,7 +200,7 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         if (!conditionText.equals("Any Condition")) {
             for (Product.ProductCondition condition : Product.ProductCondition.values()) {
                 if (condition.getDisplayName().equals(conditionText)) {
-                    filter.condition = condition.name();
+                    filter.condition = condition;
                     break;
                 }
             }
@@ -213,39 +210,38 @@ public class SearchFilterBottomSheet extends BottomSheetDialogFragment {
         String minPriceText = etMinPrice.getText().toString().trim();
         if (!minPriceText.isEmpty()) {
             try {
-                filter.minPrice = Double.parseDouble(minPriceText);
+                filter.minPrice = new BigDecimal(minPriceText);
             } catch (NumberFormatException e) {
-                // Ignore invalid price
+                // Invalid price, ignore
             }
         }
 
         String maxPriceText = etMaxPrice.getText().toString().trim();
         if (!maxPriceText.isEmpty()) {
             try {
-                filter.maxPrice = Double.parseDouble(maxPriceText);
+                filter.maxPrice = new BigDecimal(maxPriceText);
             } catch (NumberFormatException e) {
-                // Ignore invalid price
+                // Invalid price, ignore
             }
         }
 
         // Distance
-        filter.radius = seekDistance.getProgress();
-        if (filter.radius < 1) filter.radius = 1;
+        int distance = seekDistance.getProgress();
+        if (distance >= 5) { // Only apply if >= 5km
+            filter.radius = distance;
 
-        // Keep existing location if available
-        if (currentFilter != null) {
-            filter.latitude = currentFilter.latitude;
-            filter.longitude = currentFilter.longitude;
+            // Copy current location if available
+            if (currentFilter != null) {
+                filter.latitude = currentFilter.latitude;
+                filter.longitude = currentFilter.longitude;
+            }
         }
 
+        // Apply filter
         if (listener != null) {
             listener.onFilterApplied(filter);
         }
 
         dismiss();
-    }
-
-    public void setOnFilterAppliedListener(OnFilterAppliedListener listener) {
-        this.listener = listener;
     }
 }
