@@ -7,6 +7,7 @@ public class StandardResponse<T> {
     private T data;
     private long timestamp;
 
+    // Constructors
     public StandardResponse() {}
 
     public StandardResponse(boolean success, String message, T data) {
@@ -14,6 +15,15 @@ public class StandardResponse<T> {
         this.message = message;
         this.data = data;
         this.timestamp = System.currentTimeMillis();
+    }
+
+    // Static factory methods
+    public static <T> StandardResponse<T> success(T data, String message) {
+        return new StandardResponse<>(true, message, data);
+    }
+
+    public static <T> StandardResponse<T> error(String message) {
+        return new StandardResponse<>(false, message, null);
     }
 
     // Getters and Setters
@@ -28,4 +38,14 @@ public class StandardResponse<T> {
 
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+
+    @Override
+    public String toString() {
+        return "StandardResponse{" +
+                "success=" + success +
+                ", message='" + message + '\'' +
+                ", data=" + data +
+                ", timestamp=" + timestamp +
+                '}';
+    }
 }

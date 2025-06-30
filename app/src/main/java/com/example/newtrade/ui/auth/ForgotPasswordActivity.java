@@ -13,6 +13,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ProgressBar;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.newtrade.R;
@@ -95,71 +96,77 @@ public class ForgotPasswordActivity extends AppCompatActivity {
     }
 
     private void sendPasswordResetOTP() {
-        if (isLoading) return;
-
         String email = etEmail.getText().toString().trim();
 
         // Validate email
-        String emailError = ValidationUtils.getEmailValidationError(email);
-        if (emailError != null) {
-            tilEmail.setError(emailError);
+        if (!ValidationUtils.isValidEmail(email)) {
+            tilEmail.setError("Please enter a valid email address");
             return;
         }
 
         setLoading(true);
 
-        Map<String, String> forgotRequest = new HashMap<>();
-        forgotRequest.put("email", email);
+        Map<String, String> forgotData = new HashMap<>();
+        forgotData.put("email", email);
 
-        ApiClient.getAuthService().forgotPassword(forgotRequest)
-                .enqueue(new Callback<StandardResponse<Map<String, String>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<Map<String, String>>> call,
-                                           Response<StandardResponse<Map<String, String>>> response) {
-                        setLoading(false);
+        Call<StandardResponse<Map<String, String>>> call = ApiClient.getAuthService().forgotPassword(forgotData);
+        call.enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, String>>> response) {
+                setLoading(false);
+                handleForgotPasswordResponse(response, email);
+            }
 
-                        if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<Map<String, String>> apiResponse = response.body();
-
-                            if (apiResponse.isSuccess()) {
-                                handleSendSuccess(email);
-                            } else {
-                                showError(apiResponse.getMessage());
-                            }
-                        } else {
-                            showError("Failed to send reset email. Please try again.");
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
-                        setLoading(false);
-                        Log.e(TAG, "Forgot password API call failed", t);
-                        showError("Network error. Please check your connection.");
-                    }
-                });
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                  @NonNull Throwable t) {
+                setLoading(false);
+                Log.e(TAG, "Forgot password request failed", t);
+                showError("Request failed: " + t.getMessage());
+            }
+        });
     }
 
-    private void handleSendSuccess(String email) {
-        Toast.makeText(this, "Password reset email sent! Please check your inbox.", Toast.LENGTH_LONG).show();
+    private void handleForgotPasswordResponse(Response<StandardResponse<Map<String, String>>> response, String email) {
+        try {
+            if (response.isSuccessful() && response.body() != null) {
+                StandardResponse<Map<String, String>> apiResponse = response.body();
 
-        // Navigate to OTP verification
-        Intent intent = new Intent(this, OTPVerificationActivity.class);
-        intent.putExtra("email", email);
-        intent.putExtra("from_forgot_password", true);
-        startActivity(intent);
-        finish();
+                if (apiResponse.isSuccess()) {
+                    Toast.makeText(this, "Reset code sent to your email!", Toast.LENGTH_LONG).show();
+
+                    // Navigate to OTP verification
+                    Intent intent = new Intent(this, OtpVerificationActivity.class);
+                    intent.putExtra("email", email);
+                    intent.putExtra("fromForgotPassword", true);
+                    startActivity(intent);
+                    finish();
+                } else {
+                    showError(apiResponse.getMessage());
+                }
+            } else {
+                String errorMsg = "Failed to send reset code";
+                if (response.code() == 404) {
+                    errorMsg = "Email address not found";
+                }
+                showError(errorMsg);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing forgot password response", e);
+            showError("Request failed");
+        }
     }
 
     private void setLoading(boolean loading) {
         isLoading = loading;
+        updateSendButtonState();
+        btnSendOTP.setText(loading ? "Sending..." : "Send Reset Code");
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-        btnSendOTP.setEnabled(!loading && !etEmail.getText().toString().trim().isEmpty());
-        etEmail.setEnabled(!loading);
-        tvBackToLogin.setEnabled(!loading);
     }
 
     private void showError(String message) {
+        Log.e(TAG, "Showing error: " + message);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 }

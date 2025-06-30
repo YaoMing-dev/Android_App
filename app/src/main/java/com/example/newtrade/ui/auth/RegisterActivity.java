@@ -14,6 +14,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ProgressBar;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.newtrade.R;
@@ -84,7 +85,7 @@ public class RegisterActivity extends AppCompatActivity {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                clearFieldErrors();
+                clearErrors();
                 updateRegisterButtonState();
             }
 
@@ -102,7 +103,7 @@ public class RegisterActivity extends AppCompatActivity {
         cbTerms.setOnCheckedChangeListener((buttonView, isChecked) -> updateRegisterButtonState());
 
         // Register button
-        btnRegister.setOnClickListener(v -> performRegister());
+        btnRegister.setOnClickListener(v -> performRegistration());
 
         // Login link
         tvLogin.setOnClickListener(v -> {
@@ -111,7 +112,7 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
-    private void clearFieldErrors() {
+    private void clearErrors() {
         tilFullName.setError(null);
         tilDisplayName.setError(null);
         tilEmail.setError(null);
@@ -120,150 +121,124 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     private void updateRegisterButtonState() {
-        String fullName = etFullName.getText().toString().trim();
-        String displayName = etDisplayName.getText().toString().trim();
-        String email = etEmail.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
-        String confirmPassword = etConfirmPassword.getText().toString().trim();
+        boolean allFieldsFilled = !etFullName.getText().toString().trim().isEmpty() &&
+                !etDisplayName.getText().toString().trim().isEmpty() &&
+                !etEmail.getText().toString().trim().isEmpty() &&
+                !etPassword.getText().toString().trim().isEmpty() &&
+                !etConfirmPassword.getText().toString().trim().isEmpty() &&
+                cbTerms.isChecked();
 
-        boolean isFormValid = !fullName.isEmpty() && !displayName.isEmpty() &&
-                !email.isEmpty() && !password.isEmpty() && !confirmPassword.isEmpty() &&
-                cbTerms.isChecked() && !isLoading;
-
-        btnRegister.setEnabled(isFormValid);
+        btnRegister.setEnabled(allFieldsFilled && !isLoading);
     }
 
-    private void performRegister() {
-        if (isLoading) return;
-
+    private void performRegistration() {
         String fullName = etFullName.getText().toString().trim();
         String displayName = etDisplayName.getText().toString().trim();
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
         String confirmPassword = etConfirmPassword.getText().toString().trim();
 
-        if (!validateRegistrationForm(fullName, displayName, email, password, confirmPassword)) {
+        // Validate inputs
+        if (!ValidationUtils.isValidName(fullName)) {
+            tilFullName.setError("Full name must be at least 2 characters");
             return;
         }
 
+        if (!ValidationUtils.isValidName(displayName)) {
+            tilDisplayName.setError("Display name must be at least 2 characters");
+            return;
+        }
+
+        if (!ValidationUtils.isValidEmail(email)) {
+            tilEmail.setError("Please enter a valid email address");
+            return;
+        }
+
+        if (!ValidationUtils.isValidPassword(password)) {
+            tilPassword.setError("Password must be at least 6 characters");
+            return;
+        }
+
+        if (!password.equals(confirmPassword)) {
+            tilConfirmPassword.setError("Passwords do not match");
+            return;
+        }
+
+        if (!cbTerms.isChecked()) {
+            Toast.makeText(this, "Please accept the terms and conditions", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Perform registration
         setLoading(true);
 
-        Map<String, Object> registerRequest = new HashMap<>();
-        registerRequest.put("fullName", fullName);
-        registerRequest.put("displayName", displayName);
-        registerRequest.put("email", email);
-        registerRequest.put("password", password);
+        Map<String, Object> registerData = new HashMap<>();
+        registerData.put("fullName", fullName);
+        registerData.put("displayName", displayName);
+        registerData.put("email", email);
+        registerData.put("password", password);
 
-        ApiClient.getAuthService().register(registerRequest)
-                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                           Response<StandardResponse<Map<String, Object>>> response) {
-                        setLoading(false);
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getAuthService().register(registerData);
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                setLoading(false);
+                handleRegistrationResponse(response);
+            }
 
-                        if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<Map<String, Object>> apiResponse = response.body();
-
-                            if (apiResponse.isSuccess()) {
-                                handleRegistrationSuccess(email);
-                            } else {
-                                showError(apiResponse.getMessage());
-                            }
-                        } else {
-                            showError("Registration failed. Please try again.");
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        setLoading(false);
-                        Log.e(TAG, "Registration API call failed", t);
-                        showError("Network error. Please check your connection.");
-                    }
-                });
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                  @NonNull Throwable t) {
+                setLoading(false);
+                Log.e(TAG, "Registration request failed", t);
+                showError("Registration failed: " + t.getMessage());
+            }
+        });
     }
 
-    private boolean validateRegistrationForm(String fullName, String displayName,
-                                             String email, String password, String confirmPassword) {
-        boolean isValid = true;
+    private void handleRegistrationResponse(Response<StandardResponse<Map<String, Object>>> response) {
+        try {
+            if (response.isSuccessful() && response.body() != null) {
+                StandardResponse<Map<String, Object>> apiResponse = response.body();
 
-        // Validate full name
-        String fullNameError = ValidationUtils.getNameValidationError(fullName);
-        if (fullNameError != null) {
-            tilFullName.setError(fullNameError);
-            isValid = false;
+                if (apiResponse.isSuccess()) {
+                    Toast.makeText(this, "Registration successful! Please verify your email.",
+                            Toast.LENGTH_LONG).show();
+
+                    // Navigate to OTP verification
+                    Intent intent = new Intent(this, OtpVerificationActivity.class);
+                    intent.putExtra("email", etEmail.getText().toString().trim());
+                    intent.putExtra("fromRegistration", true);
+                    startActivity(intent);
+                    finish();
+                } else {
+                    showError(apiResponse.getMessage());
+                }
+            } else {
+                String errorMsg = "Registration failed";
+                if (response.code() == 400) {
+                    errorMsg = "Invalid registration data";
+                } else if (response.code() == 409) {
+                    errorMsg = "Email already exists";
+                }
+                showError(errorMsg);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing registration response", e);
+            showError("Registration failed");
         }
-
-        // Validate display name
-        String displayNameError = ValidationUtils.getNameValidationError(displayName);
-        if (displayNameError != null) {
-            tilDisplayName.setError(displayNameError);
-            isValid = false;
-        }
-
-        // Validate email
-        String emailError = ValidationUtils.getEmailValidationError(email);
-        if (emailError != null) {
-            tilEmail.setError(emailError);
-            isValid = false;
-        }
-
-        // Validate password
-        String passwordError = ValidationUtils.getPasswordValidationError(password);
-        if (passwordError != null) {
-            tilPassword.setError(passwordError);
-            isValid = false;
-        }
-
-        // Validate confirm password
-        if (!password.equals(confirmPassword)) {
-            tilConfirmPassword.setError("Passwords don't match");
-            isValid = false;
-        }
-
-        // Validate terms
-        if (!cbTerms.isChecked()) {
-            showError("Please accept the Terms of Service and Privacy Policy");
-            isValid = false;
-        }
-
-        return isValid;
-    }
-
-    private void handleRegistrationSuccess(String email) {
-        Toast.makeText(this, "Registration successful! Please check your email for verification.", Toast.LENGTH_LONG).show();
-
-        // Navigate to OTP verification
-        Intent intent = new Intent(this, OTPVerificationActivity.class);
-        intent.putExtra("email", email);
-        intent.putExtra("from_registration", true);
-        startActivity(intent);
-        finish();
     }
 
     private void setLoading(boolean loading) {
         isLoading = loading;
+        updateRegisterButtonState();
+        btnRegister.setText(loading ? "Creating Account..." : "Create Account");
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-        btnRegister.setEnabled(!loading && areFieldsValid() && cbTerms.isChecked());
-
-        etFullName.setEnabled(!loading);
-        etDisplayName.setEnabled(!loading);
-        etEmail.setEnabled(!loading);
-        etPassword.setEnabled(!loading);
-        etConfirmPassword.setEnabled(!loading);
-        cbTerms.setEnabled(!loading);
-        tvLogin.setEnabled(!loading);
-    }
-
-    private boolean areFieldsValid() {
-        return !etFullName.getText().toString().trim().isEmpty() &&
-                !etDisplayName.getText().toString().trim().isEmpty() &&
-                !etEmail.getText().toString().trim().isEmpty() &&
-                !etPassword.getText().toString().trim().isEmpty() &&
-                !etConfirmPassword.getText().toString().trim().isEmpty();
     }
 
     private void showError(String message) {
+        Log.e(TAG, "Showing error: " + message);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 }

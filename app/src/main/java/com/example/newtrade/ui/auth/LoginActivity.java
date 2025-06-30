@@ -20,6 +20,7 @@ import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.models.User;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.ValidationUtils;
@@ -40,6 +41,7 @@ import retrofit2.Response;
 
 public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
+    private static final int RC_SIGN_IN = 9001;
 
     // UI Components
     private TextInputLayout tilEmail, tilPassword;
@@ -53,6 +55,8 @@ public class LoginActivity extends AppCompatActivity {
 
     // Utils
     private SharedPrefsManager prefsManager;
+
+    // State
     private boolean isLoading = false;
 
     @Override
@@ -63,7 +67,7 @@ public class LoginActivity extends AppCompatActivity {
         // Initialize API client
         ApiClient.init(this);
 
-        // Initialize components
+        // Initialize views and utilities
         initViews();
         initGoogleSignIn();
         initUtils();
@@ -71,11 +75,12 @@ public class LoginActivity extends AppCompatActivity {
 
         // Check if already logged in
         if (prefsManager.isLoggedIn()) {
+            Log.d(TAG, "User already logged in, redirecting to main");
             navigateToMain();
             return;
         }
 
-        Log.d(TAG, "LoginActivity initialized successfully");
+        Log.d(TAG, "LoginActivity created successfully");
     }
 
     private void initViews() {
@@ -91,6 +96,16 @@ public class LoginActivity extends AppCompatActivity {
 
         // Initially disable login button
         btnLogin.setEnabled(false);
+
+        // Check if views are found
+        if (etEmail == null || etPassword == null || btnLogin == null) {
+            Log.e(TAG, "❌ Required views not found in layout");
+            Toast.makeText(this, "Layout error", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
+        Log.d(TAG, "✅ Views initialized successfully");
     }
 
     private void initGoogleSignIn() {
@@ -144,205 +159,195 @@ public class LoginActivity extends AppCompatActivity {
         btnGoogleSignIn.setOnClickListener(v -> performGoogleSignIn());
 
         // Register link
-        tvRegister.setOnClickListener(v -> {
-            startActivity(new Intent(this, RegisterActivity.class));
-        });
+        tvRegister.setOnClickListener(v -> navigateToRegister());
 
         // Forgot password link
-        tvForgotPassword.setOnClickListener(v -> {
-            startActivity(new Intent(this, ForgotPasswordActivity.class));
-        });
+        tvForgotPassword.setOnClickListener(v -> navigateToForgotPassword());
     }
 
     private void updateLoginButtonState() {
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
-
-        boolean isFormValid = !email.isEmpty() && !password.isEmpty() && !isLoading;
-        btnLogin.setEnabled(isFormValid);
+        btnLogin.setEnabled(!email.isEmpty() && !password.isEmpty() && !isLoading);
     }
 
     private void performLogin() {
-        if (isLoading) return;
-
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
 
-        // Validate input
-        if (!validateLoginForm(email, password)) {
+        // Validate inputs
+        if (!ValidationUtils.isValidEmail(email)) {
+            tilEmail.setError("Please enter a valid email address");
             return;
         }
 
+        if (!ValidationUtils.isValidPassword(password)) {
+            tilPassword.setError("Password must be at least 6 characters");
+            return;
+        }
+
+        // Perform login
         setLoading(true);
 
-        Map<String, Object> loginRequest = new HashMap<>();
-        loginRequest.put("email", email);
-        loginRequest.put("password", password);
+        Map<String, String> loginData = new HashMap<>();
+        loginData.put("email", email);
+        loginData.put("password", password);
 
-        ApiClient.getAuthService().login(loginRequest)
-                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                           Response<StandardResponse<Map<String, Object>>> response) {
-                        setLoading(false);
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getAuthService().login(loginData);
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                setLoading(false);
+                handleLoginResponse(response);
+            }
 
-                        if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<Map<String, Object>> apiResponse = response.body();
-
-                            if (apiResponse.isSuccess()) {
-                                handleLoginSuccess(apiResponse.getData());
-                            } else {
-                                showError(apiResponse.getMessage());
-                            }
-                        } else {
-                            showError("Login failed. Please check your credentials.");
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        setLoading(false);
-                        Log.e(TAG, "Login API call failed", t);
-                        showError("Network error. Please check your connection.");
-                    }
-                });
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                  @NonNull Throwable t) {
+                setLoading(false);
+                Log.e(TAG, "Login request failed", t);
+                showError(getNetworkErrorMessage(t));
+            }
+        });
     }
 
     private void performGoogleSignIn() {
-        if (isLoading) return;
-
+        setLoading(true);
         Intent signInIntent = googleSignInClient.getSignInIntent();
-        startActivityForResult(signInIntent, Constants.GOOGLE_SIGN_IN_REQUEST);
+        startActivityForResult(signInIntent, RC_SIGN_IN);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == Constants.GOOGLE_SIGN_IN_REQUEST) {
+        if (requestCode == RC_SIGN_IN) {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-            handleGoogleSignInResult(task);
-        }
-    }
-
-    private void handleGoogleSignInResult(Task<GoogleSignInAccount> completedTask) {
-        try {
-            GoogleSignInAccount account = completedTask.getResult(ApiException.class);
-
-            if (account != null && account.getIdToken() != null) {
-                setLoading(true);
-
-                Map<String, String> googleRequest = new HashMap<>();
-                googleRequest.put("idToken", account.getIdToken());
-                googleRequest.put("email", account.getEmail());
-                googleRequest.put("name", account.getDisplayName());
-
-                ApiClient.getAuthService().googleLogin(googleRequest)
-                        .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                            @Override
-                            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                                   Response<StandardResponse<Map<String, Object>>> response) {
-                                setLoading(false);
-
-                                if (response.isSuccessful() && response.body() != null) {
-                                    StandardResponse<Map<String, Object>> apiResponse = response.body();
-
-                                    if (apiResponse.isSuccess()) {
-                                        handleLoginSuccess(apiResponse.getData());
-                                    } else {
-                                        showError(apiResponse.getMessage());
-                                    }
-                                } else {
-                                    showError("Google sign-in failed. Please try again.");
-                                }
-                            }
-
-                            @Override
-                            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                                setLoading(false);
-                                Log.e(TAG, "Google login API call failed", t);
-                                showError("Network error. Please try again.");
-                            }
-                        });
+            try {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                handleGoogleSignInResult(account);
+            } catch (ApiException e) {
+                setLoading(false);
+                Log.e(TAG, "Google sign in failed", e);
+                showError("Google sign in failed: " + e.getMessage());
             }
-        } catch (ApiException e) {
-            Log.e(TAG, "Google sign-in failed", e);
-            showError("Google sign-in was cancelled or failed.");
         }
     }
 
-    private boolean validateLoginForm(String email, String password) {
-        boolean isValid = true;
-
-        // Validate email
-        String emailError = ValidationUtils.getEmailValidationError(email);
-        if (emailError != null) {
-            tilEmail.setError(emailError);
-            isValid = false;
+    private void handleGoogleSignInResult(GoogleSignInAccount account) {
+        String idToken = account.getIdToken();
+        if (idToken == null) {
+            setLoading(false);
+            showError("Failed to get Google ID token");
+            return;
         }
 
-        // Validate password
-        String passwordError = ValidationUtils.getPasswordValidationError(password);
-        if (passwordError != null) {
-            tilPassword.setError(passwordError);
-            isValid = false;
-        }
+        Map<String, String> googleData = new HashMap<>();
+        googleData.put("idToken", idToken);
 
-        return isValid;
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getAuthService().googleSignIn(googleData);
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                setLoading(false);
+                handleLoginResponse(response);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                  @NonNull Throwable t) {
+                setLoading(false);
+                Log.e(TAG, "Google sign in request failed", t);
+                showError(getNetworkErrorMessage(t));
+            }
+        });
     }
 
-    private void handleLoginSuccess(Map<String, Object> userData) {
+    @SuppressWarnings("unchecked")
+    private void handleLoginResponse(Response<StandardResponse<Map<String, Object>>> response) {
         try {
-            // Extract user data
-            Map<String, Object> user = (Map<String, Object>) userData.get("user");
-            String token = (String) userData.get("token");
+            if (response.isSuccessful() && response.body() != null) {
+                StandardResponse<Map<String, Object>> apiResponse = response.body();
 
-            if (user != null && token != null) {
-                Long userId = Long.valueOf(user.get("id").toString());
-                String email = (String) user.get("email");
-                String displayName = (String) user.get("displayName");
-                String avatarUrl = (String) user.get("profilePicture");
-                Boolean isEmailVerified = (Boolean) user.get("isEmailVerified");
+                if (apiResponse.isSuccess()) {
+                    Map<String, Object> data = apiResponse.getData();
 
-                // Save user session
-                prefsManager.saveUserLogin(userId, email, displayName, avatarUrl, token);
+                    // Check if OTP is required
+                    Boolean requiresOtp = (Boolean) data.get("requiresOtp");
+                    if (requiresOtp != null && requiresOtp) {
+                        String email = etEmail.getText().toString().trim();
+                        navigateToOtpVerification(email);
+                        return;
+                    }
 
-                // Check if email is verified
-                if (isEmailVerified != null && !isEmailVerified) {
-                    // Redirect to OTP verification
-                    Intent intent = new Intent(this, OTPVerificationActivity.class);
-                    intent.putExtra("email", email);
-                    intent.putExtra("from_login", true);
-                    startActivity(intent);
-                    finish();
+                    // Get user data
+                    Map<String, Object> userData = (Map<String, Object>) data.get("user");
+                    if (userData != null) {
+                        // Save user data
+                        prefsManager.saveLoginData(userData);
+
+                        Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show();
+                        navigateToMain();
+                    } else {
+                        showError("Invalid response data");
+                    }
                 } else {
-                    // Navigate to main activity
-                    navigateToMain();
+                    showError(apiResponse.getMessage());
                 }
-
-                Toast.makeText(this, "Welcome back, " + displayName + "!", Toast.LENGTH_SHORT).show();
             } else {
-                showError("Invalid response from server.");
+                String errorMsg = "Login failed";
+                if (response.code() == 401) {
+                    errorMsg = "Invalid email or password";
+                } else if (response.code() == 400) {
+                    errorMsg = "Invalid request. Please check your input.";
+                }
+                showError(errorMsg);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing login response", e);
-            showError("Login successful but failed to process user data.");
+            Log.e(TAG, "Error processing login response", e);
+            showError("Login successful but failed to save user data");
         }
     }
 
     private void setLoading(boolean loading) {
         isLoading = loading;
-        progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         btnLogin.setEnabled(!loading && !etEmail.getText().toString().trim().isEmpty()
                 && !etPassword.getText().toString().trim().isEmpty());
         btnGoogleSignIn.setEnabled(!loading);
-        etEmail.setEnabled(!loading);
-        etPassword.setEnabled(!loading);
-        tvRegister.setEnabled(!loading);
-        tvForgotPassword.setEnabled(!loading);
+        btnLogin.setText(loading ? "Signing in..." : "Sign In");
+        progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
+    }
+
+    private String getNetworkErrorMessage(Throwable throwable) {
+        if (throwable == null) {
+            return "Unknown error occurred";
+        }
+
+        String message = throwable.getMessage();
+        if (message == null || message.isEmpty()) {
+            return "Network error occurred";
+        }
+
+        // Handle specific error types
+        if (message.contains("timeout")) {
+            return "Connection timeout. Please try again.";
+        } else if (message.contains("connection")) {
+            return "Connection failed. Please check your internet.";
+        } else if (message.contains("401")) {
+            return "Invalid email or password";
+        } else if (message.contains("400")) {
+            return "Invalid request. Please check your input.";
+        } else if (message.contains("500")) {
+            return "Server error. Please try again later.";
+        }
+
+        return message;
     }
 
     private void showError(String message) {
+        Log.e(TAG, "Showing error: " + message);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
@@ -351,5 +356,22 @@ public class LoginActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
+    }
+
+    private void navigateToRegister() {
+        Intent intent = new Intent(this, RegisterActivity.class);
+        startActivity(intent);
+    }
+
+    private void navigateToForgotPassword() {
+        Intent intent = new Intent(this, ForgotPasswordActivity.class);
+        startActivity(intent);
+    }
+
+    private void navigateToOtpVerification(String email) {
+        Intent intent = new Intent(this, OtpVerificationActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("fromLogin", true);
+        startActivity(intent);
     }
 }

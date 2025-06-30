@@ -6,23 +6,37 @@ public class Category {
     private String name;
     private String description;
     private String iconUrl;
-    private String colorHex;
-    private Integer displayOrder;
+    private String color;
     private Boolean isActive;
+    private Integer productCount;
     private String createdAt;
     private String updatedAt;
-
-    // Product count
-    private Integer productCount;
 
     // Constructors
     public Category() {}
 
-    public Category(String name, String description) {
+    public Category(Long id, String name) {
+        this.id = id;
         this.name = name;
-        this.description = description;
-        this.isActive = true;
-        this.displayOrder = 0;
+    }
+
+    // Helper methods
+    public String getDisplayName() {
+        return name != null ? name : "Unknown Category";
+    }
+
+    public boolean hasIcon() {
+        return iconUrl != null && !iconUrl.trim().isEmpty();
+    }
+
+    public String getProductCountText() {
+        if (productCount == null || productCount == 0) {
+            return "No items";
+        } else if (productCount == 1) {
+            return "1 item";
+        } else {
+            return productCount + " items";
+        }
     }
 
     // Getters and Setters
@@ -38,14 +52,14 @@ public class Category {
     public String getIconUrl() { return iconUrl; }
     public void setIconUrl(String iconUrl) { this.iconUrl = iconUrl; }
 
-    public String getColorHex() { return colorHex; }
-    public void setColorHex(String colorHex) { this.colorHex = colorHex; }
-
-    public Integer getDisplayOrder() { return displayOrder; }
-    public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
+    public String getColor() { return color; }
+    public void setColor(String color) { this.color = color; }
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+
+    public Integer getProductCount() { return productCount; }
+    public void setProductCount(Integer productCount) { this.productCount = productCount; }
 
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
@@ -53,17 +67,26 @@ public class Category {
     public String getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
 
-    public Integer getProductCount() { return productCount; }
-    public void setProductCount(Integer productCount) { this.productCount = productCount; }
-
-    // Helper methods
-    public String getFormattedProductCount() {
-        if (productCount == null || productCount == 0) return "No items";
-        return productCount + (productCount == 1 ? " item" : " items");
+    @Override
+    public String toString() {
+        return "Category{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", isActive=" + isActive +
+                ", productCount=" + productCount +
+                '}';
     }
 
     @Override
-    public String toString() {
-        return name;
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Category category = (Category) o;
+        return id != null && id.equals(category.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id != null ? id.hashCode() : 0;
     }
 }
