@@ -13,6 +13,7 @@ import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
@@ -37,7 +38,6 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Category;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.ui.product.adapter.ProductImageAdapter;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.LocationManager;
@@ -67,30 +67,30 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
 
     // UI Components
     private Toolbar toolbar;
-    protected TextInputLayout tilTitle, tilDescription, tilPrice, tilLocation;
-    protected EditText etTitle, etDescription, etPrice, etLocation;
-    protected AutoCompleteTextView actvCategory, actvCondition;
+    private TextInputLayout tilTitle, tilDescription, tilPrice, tilLocation;
+    private EditText etTitle, etDescription, etPrice, etLocation;
+    private AutoCompleteTextView actvCategory, actvCondition;
     private RecyclerView rvImages;
-    private ImageView ivAddImage;
-    protected Button btnPreview, btnPublish;
-    protected ProgressBar progressBar;
+    private Button btnAddImage, btnGetLocation, btnPreview, btnPublish;
+    private ImageView ivLocationIcon;
+    private ProgressBar progressBar;
 
     // Data
     private List<Category> categories = new ArrayList<>();
-    private List<Product.ProductCondition> conditions = new ArrayList<>();
-    protected List<String> selectedImagePaths = new ArrayList<>();
-    protected ProductImageAdapter imageAdapter;
-
-    // Selected values
-    protected Category selectedCategory;
-    protected Product.ProductCondition selectedCondition;
-    protected Double currentLatitude;
-    protected Double currentLongitude;
-
-    // Utils
-    protected SharedPrefsManager prefsManager;
+    private List<String> selectedImagePaths = new ArrayList<>();
+    private Category selectedCategory;
+    private Product.ProductCondition selectedCondition;
+    private SharedPrefsManager prefsManager;
     private LocationManager locationManager;
-    private File currentPhotoFile;
+
+    // Location
+    private Double currentLatitude;
+    private Double currentLongitude;
+    private String currentLocationAddress;
+
+    // Image capture
+    private Uri photoUri;
+    private static final String PHOTO_FILE_NAME = "product_photo.jpg";
 
     // State
     private boolean isLoading = false;
@@ -101,18 +101,14 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_product);
 
-        ApiClient.init(this);
-        prefsManager = new SharedPrefsManager(this);
-        locationManager = new LocationManager(this, this);
-
         initViews();
+        initUtils();
         setupToolbar();
-        setupRecyclerView();
         setupListeners();
-        loadCategories();
-        setupConditions();
+        setupRecyclerView();
 
-        Log.d(TAG, "AddProductActivity initialized");
+        loadCategories();
+        setupConditionSpinner();
     }
 
     private void initViews() {
@@ -121,25 +117,24 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
         tilDescription = findViewById(R.id.til_description);
         tilPrice = findViewById(R.id.til_price);
         tilLocation = findViewById(R.id.til_location);
-
         etTitle = findViewById(R.id.et_title);
         etDescription = findViewById(R.id.et_description);
         etPrice = findViewById(R.id.et_price);
         etLocation = findViewById(R.id.et_location);
-
         actvCategory = findViewById(R.id.actv_category);
         actvCondition = findViewById(R.id.actv_condition);
-
         rvImages = findViewById(R.id.rv_images);
-        ivAddImage = findViewById(R.id.iv_add_image);
-
+        btnAddImage = findViewById(R.id.btn_add_image);
+        btnGetLocation = findViewById(R.id.btn_get_location);
         btnPreview = findViewById(R.id.btn_preview);
         btnPublish = findViewById(R.id.btn_publish);
+        ivLocationIcon = findViewById(R.id.iv_location_icon);
         progressBar = findViewById(R.id.progress_bar);
+    }
 
-        // Initially disable buttons
-        btnPreview.setEnabled(false);
-        btnPublish.setEnabled(false);
+    private void initUtils() {
+        prefsManager = new SharedPrefsManager(this);
+        locationManager = new LocationManager(this, this);
     }
 
     private void setupToolbar() {
@@ -148,99 +143,138 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setTitle("Add Product");
         }
-
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
-    }
-
-    private void setupRecyclerView() {
-        imageAdapter = new ProductImageAdapter(selectedImagePaths, new ProductImageAdapter.OnImageClickListener() {
-            @Override
-            public void onImageClick(int position) {
-                showImageOptionsDialog(position);
-            }
-
-            @Override
-            public void onRemoveClick(int position) {
-                removeImage(position);
-            }
-        });
-
-        rvImages.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
-        rvImages.setAdapter(imageAdapter);
     }
 
     private void setupListeners() {
-        // Text watchers for validation
-        TextWatcher textWatcher = new TextWatcher() {
+        // Text validation listeners
+        etTitle.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                clearFieldErrors();
-                updateButtonStates();
+                tilTitle.setError(null);
+                updatePublishButtonState();
             }
-
             @Override
             public void afterTextChanged(Editable s) {}
-        };
+        });
 
-        etTitle.addTextChangedListener(textWatcher);
-        etDescription.addTextChangedListener(textWatcher);
-        etPrice.addTextChangedListener(textWatcher);
-        etLocation.addTextChangedListener(textWatcher);
+        etDescription.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                tilDescription.setError(null);
+                updatePublishButtonState();
+            }
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        etPrice.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                tilPrice.setError(null);
+                updatePublishButtonState();
+            }
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        etLocation.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                tilLocation.setError(null);
+                updatePublishButtonState();
+            }
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        // Button listeners
+        btnAddImage.setOnClickListener(v -> showImageSourceDialog());
+        btnGetLocation.setOnClickListener(v -> getCurrentLocation());
+        btnPreview.setOnClickListener(v -> previewListing());
+        btnPublish.setOnClickListener(v -> publishProduct());
 
         // Category selection
         actvCategory.setOnItemClickListener((parent, view, position, id) -> {
             selectedCategory = categories.get(position);
-            updateButtonStates();
+            updatePublishButtonState();
         });
 
         // Condition selection
         actvCondition.setOnItemClickListener((parent, view, position, id) -> {
-            selectedCondition = conditions.get(position);
-            updateButtonStates();
+            selectedCondition = Product.ProductCondition.values()[position];
+            updatePublishButtonState();
         });
+    }
 
-        // Add image button
-        ivAddImage.setOnClickListener(v -> showImagePickerDialog());
-
-        // Location field click
-        etLocation.setOnClickListener(v -> showLocationOptionsDialog());
-
-        // Preview button
-        btnPreview.setOnClickListener(v -> showPreviewDialog());
-
-        // Publish button
-        btnPublish.setOnClickListener(v -> publishProduct());
+    private void setupRecyclerView() {
+        rvImages.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
+        // TODO: Create ProductImageAdapter
+        // ProductImageAdapter adapter = new ProductImageAdapter(selectedImagePaths, this);
+        // rvImages.setAdapter(adapter);
     }
 
     private void loadCategories() {
-        ApiClient.getProductService().getCategories()
-                .enqueue(new Callback<StandardResponse<List<Category>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<List<Category>>> call,
-                                           Response<StandardResponse<List<Category>>> response) {
-                        if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<List<Category>> apiResponse = response.body();
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getProductService().getCategories();
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                handleCategoriesResponse(response);
+            }
 
-                            if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                                categories.clear();
-                                categories.addAll(apiResponse.getData());
-                                setupCategoryAdapter();
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<List<Category>>> call, Throwable t) {
-                        Log.e(TAG, "Failed to load categories", t);
-                        showError("Failed to load categories");
-                    }
-                });
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "Failed to load categories", t);
+                Toast.makeText(AddProductActivity.this, "Failed to load categories", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
-    private void setupCategoryAdapter() {
+    @SuppressWarnings("unchecked")
+    private void handleCategoriesResponse(Response<StandardResponse<Map<String, Object>>> response) {
+        try {
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                Map<String, Object> data = response.body().getData();
+                List<Map<String, Object>> categoryMaps = (List<Map<String, Object>>) data.get("content");
+
+                if (categoryMaps != null) {
+                    categories.clear();
+                    for (Map<String, Object> categoryMap : categoryMaps) {
+                        Category category = parseCategoryFromMap(categoryMap);
+                        if (category != null) {
+                            categories.add(category);
+                        }
+                    }
+                    setupCategorySpinner();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing categories response", e);
+        }
+    }
+
+    private Category parseCategoryFromMap(Map<String, Object> categoryMap) {
+        try {
+            Category category = new Category();
+            category.setId(((Number) categoryMap.get("id")).longValue());
+            category.setName((String) categoryMap.get("name"));
+            category.setDescription((String) categoryMap.get("description"));
+            return category;
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing category", e);
+            return null;
+        }
+    }
+
+    private void setupCategorySpinner() {
         List<String> categoryNames = new ArrayList<>();
         for (Category category : categories) {
             categoryNames.add(category.getName());
@@ -251,14 +285,10 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
         actvCategory.setAdapter(adapter);
     }
 
-    private void setupConditions() {
-        conditions.clear();
-        for (Product.ProductCondition condition : Product.ProductCondition.values()) {
-            conditions.add(condition);
-        }
-
+    // FR-2.1.1: Required fields validation
+    private void setupConditionSpinner() {
         List<String> conditionNames = new ArrayList<>();
-        for (Product.ProductCondition condition : conditions) {
+        for (Product.ProductCondition condition : Product.ProductCondition.values()) {
             conditionNames.add(condition.getDisplayName());
         }
 
@@ -267,97 +297,51 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
         actvCondition.setAdapter(adapter);
     }
 
-    // Image handling methods
-    private void showImagePickerDialog() {
+    private void showImageSourceDialog() {
+        // FR-2.1.4: Image upload (up to 10), supports JPEG/PNG
         if (selectedImagePaths.size() >= Constants.MAX_PRODUCT_IMAGES) {
-            showError("Maximum " + Constants.MAX_PRODUCT_IMAGES + " images allowed");
+            Toast.makeText(this, "Maximum " + Constants.MAX_PRODUCT_IMAGES + " images allowed",
+                    Toast.LENGTH_SHORT).show();
             return;
         }
 
-        BottomSheetDialog dialog = new BottomSheetDialog(this);
-        View view = getLayoutInflater().inflate(R.layout.dialog_image_picker, null);
-
-        view.findViewById(R.id.btn_camera).setOnClickListener(v -> {
-            dialog.dismiss();
-            checkCameraPermissionAndCapture();
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Add Photo");
+        builder.setItems(new CharSequence[]{"Camera", "Gallery"}, (dialog, which) -> {
+            if (which == 0) {
+                openCamera();
+            } else {
+                openGallery();
+            }
         });
-
-        view.findViewById(R.id.btn_gallery).setOnClickListener(v -> {
-            dialog.dismiss();
-            checkStoragePermissionAndPick();
-        });
-
-        dialog.setContentView(view);
-        dialog.show();
+        builder.show();
     }
 
-    private void checkCameraPermissionAndCapture() {
+    private void openCamera() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.CAMERA},
-                    Constants.REQUEST_CAMERA_PERMISSION);
-        } else {
-            captureImage();
+                    Constants.PERMISSION_REQUEST_CAMERA);
+            return;
+        }
+
+        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+            File photoFile = new File(getCacheDir(), PHOTO_FILE_NAME);
+            photoUri = FileProvider.getUriForFile(this,
+                    getPackageName() + ".fileprovider", photoFile);
+            cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
+            startActivityForResult(cameraIntent, Constants.REQUEST_CODE_CAMERA);
         }
     }
 
-    private void checkStoragePermissionAndPick() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                    Constants.REQUEST_STORAGE_PERMISSION);
-        } else {
-            pickFromGallery();
-        }
+    private void openGallery() {
+        Intent galleryIntent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(galleryIntent, Constants.REQUEST_CODE_GALLERY);
     }
 
-    private void captureImage() {
-        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-            try {
-                currentPhotoFile = ImageUtils.createImageFile(this);
-                if (currentPhotoFile != null) {
-                    Uri photoURI = FileProvider.getUriForFile(this,
-                            "com.example.newtrade.fileprovider", currentPhotoFile);
-                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-                    startActivityForResult(takePictureIntent, Constants.REQUEST_CAPTURE_IMAGE);
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "Error creating image file", e);
-                showError("Failed to create image file");
-            }
-        }
-    }
-
-    private void pickFromGallery() {
-        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        intent.setType("image/*");
-        startActivityForResult(intent, Constants.REQUEST_PICK_IMAGE);
-    }
-
-    // Location handling methods
-    private void showLocationOptionsDialog() {
-        BottomSheetDialog dialog = new BottomSheetDialog(this);
-        View view = getLayoutInflater().inflate(R.layout.dialog_location_picker, null);
-
-        view.findViewById(R.id.btn_current_location).setOnClickListener(v -> {
-            dialog.dismiss();
-            getCurrentLocation();
-        });
-
-        view.findViewById(R.id.btn_manual_location).setOnClickListener(v -> {
-            dialog.dismiss();
-            etLocation.setEnabled(true);
-            etLocation.setFocusable(true);
-            etLocation.requestFocus();
-        });
-
-        dialog.setContentView(view);
-        dialog.show();
-    }
-
+    // FR-2.1.3: Location autofill using GPS (with permission check)
     private void getCurrentLocation() {
         if (!locationManager.hasLocationPermission()) {
             locationManager.requestLocationPermission();
@@ -368,6 +352,199 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
         locationManager.getCurrentLocation();
     }
 
+    private void setLocationLoading(boolean loading) {
+        isLocationLoading = loading;
+        btnGetLocation.setEnabled(!loading);
+        btnGetLocation.setText(loading ? "Getting..." : "Get Location");
+        ivLocationIcon.setVisibility(loading ? View.GONE : View.VISIBLE);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (resultCode == RESULT_OK) {
+            if (requestCode == Constants.REQUEST_CODE_CAMERA && photoUri != null) {
+                processSelectedImage(photoUri);
+            } else if (requestCode == Constants.REQUEST_CODE_GALLERY && data != null) {
+                Uri imageUri = data.getData();
+                if (imageUri != null) {
+                    processSelectedImage(imageUri);
+                }
+            }
+        }
+    }
+
+    private void processSelectedImage(Uri imageUri) {
+        String fileName = ImageUtils.generateImageFileName();
+        String compressedPath = ImageUtils.compressImage(this, imageUri, fileName);
+
+        if (compressedPath != null) {
+            selectedImagePaths.add(compressedPath);
+            updateImageRecyclerView();
+            updatePublishButtonState();
+        } else {
+            Toast.makeText(this, "Failed to process image", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void updateImageRecyclerView() {
+        // TODO: Notify adapter of changes
+        Log.d(TAG, "Images count: " + selectedImagePaths.size());
+    }
+
+    // FR-2.1.5: Users can preview listing before submission
+    private void previewListing() {
+        if (!validateForm()) {
+            return;
+        }
+
+        // TODO: Show preview dialog or navigate to preview activity
+        Toast.makeText(this, "Preview - Coming soon", Toast.LENGTH_SHORT).show();
+    }
+
+    private void publishProduct() {
+        if (!validateForm()) {
+            return;
+        }
+
+        setLoading(true);
+
+        // Prepare product data
+        Map<String, Object> productData = new HashMap<>();
+        productData.put("title", etTitle.getText().toString().trim());
+        productData.put("description", etDescription.getText().toString().trim());
+        productData.put("price", new BigDecimal(etPrice.getText().toString().trim()));
+        productData.put("condition", selectedCondition.name());
+        productData.put("location", etLocation.getText().toString().trim());
+        productData.put("categoryId", selectedCategory.getId());
+
+        if (!selectedImagePaths.isEmpty()) {
+            productData.put("imageUrls", selectedImagePaths);
+        }
+
+        Call<StandardResponse<Product>> call = ApiClient.getProductService()
+                .createProduct(productData, prefsManager.getUserId());
+
+        call.enqueue(new Callback<StandardResponse<Product>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Product>> call,
+                                   @NonNull Response<StandardResponse<Product>> response) {
+                setLoading(false);
+                handlePublishResponse(response);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Product>> call, @NonNull Throwable t) {
+                setLoading(false);
+                Log.e(TAG, "Failed to publish product", t);
+                showError("Failed to publish product: " + t.getMessage());
+            }
+        });
+    }
+
+    private void handlePublishResponse(Response<StandardResponse<Product>> response) {
+        try {
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                Toast.makeText(this, "Product published successfully!", Toast.LENGTH_SHORT).show();
+
+                // Navigate to product detail
+                Product product = response.body().getData();
+                if (product != null) {
+                    Intent intent = new Intent(this, ProductDetailActivity.class);
+                    intent.putExtra(Constants.BUNDLE_PRODUCT_ID, product.getId());
+                    startActivity(intent);
+                }
+
+                finish();
+            } else {
+                String message = response.body() != null ? response.body().getMessage() : "Failed to publish";
+                showError(message);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing publish response", e);
+            showError("Failed to publish product");
+        }
+    }
+
+    private boolean validateForm() {
+        boolean isValid = true;
+
+        // FR-2.1.1: Required fields validation
+        String title = etTitle.getText().toString().trim();
+        if (!ValidationUtils.isValidProductTitle(title)) {
+            tilTitle.setError("Title must be between " + Constants.MIN_PRODUCT_TITLE_LENGTH +
+                    "-" + Constants.MAX_PRODUCT_TITLE_LENGTH + " characters");
+            isValid = false;
+        }
+
+        String description = etDescription.getText().toString().trim();
+        if (!ValidationUtils.isValidProductDescription(description)) {
+            tilDescription.setError("Description must be between " + Constants.MIN_PRODUCT_DESCRIPTION_LENGTH +
+                    "-" + Constants.MAX_PRODUCT_DESCRIPTION_LENGTH + " characters");
+            isValid = false;
+        }
+
+        String priceStr = etPrice.getText().toString().trim();
+        if (!ValidationUtils.isValidPrice(priceStr)) {
+            tilPrice.setError("Please enter a valid price");
+            isValid = false;
+        }
+
+        String location = etLocation.getText().toString().trim();
+        if (!ValidationUtils.isValidLocation(location)) {
+            tilLocation.setError("Please enter a valid location");
+            isValid = false;
+        }
+
+        if (selectedCategory == null) {
+            Toast.makeText(this, "Please select a category", Toast.LENGTH_SHORT).show();
+            isValid = false;
+        }
+
+        if (selectedCondition == null) {
+            Toast.makeText(this, "Please select item condition", Toast.LENGTH_SHORT).show();
+            isValid = false;
+        }
+
+        // FR-2.1.1: At least 1 photo required
+        if (selectedImagePaths.isEmpty()) {
+            Toast.makeText(this, "Please add at least one photo", Toast.LENGTH_SHORT).show();
+            isValid = false;
+        }
+
+        return isValid;
+    }
+
+    private void updatePublishButtonState() {
+        String title = etTitle.getText().toString().trim();
+        String description = etDescription.getText().toString().trim();
+        String price = etPrice.getText().toString().trim();
+        String location = etLocation.getText().toString().trim();
+
+        boolean isFormValid = ValidationUtils.isValidProductTitle(title) &&
+                ValidationUtils.isValidProductDescription(description) &&
+                ValidationUtils.isValidPrice(price) &&
+                ValidationUtils.isValidLocation(location) &&
+                selectedCategory != null &&
+                selectedCondition != null &&
+                !selectedImagePaths.isEmpty();
+
+        btnPublish.setEnabled(isFormValid && !isLoading);
+        btnPreview.setEnabled(isFormValid && !isLoading);
+    }
+
+    private void setLoading(boolean loading) {
+        isLoading = loading;
+        progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
+        updatePublishButtonState();
+    }
+
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    // LocationManager.LocationCallback implementation
     @Override
     public void onLocationReceived(Location location) {
         setLocationLoading(false);
@@ -382,9 +559,8 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
 
             if (addresses != null && !addresses.isEmpty()) {
                 Address address = addresses.get(0);
-                String locationString = address.getAddressLine(0);
-                etLocation.setText(locationString);
-                etLocation.setEnabled(false);
+                currentLocationAddress = address.getAddressLine(0);
+                etLocation.setText(currentLocationAddress);
             } else {
                 etLocation.setText(String.format("%.6f, %.6f", currentLatitude, currentLongitude));
             }
@@ -393,7 +569,7 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
             etLocation.setText(String.format("%.6f, %.6f", currentLatitude, currentLongitude));
         }
 
-        updateButtonStates();
+        updatePublishButtonState();
     }
 
     @Override
@@ -402,277 +578,26 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
         showError("Failed to get location: " + error);
     }
 
-    // Validation and publishing methods
-    protected boolean validateForm() {
-        boolean isValid = true;
-
-        // Validate title
-        String title = etTitle.getText().toString().trim();
-        if (!ValidationUtils.isValidProductTitle(title)) {
-            tilTitle.setError("Title must be between 5-200 characters");
-            isValid = false;
-        }
-
-        // Validate description
-        String description = etDescription.getText().toString().trim();
-        if (!ValidationUtils.isValidProductDescription(description)) {
-            tilDescription.setError("Description must be between 10-2000 characters");
-            isValid = false;
-        }
-
-        // Validate price
-        String priceStr = etPrice.getText().toString().trim();
-        if (!ValidationUtils.isValidPrice(priceStr)) {
-            tilPrice.setError("Please enter a valid price");
-            isValid = false;
-        }
-
-        // Validate location
-        String location = etLocation.getText().toString().trim();
-        if (location.isEmpty()) {
-            tilLocation.setError("Location is required");
-            isValid = false;
-        }
-
-        // Validate category
-        if (selectedCategory == null) {
-            showError("Please select a category");
-            isValid = false;
-        }
-
-        // Validate condition
-        if (selectedCondition == null) {
-            showError("Please select a condition");
-            isValid = false;
-        }
-
-        // Validate images
-        if (selectedImagePaths.isEmpty()) {
-            showError("At least one image is required");
-            isValid = false;
-        }
-
-        return isValid;
-    }
-
-    protected void publishProduct() {
-        if (!validateForm()) {
-            return;
-        }
-
-        setLoading(true);
-
-        // First upload images, then create product
-        uploadImagesAndCreateProduct();
-    }
-
-    private void uploadImagesAndCreateProduct() {
-        List<String> uploadedImageUrls = new ArrayList<>();
-        uploadNextImage(0, uploadedImageUrls);
-    }
-
-    private void uploadNextImage(int index, List<String> uploadedUrls) {
-        if (index >= selectedImagePaths.size()) {
-            // All images uploaded, now create product
-            createProductWithImages(uploadedUrls);
-            return;
-        }
-
-        String imagePath = selectedImagePaths.get(index);
-        File imageFile = new File(imagePath);
-
-        RequestBody requestFile = RequestBody.create(MediaType.parse("image/*"), imageFile);
-        MultipartBody.Part imagePart = MultipartBody.Part.createFormData("file", imageFile.getName(), requestFile);
-
-        ApiClient.getProductService().uploadProductImage(imagePart)
-                .enqueue(new Callback<StandardResponse<Map<String, String>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<Map<String, String>>> call,
-                                           Response<StandardResponse<Map<String, String>>> response) {
-                        if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<Map<String, String>> apiResponse = response.body();
-
-                            if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                                String imageUrl = apiResponse.getData().get("imageUrl");
-                                uploadedUrls.add(imageUrl);
-
-                                // Upload next image
-                                uploadNextImage(index + 1, uploadedUrls);
-                            } else {
-                                setLoading(false);
-                                showError("Failed to upload image: " + apiResponse.getMessage());
-                            }
-                        } else {
-                            setLoading(false);
-                            showError("Failed to upload image");
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
-                        setLoading(false);
-                        Log.e(TAG, "Image upload failed", t);
-                        showError("Network error during image upload");
-                    }
-                });
-    }
-
-    private void createProductWithImages(List<String> imageUrls) {
-        Map<String, Object> productRequest = new HashMap<>();
-        productRequest.put("title", etTitle.getText().toString().trim());
-        productRequest.put("description", etDescription.getText().toString().trim());
-        productRequest.put("price", new BigDecimal(etPrice.getText().toString().trim()));
-        productRequest.put("condition", selectedCondition.name());
-        productRequest.put("location", etLocation.getText().toString().trim());
-        productRequest.put("categoryId", selectedCategory.getId());
-        productRequest.put("imageUrls", imageUrls);
-
-        if (currentLatitude != null && currentLongitude != null) {
-            productRequest.put("latitude", currentLatitude);
-            productRequest.put("longitude", currentLongitude);
-            productRequest.put("locationRadius", Constants.DEFAULT_LOCATION_RADIUS);
-        }
-
-        Long userId = prefsManager.getUserId();
-
-        ApiClient.getProductService().createProduct(productRequest, userId)
-                .enqueue(new Callback<StandardResponse<Product>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<Product>> call,
-                                           Response<StandardResponse<Product>> response) {
-                        setLoading(false);
-
-                        if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<Product> apiResponse = response.body();
-
-                            if (apiResponse.isSuccess()) {
-                                Toast.makeText(AddProductActivity.this,
-                                        "Product published successfully!", Toast.LENGTH_SHORT).show();
-                                finish();
-                            } else {
-                                showError(apiResponse.getMessage());
-                            }
-                        } else {
-                            showError("Failed to publish product");
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<Product>> call, Throwable t) {
-                        setLoading(false);
-                        Log.e(TAG, "Create product failed", t);
-                        showError("Network error during product creation");
-                    }
-                });
-    }
-
-    // Helper methods
-    private void clearFieldErrors() {
-        tilTitle.setError(null);
-        tilDescription.setError(null);
-        tilPrice.setError(null);
-        tilLocation.setError(null);
-    }
-
-    protected void updateButtonStates() {
-        boolean isFormComplete = !etTitle.getText().toString().trim().isEmpty() &&
-                !etDescription.getText().toString().trim().isEmpty() &&
-                !etPrice.getText().toString().trim().isEmpty() &&
-                !etLocation.getText().toString().trim().isEmpty() &&
-                selectedCategory != null &&
-                selectedCondition != null &&
-                !selectedImagePaths.isEmpty() &&
-                !isLoading;
-
-        btnPreview.setEnabled(isFormComplete);
-        btnPublish.setEnabled(isFormComplete);
-    }
-
-    private void setLoading(boolean loading) {
-        isLoading = loading;
-        progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-        updateButtonStates();
-    }
-
-    private void setLocationLoading(boolean loading) {
-        isLocationLoading = loading;
-        etLocation.setEnabled(!loading);
-        if (loading) {
-            etLocation.setText("Getting location...");
-        }
-    }
-
-    private void removeImage(int position) {
-        selectedImagePaths.remove(position);
-        imageAdapter.notifyItemRemoved(position);
-        updateButtonStates();
-    }
-
-    private void showImageOptionsDialog(int position) {
-        // Implementation for image options (view full size, remove, etc.)
-    }
-
-    private void showPreviewDialog() {
-        // Implementation for product preview
-        Intent intent = new Intent(this, ProductPreviewActivity.class);
-        intent.putExtra("title", etTitle.getText().toString().trim());
-        intent.putExtra("description", etDescription.getText().toString().trim());
-        intent.putExtra("price", etPrice.getText().toString().trim());
-        intent.putExtra("location", etLocation.getText().toString().trim());
-        intent.putExtra("category", selectedCategory.getName());
-        intent.putExtra("condition", selectedCondition.getDisplayName());
-        intent.putStringArrayListExtra("images", new ArrayList<>(selectedImagePaths));
-        startActivity(intent);
-    }
-
-    private void showError(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (resultCode == RESULT_OK) {
-            if (requestCode == Constants.REQUEST_CAPTURE_IMAGE) {
-                if (currentPhotoFile != null) {
-                    selectedImagePaths.add(currentPhotoFile.getAbsolutePath());
-                    imageAdapter.notifyItemInserted(selectedImagePaths.size() - 1);
-                    updateButtonStates();
-                }
-            } else if (requestCode == Constants.REQUEST_PICK_IMAGE) {
-                if (data != null && data.getData() != null) {
-                    Uri imageUri = data.getData();
-                    String imagePath = ImageUtils.getRealPathFromUri(this, imageUri);
-                    if (imagePath != null) {
-                        selectedImagePaths.add(imagePath);
-                        imageAdapter.notifyItemInserted(selectedImagePaths.size() - 1);
-                        updateButtonStates();
-                    }
-                }
-            }
-        }
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            switch (requestCode) {
-                case Constants.REQUEST_CAMERA_PERMISSION:
-                    captureImage();
-                    break;
-                case Constants.REQUEST_STORAGE_PERMISSION:
-                    pickFromGallery();
-                    break;
-                case Constants.REQUEST_LOCATION_PERMISSION:
-                    getCurrentLocation();
-                    break;
+        if (requestCode == Constants.PERMISSION_REQUEST_CAMERA) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                openCamera();
+            } else {
+                Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show();
             }
-        } else {
-            showError("Permission denied");
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override

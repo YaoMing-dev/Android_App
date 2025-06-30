@@ -1,58 +1,66 @@
 // app/src/main/java/com/example/newtrade/utils/DateTimeUtils.java
 package com.example.newtrade.utils;
 
-import android.text.format.DateUtils;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 public class DateTimeUtils {
 
-    private static final SimpleDateFormat API_DATE_FORMAT =
-            new SimpleDateFormat(Constants.DATE_FORMAT_API, Locale.getDefault());
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+    private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+    private static final SimpleDateFormat FULL_FORMAT = new SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault());
 
-    private static final SimpleDateFormat DISPLAY_DATE_FORMAT =
-            new SimpleDateFormat(Constants.DATE_FORMAT_DISPLAY, Locale.getDefault());
+    public static String formatDate(Date date) {
+        if (date == null) return "";
+        return DATE_FORMAT.format(date);
+    }
 
-    private static final SimpleDateFormat TIME_FORMAT =
-            new SimpleDateFormat(Constants.TIME_FORMAT_DISPLAY, Locale.getDefault());
+    public static String formatTime(Date date) {
+        if (date == null) return "";
+        return TIME_FORMAT.format(date);
+    }
 
-    public static String formatMessageTime(String apiDateString) {
-        try {
-            Date date = API_DATE_FORMAT.parse(apiDateString);
-            if (date == null) return "";
+    public static String formatDateTime(Date date) {
+        if (date == null) return "";
+        return FULL_FORMAT.format(date);
+    }
 
-            long now = System.currentTimeMillis();
-            long messageTime = date.getTime();
+    public static String getTimeAgo(Date date) {
+        if (date == null) return "";
 
-            if (DateUtils.isToday(messageTime)) {
-                return TIME_FORMAT.format(date);
-            } else if (now - messageTime < DateUtils.WEEK_IN_MILLIS) {
-                return DateUtils.getRelativeTimeSpanString(messageTime, now, DateUtils.DAY_IN_MILLIS).toString();
-            } else {
-                return DISPLAY_DATE_FORMAT.format(date);
-            }
-        } catch (Exception e) {
-            return apiDateString;
+        long timeAgo = System.currentTimeMillis() - date.getTime();
+
+        if (timeAgo < TimeUnit.MINUTES.toMillis(1)) {
+            return "Just now";
+        } else if (timeAgo < TimeUnit.HOURS.toMillis(1)) {
+            long minutes = TimeUnit.MILLISECONDS.toMinutes(timeAgo);
+            return minutes + " minute" + (minutes == 1 ? "" : "s") + " ago";
+        } else if (timeAgo < TimeUnit.DAYS.toMillis(1)) {
+            long hours = TimeUnit.MILLISECONDS.toHours(timeAgo);
+            return hours + " hour" + (hours == 1 ? "" : "s") + " ago";
+        } else if (timeAgo < TimeUnit.DAYS.toMillis(7)) {
+            long days = TimeUnit.MILLISECONDS.toDays(timeAgo);
+            return days + " day" + (days == 1 ? "" : "s") + " ago";
+        } else {
+            return formatDate(date);
         }
     }
 
-    public static String formatProductDate(String apiDateString) {
-        try {
-            Date date = API_DATE_FORMAT.parse(apiDateString);
-            if (date == null) return "";
+    public static String getMessageTimeFormat(Date date) {
+        if (date == null) return "";
 
-            long now = System.currentTimeMillis();
-            long productTime = date.getTime();
+        long timeAgo = System.currentTimeMillis() - date.getTime();
 
-            if (now - productTime < DateUtils.DAY_IN_MILLIS) {
-                return DateUtils.getRelativeTimeSpanString(productTime, now, DateUtils.MINUTE_IN_MILLIS).toString();
-            } else {
-                return DISPLAY_DATE_FORMAT.format(date);
-            }
-        } catch (Exception e) {
-            return apiDateString;
+        if (timeAgo < TimeUnit.DAYS.toMillis(1)) {
+            return formatTime(date);
+        } else if (timeAgo < TimeUnit.DAYS.toMillis(7)) {
+            SimpleDateFormat dayFormat = new SimpleDateFormat("EEE", Locale.getDefault());
+            return dayFormat.format(date);
+        } else {
+            SimpleDateFormat shortFormat = new SimpleDateFormat("MM/dd", Locale.getDefault());
+            return shortFormat.format(date);
         }
     }
 }

@@ -5,13 +5,23 @@ import com.example.newtrade.models.StandardResponse;
 import retrofit2.Call;
 import retrofit2.http.*;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 public interface OfferService {
 
     @POST("offers")
-    Call<StandardResponse<Map<String, Object>>> createOffer(
+    Call<StandardResponse<Map<String, Object>>> makeOffer(
             @Body Map<String, Object> offerData,
+            @Header("User-ID") Long userId
+    );
+
+    @PUT("offers/{id}/respond")
+    Call<StandardResponse<Map<String, Object>>> respondToOffer(
+            @Path("id") Long offerId,
+            @Query("status") String status,
+            @Query("counterAmount") BigDecimal counterAmount,
+            @Query("message") String message,
             @Header("User-ID") Long userId
     );
 
@@ -29,15 +39,11 @@ public interface OfferService {
             @Header("User-ID") Long userId
     );
 
-    @PUT("offers/{id}/accept")
-    Call<StandardResponse<Map<String, Object>>> acceptOffer(
-            @Path("id") Long offerId,
-            @Header("User-ID") Long userId
-    );
-
-    @PUT("offers/{id}/reject")
-    Call<StandardResponse<Void>> rejectOffer(
-            @Path("id") Long offerId,
+    @GET("offers/product/{productId}")
+    Call<StandardResponse<Map<String, Object>>> getProductOffers(
+            @Path("productId") Long productId,
+            @Query("page") int page,
+            @Query("size") int size,
             @Header("User-ID") Long userId
     );
 }
