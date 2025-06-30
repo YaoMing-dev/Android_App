@@ -5,7 +5,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.PopupMenu;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -15,6 +14,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 
 import java.util.List;
@@ -27,9 +27,11 @@ public class MyProductsAdapter extends RecyclerView.Adapter<MyProductsAdapter.Pr
     public interface OnProductActionListener {
         void onProductClick(Product product);
         void onEditClick(Product product);
-        void onStatusChange(Product product, Product.ProductStatus newStatus);
         void onDeleteClick(Product product);
-        void onAnalyticsClick(Product product);
+        void onMarkSoldClick(Product product);
+        void onArchiveClick(Product product);
+        void onRestoreClick(Product product);
+        void onViewAnalyticsClick(Product product);
     }
 
     public MyProductsAdapter(List<Product> products, OnProductActionListener listener) {
@@ -49,35 +51,41 @@ public class MyProductsAdapter extends RecyclerView.Adapter<MyProductsAdapter.Pr
     public void onBindViewHolder(@NonNull ProductViewHolder holder, int position) {
         Product product = products.get(position);
 
-        // Basic info
+        // Product info
         holder.tvTitle.setText(product.getTitle());
         holder.tvPrice.setText(product.getFormattedPrice());
-        holder.tvLocation.setText(product.getLocation());
 
-        // Status chip
-        holder.chipStatus.setText(product.getStatus().getDisplayName());
-        holder.chipStatus.setChipBackgroundColorResource(getStatusColor(product.getStatus()));
-
-        // View count
-        holder.tvViews.setText(String.valueOf(product.getViewCount() != null ? product.getViewCount() : 0) + " views");
+        // Views count
+        if (product.getViewCount() != null && product.getViewCount() > 0) {
+            holder.tvViews.setText(product.getViewCount() + " views");
+            holder.tvViews.setVisibility(View.VISIBLE);
+        } else {
+            holder.tvViews.setVisibility(View.GONE);
+        }
 
         // Created date
         if (product.getCreatedAt() != null) {
             holder.tvDate.setText(formatDate(product.getCreatedAt()));
         }
 
-        // Load product image
+        // Status chip
+        setupStatusChip(holder.chipStatus, product.getStatus());
+
+        // Product image
         String imageUrl = product.getFirstImageUrl();
-        if (imageUrl != null) {
+        if (imageUrl != null && !imageUrl.isEmpty()) {
             Glide.with(holder.itemView.getContext())
                     .load(imageUrl)
-                    .transform(new RoundedCorners(16))
-                    .placeholder(R.drawable.placeholder_image)
-                    .error(R.drawable.placeholder_image)
-                    .into(holder.ivProduct);
+                    .transform(new RoundedCorners(8))
+                    .placeholder(R.drawable.placeholder_product)
+                    .error(R.drawable.ic_error_image)
+                    .into(holder.ivImage);
         } else {
-            holder.ivProduct.setImageResource(R.drawable.placeholder_image);
+            holder.ivImage.setImageResource(R.drawable.placeholder_product);
         }
+
+        // Action buttons based on status
+        setupActionButtons(holder, product);
 
         // Click listeners
         holder.itemView.setOnClickListener(v -> {
@@ -86,75 +94,9 @@ public class MyProductsAdapter extends RecyclerView.Adapter<MyProductsAdapter.Pr
             }
         });
 
-        holder.ivMore.setOnClickListener(v -> showPopupMenu(v, product));
-    }
-
-    private void showPopupMenu(View anchor, Product product) {
-        PopupMenu popup = new PopupMenu(anchor.getContext(), anchor);
-        popup.getMenuInflater().inflate(R.menu.menu_my_product, popup.getMenu());
-
-        // Show/hide menu items based on status
-        if (product.getStatus() == Product.ProductStatus.SOLD) {
-            popup.getMenu().findItem(R.id.action_mark_sold).setVisible(false);
-            popup.getMenu().findItem(R.id.action_pause).setVisible(false);
-        } else if (product.getStatus() == Product.ProductStatus.PAUSED) {
-            popup.getMenu().findItem(R.id.action_pause).setVisible(false);
-            popup.getMenu().findItem(R.id.action_resume).setVisible(true);
-        } else {
-            popup.getMenu().findItem(R.id.action_resume).setVisible(false);
-        }
-
-        popup.setOnMenuItemClickListener(item -> {
-            if (listener == null) return false;
-
-            int itemId = item.getItemId();
-            if (itemId == R.id.action_edit) {
-                listener.onEditClick(product);
-                return true;
-            } else if (itemId == R.id.action_mark_sold) {
-                listener.onStatusChange(product, Product.ProductStatus.SOLD);
-                return true;
-            } else if (itemId == R.id.action_pause) {
-                listener.onStatusChange(product, Product.ProductStatus.PAUSED);
-                return true;
-            } else if (itemId == R.id.action_resume) {
-                listener.onStatusChange(product, Product.ProductStatus.AVAILABLE);
-                return true;
-            } else if (itemId == R.id.action_analytics) {
-                listener.onAnalyticsClick(product);
-                return true;
-            } else if (itemId == R.id.action_delete) {
-                listener.onDeleteClick(product);
-                return true;
-            }
-            return false;
-        });
-
-        popup.show();
-    }
-
-    private int getStatusColor(Product.ProductStatus status) {
-        switch (status) {
-            case AVAILABLE:
-                return R.color.status_available;
-            case SOLD:
-                return R.color.status_sold;
-            case PAUSED:
-                return R.color.status_paused;
-            case RESERVED:
-                return R.color.status_reserved;
-            default:
-                return R.color.status_default;
-        }
-    }
-
-    private String formatDate(String dateString) {
-        try {
-            // Simple date formatting
-            return dateString.substring(0, 10); // yyyy-MM-dd
-        } catch (Exception e) {
-            return dateString;
-        }
+        holder.btnPrimary.setOnClickListener(v -> handlePrimaryAction(product));
+        holder.btnSecondary.setOnClickListener(v -> handleSecondaryAction(product));
+        holder.ivMenu.setOnClickListener(v -> showProductMenu(holder.ivMenu, product));
     }
 
     @Override
@@ -162,21 +104,125 @@ public class MyProductsAdapter extends RecyclerView.Adapter<MyProductsAdapter.Pr
         return products.size();
     }
 
+    private void setupStatusChip(Chip chip, Product.ProductStatus status) {
+        if (status == null) {
+            chip.setVisibility(View.GONE);
+            return;
+        }
+
+        chip.setVisibility(View.VISIBLE);
+        chip.setText(status.getDisplayName());
+
+        // Set chip color based on status
+        switch (status) {
+            case AVAILABLE:
+                chip.setChipBackgroundColorResource(R.color.status_available);
+                break;
+            case SOLD:
+                chip.setChipBackgroundColorResource(R.color.status_sold);
+                break;
+            case RESERVED:
+                chip.setChipBackgroundColorResource(R.color.status_reserved);
+                break;
+            case PAUSED:
+                chip.setChipBackgroundColorResource(R.color.status_paused);
+                break;
+            case ARCHIVED:
+                chip.setChipBackgroundColorResource(R.color.status_archived);
+                break;
+            default:
+                chip.setChipBackgroundColorResource(R.color.status_default);
+                break;
+        }
+    }
+
+    private void setupActionButtons(ProductViewHolder holder, Product product) {
+        Product.ProductStatus status = product.getStatus();
+
+        if (status == Product.ProductStatus.AVAILABLE) {
+            holder.btnPrimary.setText("Mark as Sold");
+            holder.btnPrimary.setVisibility(View.VISIBLE);
+            holder.btnSecondary.setText("Edit");
+            holder.btnSecondary.setVisibility(View.VISIBLE);
+        } else if (status == Product.ProductStatus.SOLD) {
+            holder.btnPrimary.setText("View Analytics");
+            holder.btnPrimary.setVisibility(View.VISIBLE);
+            holder.btnSecondary.setText("Archive");
+            holder.btnSecondary.setVisibility(View.VISIBLE);
+        } else if (status == Product.ProductStatus.ARCHIVED) {
+            holder.btnPrimary.setText("Restore");
+            holder.btnPrimary.setVisibility(View.VISIBLE);
+            holder.btnSecondary.setVisibility(View.GONE);
+        } else {
+            holder.btnPrimary.setText("Edit");
+            holder.btnPrimary.setVisibility(View.VISIBLE);
+            holder.btnSecondary.setVisibility(View.GONE);
+        }
+    }
+
+    private void handlePrimaryAction(Product product) {
+        if (listener == null) return;
+
+        Product.ProductStatus status = product.getStatus();
+        if (status == Product.ProductStatus.AVAILABLE) {
+            listener.onMarkSoldClick(product);
+        } else if (status == Product.ProductStatus.SOLD) {
+            listener.onViewAnalyticsClick(product);
+        } else if (status == Product.ProductStatus.ARCHIVED) {
+            listener.onRestoreClick(product);
+        } else {
+            listener.onEditClick(product);
+        }
+    }
+
+    private void handleSecondaryAction(Product product) {
+        if (listener == null) return;
+
+        Product.ProductStatus status = product.getStatus();
+        if (status == Product.ProductStatus.AVAILABLE) {
+            listener.onEditClick(product);
+        } else if (status == Product.ProductStatus.SOLD) {
+            listener.onArchiveClick(product);
+        }
+    }
+
+    private void showProductMenu(View anchor, Product product) {
+        // TODO: Show popup menu with more options (delete, share, duplicate, etc.)
+        // For now, just call delete
+        if (listener != null) {
+            listener.onDeleteClick(product);
+        }
+    }
+
+    private String formatDate(String dateString) {
+        // TODO: Implement proper date formatting
+        try {
+            if (dateString.length() >= 10) {
+                return dateString.substring(0, 10);
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+        return dateString;
+    }
+
     static class ProductViewHolder extends RecyclerView.ViewHolder {
-        ImageView ivProduct, ivMore;
-        TextView tvTitle, tvPrice, tvLocation, tvViews, tvDate;
+        ImageView ivImage, ivMenu;
+        TextView tvTitle, tvPrice, tvViews, tvDate;
         Chip chipStatus;
+        MaterialButton btnPrimary, btnSecondary;
 
         public ProductViewHolder(@NonNull View itemView) {
             super(itemView);
-            ivProduct = itemView.findViewById(R.id.iv_product);
-            ivMore = itemView.findViewById(R.id.iv_more);
+            ivImage = itemView.findViewById(R.id.iv_image);
+            ivMenu = itemView.findViewById(R.id.iv_menu);
             tvTitle = itemView.findViewById(R.id.tv_title);
             tvPrice = itemView.findViewById(R.id.tv_price);
-            tvLocation = itemView.findViewById(R.id.tv_location);
             tvViews = itemView.findViewById(R.id.tv_views);
             tvDate = itemView.findViewById(R.id.tv_date);
             chipStatus = itemView.findViewById(R.id.chip_status);
+            btnPrimary = itemView.findViewById(R.id.btn_primary);
+            btnSecondary = itemView.findViewById(R.id.btn_secondary);
         }
     }
 }

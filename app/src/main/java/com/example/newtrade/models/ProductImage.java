@@ -4,16 +4,18 @@ package com.example.newtrade.models;
 public class ProductImage {
     private Long id;
     private String imageUrl;
+    private String thumbnailUrl;
     private Integer displayOrder;
-    private Boolean isPrimary;
+    private String alt;
+    private Long fileSize;
     private String createdAt;
 
+    // Constructors
     public ProductImage() {}
 
-    public ProductImage(String imageUrl, Integer displayOrder, Boolean isPrimary) {
+    public ProductImage(String imageUrl, Integer displayOrder) {
         this.imageUrl = imageUrl;
         this.displayOrder = displayOrder;
-        this.isPrimary = isPrimary;
     }
 
     // Getters and Setters
@@ -23,12 +25,27 @@ public class ProductImage {
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
+    public String getThumbnailUrl() { return thumbnailUrl; }
+    public void setThumbnailUrl(String thumbnailUrl) { this.thumbnailUrl = thumbnailUrl; }
+
     public Integer getDisplayOrder() { return displayOrder; }
     public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
 
-    public Boolean getIsPrimary() { return isPrimary; }
-    public void setIsPrimary(Boolean isPrimary) { this.isPrimary = isPrimary; }
+    public String getAlt() { return alt; }
+    public void setAlt(String alt) { this.alt = alt; }
+
+    public Long getFileSize() { return fileSize; }
+    public void setFileSize(Long fileSize) { this.fileSize = fileSize; }
 
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+
+    // Helper methods
+    public String getFormattedFileSize() {
+        if (fileSize == null) return "Unknown size";
+
+        if (fileSize < 1024) return fileSize + " B";
+        if (fileSize < 1024 * 1024) return String.format("%.1f KB", fileSize / 1024.0);
+        return String.format("%.1f MB", fileSize / (1024.0 * 1024.0));
+    }
 }

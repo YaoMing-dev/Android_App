@@ -4,11 +4,14 @@ package com.example.newtrade.ui.home;
 import android.content.Intent;
 import android.location.Location;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,8 +25,12 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Category;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.ui.home.adapter.CategoriesAdapter;
+import com.example.newtrade.ui.home.adapter.HomeSectionsAdapter;
+import com.example.newtrade.ui.home.adapter.ProductSectionAdapter;
 import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.ui.search.SearchActivity;
+import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.LocationManager;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.textfield.TextInputEditText;
@@ -63,6 +70,38 @@ public class HomeFragment extends Fragment implements
     private Double currentLatitude;
     private Double currentLongitude;
 
+    // State
+    private boolean isLoadingData = false;
+
+    public static class HomeSection {
+        public enum SectionType {
+            RECENT_PRODUCTS,
+            NEARBY_PRODUCTS,
+            POPULAR_PRODUCTS,
+            RECOMMENDED_PRODUCTS
+        }
+
+        private String title;
+        private SectionType type;
+        private List<Product> products;
+
+        public HomeSection(String title, SectionType type, List<Product> products) {
+            this.title = title;
+            this.type = type;
+            this.products = products;
+        }
+
+        // Getters
+        public String getTitle() { return title; }
+        public SectionType getType() { return type; }
+        public List<Product> getProducts() { return products; }
+
+        // Setters
+        public void setTitle(String title) { this.title = title; }
+        public void setType(SectionType type) { this.type = type; }
+        public void setProducts(List<Product> products) { this.products = products; }
+    }
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_home, container, false);
@@ -95,301 +134,356 @@ public class HomeFragment extends Fragment implements
         if (userName != null && !userName.isEmpty()) {
             tvWelcome.setText(getString(R.string.welcome_user, userName));
         } else {
-            tvWelcome.setText("Welcome to TradeUp!");
+            tvWelcome.setText("Welcome to NewTrade!");
         }
     }
 
     private void setupRecyclerViews() {
-        // Categories RecyclerView (horizontal)
+        // Categories RecyclerView
+        rvCategories.setLayoutManager(new LinearLayoutManager(requireContext(),
+                LinearLayoutManager.HORIZONTAL, false));
         categoriesAdapter = new CategoriesAdapter(categories, this);
-        rvCategories.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
         rvCategories.setAdapter(categoriesAdapter);
 
-        // Sections RecyclerView (vertical)
+        // Content RecyclerView
+        rvContent.setLayoutManager(new LinearLayoutManager(requireContext()));
         sectionsAdapter = new HomeSectionsAdapter(homeSections, this);
-        rvContent.setLayoutManager(new LinearLayoutManager(getContext()));
         rvContent.setAdapter(sectionsAdapter);
     }
 
     private void setupListeners() {
-        // Search field click
-        etSearch.setOnClickListener(v -> {
-            Intent intent = new Intent(getContext(), SearchActivity.class);
-            startActivity(intent);
-        });
+        // Search input click
+        etSearch.setOnClickListener(v -> openSearchActivity());
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-        etSearch.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
-                Intent intent = new Intent(getContext(), SearchActivity.class);
-                startActivity(intent);
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (s.length() > 0) {
+                    openSearchActivity(s.toString());
+                }
             }
         });
 
-        // Swipe refresh
-        swipeRefresh.setOnRefreshListener(this::refreshHomeData);
+        // Swipe to refresh
+        swipeRefresh.setOnRefreshListener(this::refreshData);
     }
 
-    private void getCurrentLocation() {
-        if (locationManager.hasLocationPermission()) {
-            locationManager.getCurrentLocation();
-        } else {
-            // Use last known location
-            currentLatitude = prefsManager.getLastLatitude();
-            currentLongitude = prefsManager.getLastLongitude();
+    private void openSearchActivity() {
+        openSearchActivity(null);
+    }
+
+    private void openSearchActivity(String query) {
+        Intent intent = new Intent(requireContext(), SearchActivity.class);
+        if (query != null && !query.trim().isEmpty()) {
+            intent.putExtra(Constants.BUNDLE_SEARCH_QUERY, query);
         }
-    }
+        startActivity(intent);
 
-    @Override
-    public void onLocationReceived(Location location) {
-        currentLatitude = location.getLatitude();
-        currentLongitude = location.getLongitude();
-        prefsManager.saveLastLocation(currentLatitude, currentLongitude);
-
-        // Reload nearby products with new location
-        loadNearbyProducts();
-    }
-
-    @Override
-    public void onLocationError(String error) {
-        Log.w(TAG, "Location error: " + error);
-        // Use last known location
-        currentLatitude = prefsManager.getLastLatitude();
-        currentLongitude = prefsManager.getLastLongitude();
+        // Clear search text
+        etSearch.setText("");
     }
 
     private void loadHomeData() {
-        loadCategories();
-        loadRecommendedProducts();
-        loadPopularProducts();
-        loadNearbyProducts();
-    }
+        if (isLoadingData) return;
 
-    private void refreshHomeData() {
-        homeSections.clear();
-        sectionsAdapter.notifyDataSetChanged();
-        loadHomeData();
+        isLoadingData = true;
+        swipeRefresh.setRefreshing(true);
+
+        loadCategories();
+        loadProducts();
     }
 
     private void loadCategories() {
-        ApiClient.getProductService().getCategories()
-                .enqueue(new Callback<StandardResponse<List<Category>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<List<Category>>> call,
-                                           Response<StandardResponse<List<Category>>> response) {
-                        if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<List<Category>> apiResponse = response.body();
-
-                            if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                                categories.clear();
-                                categories.addAll(apiResponse.getData());
-                                categoriesAdapter.notifyDataSetChanged();
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<List<Category>>> call, Throwable t) {
-                        Log.e(TAG, "Failed to load categories", t);
-                    }
-                });
-    }
-
-    private void loadRecommendedProducts() {
-        // Load personalized recommendations based on user history
-        ApiClient.getProductService().getProducts(
-                0, 10, // page, size
-                null, null, null, null, // filters
-                currentLatitude, currentLongitude, 50, // location with 50km radius
-                "createdAt", "desc" // sort by newest
-        ).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+        Call<StandardResponse<List<Category>>> call = ApiClient.getProductService().getCategories();
+        call.enqueue(new Callback<StandardResponse<List<Category>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-                handleProductsResponse(response, "Recommended for You", HomeSection.SectionType.RECOMMENDED);
+            public void onResponse(@NonNull Call<StandardResponse<List<Category>>> call,
+                                   @NonNull Response<StandardResponse<List<Category>>> response) {
+                if (response.isSuccessful() && response.body() != null
+                        && response.body().isSuccess()) {
+
+                    categories.clear();
+                    categories.addAll(response.body().getData());
+                    categoriesAdapter.notifyDataSetChanged();
+
+                    Log.d(TAG, "Categories loaded: " + categories.size());
+                } else {
+                    Log.e(TAG, "Failed to load categories: " + response.message());
+                }
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                Log.e(TAG, "Failed to load recommended products", t);
+            public void onFailure(@NonNull Call<StandardResponse<List<Category>>> call,
+                                  @NonNull Throwable t) {
+                Log.e(TAG, "Error loading categories", t);
             }
         });
     }
 
-    private void loadPopularProducts() {
-        // Load popular products (sorted by view count)
-        ApiClient.getProductService().getProducts(
-                0, 10, // page, size
-                null, null, null, null, // filters
-                null, null, null, // no location filter for popular
-                "viewCount", "desc" // sort by most viewed
-        ).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+    private void loadProducts() {
+        // Load recent products
+        loadRecentProducts();
+
+        // Load nearby products if location is available
+        if (currentLatitude != null && currentLongitude != null) {
+            loadNearbyProducts();
+        }
+
+        // Load popular products
+        loadPopularProducts();
+    }
+
+    private void loadRecentProducts() {
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getProductService()
+                .getProducts(0, 10, null, null, null, null,
+                        Constants.SORT_NEWEST, null);
+
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-                handleProductsResponse(response, "Popular Products", HomeSection.SectionType.POPULAR);
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                handleProductsResponse(response, "Recent Products",
+                        HomeSection.SectionType.RECENT_PRODUCTS);
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                Log.e(TAG, "Failed to load popular products", t);
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                  @NonNull Throwable t) {
+                Log.e(TAG, "Error loading recent products", t);
+                checkLoadingComplete();
             }
         });
     }
 
     private void loadNearbyProducts() {
-        if (currentLatitude == null || currentLongitude == null) return;
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getProductService()
+                .getNearbyProducts(currentLatitude, currentLongitude,
+                        (int) Constants.DEFAULT_LOCATION_RADIUS, 0, 10, null);
 
-        // Load nearby products
-        ApiClient.getProductService().getProducts(
-                0, 10, // page, size
-                null, null, null, null, // filters
-                currentLatitude, currentLongitude, 10, // location with 10km radius
-                "createdAt", "desc" // sort by newest
-        ).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-                handleProductsResponse(response, "Near You", HomeSection.SectionType.NEARBY);
-                swipeRefresh.setRefreshing(false);
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                handleProductsResponse(response, "Nearby Products",
+                        HomeSection.SectionType.NEARBY_PRODUCTS);
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                Log.e(TAG, "Failed to load nearby products", t);
-                swipeRefresh.setRefreshing(false);
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                  @NonNull Throwable t) {
+                Log.e(TAG, "Error loading nearby products", t);
+                checkLoadingComplete();
             }
         });
     }
 
-    private void handleProductsResponse(Response<StandardResponse<Map<String, Object>>> response,
-                                        String title, HomeSection.SectionType type) {
-        if (response.isSuccessful() && response.body() != null) {
-            StandardResponse<Map<String, Object>> apiResponse = response.body();
+    private void loadPopularProducts() {
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getProductService()
+                .getProducts(0, 10, null, null, null, null,
+                        Constants.SORT_POPULARITY, null);
 
-            if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                List<Product> products = parseProductsFromResponse(apiResponse.getData());
-
-                if (!products.isEmpty()) {
-                    HomeSection section = new HomeSection(title, products, type);
-
-                    // Remove existing section of same type and add new one
-                    removeExistingSection(type);
-                    homeSections.add(section);
-                    sectionsAdapter.notifyDataSetChanged();
-                }
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                handleProductsResponse(response, "Popular Products",
+                        HomeSection.SectionType.POPULAR_PRODUCTS);
             }
-        }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                  @NonNull Throwable t) {
+                Log.e(TAG, "Error loading popular products", t);
+                checkLoadingComplete();
+            }
+        });
     }
 
-    private List<Product> parseProductsFromResponse(Map<String, Object> data) {
-        List<Product> products = new ArrayList<>();
-
+    @SuppressWarnings("unchecked")
+    private void handleProductsResponse(Response<StandardResponse<Map<String, Object>>> response,
+                                        String sectionTitle, HomeSection.SectionType sectionType) {
         try {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> productsData = (List<Map<String, Object>>) data.get("content");
+            if (response.isSuccessful() && response.body() != null
+                    && response.body().isSuccess()) {
 
-            if (productsData != null) {
-                for (Map<String, Object> productData : productsData) {
-                    Product product = parseProductFromMap(productData);
-                    products.add(product);
+                Map<String, Object> data = response.body().getData();
+                List<Map<String, Object>> productMaps = (List<Map<String, Object>>) data.get("content");
+
+                if (productMaps != null && !productMaps.isEmpty()) {
+                    List<Product> products = new ArrayList<>();
+                    for (Map<String, Object> productMap : productMaps) {
+                        Product product = parseProductFromMap(productMap);
+                        if (product != null) {
+                            products.add(product);
+                        }
+                    }
+
+                    if (!products.isEmpty()) {
+                        HomeSection section = new HomeSection(sectionTitle, sectionType, products);
+                        homeSections.add(section);
+                        sectionsAdapter.notifyItemInserted(homeSections.size() - 1);
+                    }
                 }
+
+                Log.d(TAG, sectionTitle + " loaded: " + (productMaps != null ? productMaps.size() : 0));
+            } else {
+                Log.e(TAG, "Failed to load " + sectionTitle + ": " + response.message());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing products", e);
+            Log.e(TAG, "Error parsing " + sectionTitle, e);
+        } finally {
+            checkLoadingComplete();
         }
-
-        return products;
     }
 
-    private Product parseProductFromMap(Map<String, Object> data) {
-        Product product = new Product();
+    private Product parseProductFromMap(Map<String, Object> productMap) {
+        try {
+            Product product = new Product();
+            product.setId(getLongFromMap(productMap, "id"));
+            product.setTitle((String) productMap.get("title"));
+            product.setDescription((String) productMap.get("description"));
 
-        if (data.get("id") != null) {
-            product.setId(Long.valueOf(data.get("id").toString()));
-        }
-        product.setTitle((String) data.get("title"));
-        product.setDescription((String) data.get("description"));
-
-        if (data.get("price") != null) {
-            product.setPrice(new java.math.BigDecimal(data.get("price").toString()));
-        }
-
-        String conditionStr = (String) data.get("condition");
-        if (conditionStr != null) {
-            try {
-                product.setCondition(Product.ProductCondition.valueOf(conditionStr));
-            } catch (IllegalArgumentException e) {
-                product.setCondition(Product.ProductCondition.GOOD);
+            // Parse price
+            Object priceObj = productMap.get("price");
+            if (priceObj != null) {
+                if (priceObj instanceof Number) {
+                    product.setPrice(java.math.BigDecimal.valueOf(((Number) priceObj).doubleValue()));
+                }
             }
-        }
 
-        product.setLocation((String) data.get("location"));
+            product.setLocation((String) productMap.get("location"));
+            product.setCreatedAt((String) productMap.get("createdAt"));
 
-        if (data.get("viewCount") != null) {
-            product.setViewCount(Integer.valueOf(data.get("viewCount").toString()));
-        }
-
-        // Parse images
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> imagesData = (List<Map<String, Object>>) data.get("images");
-        if (imagesData != null) {
-            List<com.example.newtrade.models.ProductImage> images = new ArrayList<>();
-            for (Map<String, Object> imageData : imagesData) {
-                com.example.newtrade.models.ProductImage image = new com.example.newtrade.models.ProductImage();
-                image.setImageUrl((String) imageData.get("imageUrl"));
-                images.add(image);
+            // Parse view count
+            Object viewCountObj = productMap.get("viewCount");
+            if (viewCountObj instanceof Number) {
+                product.setViewCount(((Number) viewCountObj).intValue());
             }
-            product.setImages(images);
-        }
 
-        return product;
+            // Parse condition
+            String conditionStr = (String) productMap.get("condition");
+            if (conditionStr != null) {
+                try {
+                    product.setCondition(Product.ProductCondition.valueOf(conditionStr));
+                } catch (IllegalArgumentException e) {
+                    product.setCondition(Product.ProductCondition.GOOD);
+                }
+            }
+
+            // Parse status
+            String statusStr = (String) productMap.get("status");
+            if (statusStr != null) {
+                try {
+                    product.setStatus(Product.ProductStatus.valueOf(statusStr));
+                } catch (IllegalArgumentException e) {
+                    product.setStatus(Product.ProductStatus.AVAILABLE);
+                }
+            }
+
+            return product;
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing product from map", e);
+            return null;
+        }
     }
 
-    private void removeExistingSection(HomeSection.SectionType type) {
-        for (int i = 0; i < homeSections.size(); i++) {
-            if (homeSections.get(i).getType() == type) {
-                homeSections.remove(i);
-                break;
-            }
+    private Long getLongFromMap(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
         }
+        return null;
+    }
+
+    private void checkLoadingComplete() {
+        // Simple check - if we have at least one section, consider loading complete
+        if (!homeSections.isEmpty() || categories.isEmpty()) {
+            isLoadingData = false;
+            swipeRefresh.setRefreshing(false);
+        }
+    }
+
+    private void getCurrentLocation() {
+        locationManager.requestLocation();
+    }
+
+    public void refreshData() {
+        homeSections.clear();
+        sectionsAdapter.notifyDataSetChanged();
+
+        categories.clear();
+        categoriesAdapter.notifyDataSetChanged();
+
+        loadHomeData();
+    }
+
+    public boolean onBackPressed() {
+        // Handle back press if needed
+        return false;
+    }
+
+    // LocationManager.LocationCallback implementation
+    @Override
+    public void onLocationReceived(Location location) {
+        currentLatitude = location.getLatitude();
+        currentLongitude = location.getLongitude();
+
+        // Save location to preferences
+        prefsManager.saveLocation(currentLatitude, currentLongitude, null);
+
+        // Load nearby products now that we have location
+        if (!isLoadingData) {
+            loadNearbyProducts();
+        }
+
+        Log.d(TAG, "Location received: " + currentLatitude + ", " + currentLongitude);
     }
 
     @Override
+    public void onLocationError(String error) {
+        Log.e(TAG, "Location error: " + error);
+        // Continue without location-based features
+    }
+
+    // CategoriesAdapter.OnCategoryClickListener implementation
+    @Override
     public void onCategoryClick(Category category) {
-        Intent intent = new Intent(getContext(), SearchActivity.class);
-        intent.putExtra("category_id", category.getId());
-        intent.putExtra("category_name", category.getName());
+        Intent intent = new Intent(requireContext(), CategoryProductsActivity.class);
+        intent.putExtra(Constants.BUNDLE_CATEGORY_ID, category.getId());
+        intent.putExtra("categoryName", category.getName());
         startActivity(intent);
     }
 
+    // ProductSectionAdapter.OnProductClickListener implementation
     @Override
     public void onProductClick(Product product) {
-        Intent intent = new Intent(getContext(), ProductDetailActivity.class);
-        intent.putExtra("product_id", product.getId());
+        Intent intent = new Intent(requireContext(), ProductDetailActivity.class);
+        intent.putExtra(Constants.BUNDLE_PRODUCT_ID, product.getId());
         startActivity(intent);
     }
 
     @Override
     public void onSeeAllClick(HomeSection.SectionType type) {
-        Intent intent = new Intent(getContext(), SearchActivity.class);
+        // Navigate to search/filter page based on section type
+        Intent intent = new Intent(requireContext(), SearchActivity.class);
 
         switch (type) {
-            case POPULAR:
-                intent.putExtra("sort_by", "viewCount");
-                intent.putExtra("sort_direction", "desc");
-                intent.putExtra("title", "Popular Products");
+            case RECENT_PRODUCTS:
+                intent.putExtra("sortBy", Constants.SORT_NEWEST);
                 break;
-            case NEARBY:
-                if (currentLatitude != null && currentLongitude != null) {
-                    intent.putExtra("latitude", currentLatitude);
-                    intent.putExtra("longitude", currentLongitude);
-                    intent.putExtra("radius", 10);
-                    intent.putExtra("title", "Near You");
-                }
+            case NEARBY_PRODUCTS:
+                intent.putExtra("nearbyOnly", true);
                 break;
-            case RECOMMENDED:
-            default:
-                intent.putExtra("title", "Recommended");
+            case POPULAR_PRODUCTS:
+                intent.putExtra("sortBy", Constants.SORT_POPULARITY);
+                break;
+            case RECOMMENDED_PRODUCTS:
+                intent.putExtra("recommended", true);
                 break;
         }
 
@@ -402,26 +496,5 @@ public class HomeFragment extends Fragment implements
         if (locationManager != null) {
             locationManager.cleanup();
         }
-    }
-
-    // Home section data class
-    public static class HomeSection {
-        public enum SectionType {
-            RECOMMENDED, POPULAR, NEARBY, CATEGORY
-        }
-
-        private String title;
-        private List<Product> products;
-        private SectionType type;
-
-        public HomeSection(String title, List<Product> products, SectionType type) {
-            this.title = title;
-            this.products = products;
-            this.type = type;
-        }
-
-        public String getTitle() { return title; }
-        public List<Product> getProducts() { return products; }
-        public SectionType getType() { return type; }
     }
 }

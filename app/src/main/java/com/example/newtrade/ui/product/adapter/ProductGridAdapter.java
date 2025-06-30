@@ -14,6 +14,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
+import com.example.newtrade.utils.Constants;
 
 import java.util.List;
 
@@ -50,14 +51,19 @@ public class ProductGridAdapter extends RecyclerView.Adapter<ProductGridAdapter.
         holder.tvPrice.setText(product.getFormattedPrice());
 
         // Product location
-        holder.tvLocation.setText(product.getLocation());
-
-        // View count
-        if (product.getViewCount() != null && product.getViewCount() > 0) {
-            holder.tvViews.setText(product.getViewCount() + " views");
-            holder.tvViews.setVisibility(View.VISIBLE);
+        if (product.getLocation() != null && !product.getLocation().isEmpty()) {
+            holder.tvLocation.setText(product.getLocation());
+            holder.tvLocation.setVisibility(View.VISIBLE);
         } else {
-            holder.tvViews.setVisibility(View.GONE);
+            holder.tvLocation.setVisibility(View.GONE);
+        }
+
+        // Product condition
+        if (product.getCondition() != null) {
+            holder.tvCondition.setText(product.getCondition().getDisplayName());
+            holder.tvCondition.setVisibility(View.VISIBLE);
+        } else {
+            holder.tvCondition.setVisibility(View.GONE);
         }
 
         // Load product image
@@ -65,12 +71,21 @@ public class ProductGridAdapter extends RecyclerView.Adapter<ProductGridAdapter.
         if (imageUrl != null && !imageUrl.isEmpty()) {
             Glide.with(holder.itemView.getContext())
                     .load(imageUrl)
-                    .transform(new RoundedCorners(16))
-                    .placeholder(R.drawable.placeholder_image)
-                    .error(R.drawable.placeholder_image)
-                    .into(holder.ivProduct);
+                    .transform(new RoundedCorners(12))
+                    .placeholder(R.drawable.placeholder_product)
+                    .error(R.drawable.ic_error_image)
+                    .into(holder.ivImage);
         } else {
-            holder.ivProduct.setImageResource(R.drawable.placeholder_image);
+            holder.ivImage.setImageResource(R.drawable.placeholder_product);
+        }
+
+        // Status indicator
+        if (product.getStatus() == Product.ProductStatus.SOLD) {
+            holder.viewSoldOverlay.setVisibility(View.VISIBLE);
+            holder.tvSoldLabel.setVisibility(View.VISIBLE);
+        } else {
+            holder.viewSoldOverlay.setVisibility(View.GONE);
+            holder.tvSoldLabel.setVisibility(View.GONE);
         }
 
         // Click listener
@@ -79,14 +94,6 @@ public class ProductGridAdapter extends RecyclerView.Adapter<ProductGridAdapter.
                 listener.onProductClick(product);
             }
         });
-
-        // Show condition if not good
-        if (product.getCondition() != null && product.getCondition() != Product.ProductCondition.GOOD) {
-            holder.tvCondition.setText(product.getCondition().getDisplayName());
-            holder.tvCondition.setVisibility(View.VISIBLE);
-        } else {
-            holder.tvCondition.setVisibility(View.GONE);
-        }
     }
 
     @Override
@@ -94,18 +101,25 @@ public class ProductGridAdapter extends RecyclerView.Adapter<ProductGridAdapter.
         return products.size();
     }
 
+    public void updateProducts(List<Product> newProducts) {
+        this.products = newProducts;
+        notifyDataSetChanged();
+    }
+
     static class ProductViewHolder extends RecyclerView.ViewHolder {
-        ImageView ivProduct;
-        TextView tvTitle, tvPrice, tvLocation, tvViews, tvCondition;
+        ImageView ivImage;
+        TextView tvTitle, tvPrice, tvLocation, tvCondition, tvSoldLabel;
+        View viewSoldOverlay;
 
         public ProductViewHolder(@NonNull View itemView) {
             super(itemView);
-            ivProduct = itemView.findViewById(R.id.iv_product);
+            ivImage = itemView.findViewById(R.id.iv_image);
             tvTitle = itemView.findViewById(R.id.tv_title);
             tvPrice = itemView.findViewById(R.id.tv_price);
             tvLocation = itemView.findViewById(R.id.tv_location);
-            tvViews = itemView.findViewById(R.id.tv_views);
             tvCondition = itemView.findViewById(R.id.tv_condition);
+            tvSoldLabel = itemView.findViewById(R.id.tv_sold_label);
+            viewSoldOverlay = itemView.findViewById(R.id.view_sold_overlay);
         }
     }
 }

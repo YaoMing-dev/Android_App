@@ -1,6 +1,8 @@
 // app/src/main/java/com/example/newtrade/ui/search/SearchFragment.java
 package com.example.newtrade.ui.search;
 
+import android.content.Intent;
+import android.location.Location;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,14 +30,17 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Category;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.ui.product.adapter.ProductGridAdapter;
 import com.example.newtrade.ui.search.filter.SearchFilterBottomSheet;
 import com.example.newtrade.ui.search.sort.SearchSortBottomSheet;
+import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.LocationManager;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +56,7 @@ public class SearchFragment extends Fragment implements
         LocationManager.LocationCallback {
 
     private static final String TAG = "SearchFragment";
-    private static final int SEARCH_DELAY_MS = 200; // FR-3.1.2: 200ms delay
+    private static final int SEARCH_DELAY_MS = 500;
 
     // UI Components
     private EditText etSearch;
@@ -83,6 +88,46 @@ public class SearchFragment extends Fragment implements
     private Handler searchHandler = new Handler(Looper.getMainLooper());
     private Runnable searchRunnable;
 
+    // Data classes
+    public static class SearchFilter {
+        public Long categoryId;
+        public Product.ProductCondition condition;
+        public BigDecimal minPrice;
+        public BigDecimal maxPrice;
+        public Double latitude;
+        public Double longitude;
+        public Integer radius;
+
+        public SearchFilter() {}
+
+        public SearchFilter(SearchFilter other) {
+            this.categoryId = other.categoryId;
+            this.condition = other.condition;
+            this.minPrice = other.minPrice;
+            this.maxPrice = other.maxPrice;
+            this.latitude = other.latitude;
+            this.longitude = other.longitude;
+            this.radius = other.radius;
+        }
+
+        public boolean hasActiveFilters() {
+            return categoryId != null || condition != null ||
+                    minPrice != null || maxPrice != null || radius != null;
+        }
+    }
+
+    public static class SearchSort {
+        public String sortBy = "createdAt";
+        public String sortDirection = "desc";
+
+        public SearchSort() {}
+
+        public SearchSort(String sortBy, String sortDirection) {
+            this.sortBy = sortBy;
+            this.sortDirection = sortDirection;
+        }
+    }
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_search, container, false);
@@ -102,6 +147,9 @@ public class SearchFragment extends Fragment implements
 
         // Get user location for distance-based search
         getCurrentLocation();
+
+        // Handle search query from bundle
+        handleSearchFromBundle();
     }
 
     private void initViews(View view) {
@@ -128,12 +176,13 @@ public class SearchFragment extends Fragment implements
                 super.onScrolled(recyclerView, dx, dy);
 
                 GridLayoutManager layoutManager = (GridLayoutManager) recyclerView.getLayoutManager();
-                if (layoutManager != null && !isLoading && !isLastPage && !currentQuery.isEmpty()) {
+                if (layoutManager != null && !isLoading && !isLastPage) {
                     int visibleItemCount = layoutManager.getChildCount();
                     int totalItemCount = layoutManager.getItemCount();
                     int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
 
-                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 4) {
+                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount
+                            && firstVisibleItemPosition >= 0) {
                         loadMoreProducts();
                     }
                 }
@@ -142,270 +191,286 @@ public class SearchFragment extends Fragment implements
     }
 
     private void setupListeners() {
-        // Search text watcher with 200ms delay
+        // Search input
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                // Cancel previous search
-                if (searchRunnable != null) {
-                    searchHandler.removeCallbacks(searchRunnable);
-                }
-
-                String query = s.toString().trim();
-
-                // Create new search runnable
-                searchRunnable = () -> {
-                    if (!query.equals(currentQuery)) {
-                        currentQuery = query;
-                        performSearch();
-                    }
-                };
-
-                // Post with delay
-                searchHandler.postDelayed(searchRunnable, SEARCH_DELAY_MS);
-            }
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
             @Override
-            public void afterTextChanged(Editable s) {}
+            public void afterTextChanged(Editable s) {
+                String query = s.toString().trim();
+                if (!query.equals(currentQuery)) {
+                    currentQuery = query;
+                    scheduleSearch();
+                }
+            }
         });
 
         // Filter button
-        ivFilter.setOnClickListener(v -> showFilterDialog());
+        ivFilter.setOnClickListener(v -> showFilterBottomSheet());
 
         // Sort button
-        ivSort.setOnClickListener(v -> showSortDialog());
+        ivSort.setOnClickListener(v -> showSortBottomSheet());
 
-        // Swipe refresh
+        // Swipe to refresh
         swipeRefresh.setOnRefreshListener(this::refreshSearch);
     }
 
-    private void loadCategories() {
-        ApiClient.getProductService().getCategories()
-                .enqueue(new Callback<StandardResponse<List<Category>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<List<Category>>> call,
-                                           Response<StandardResponse<List<Category>>> response) {
-                        if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<List<Category>> apiResponse = response.body();
+    private void handleSearchFromBundle() {
+        Bundle args = getArguments();
+        if (args != null) {
+            String query = args.getString(Constants.BUNDLE_SEARCH_QUERY);
+            if (query != null && !query.isEmpty()) {
+                etSearch.setText(query);
+                currentQuery = query;
+                performSearch();
+            }
 
-                            if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                                categories.clear();
-                                categories.addAll(apiResponse.getData());
-                            }
-                        }
-                    }
+            // Handle other bundle parameters
+            String sortBy = args.getString("sortBy");
+            if (sortBy != null) {
+                currentSort.sortBy = sortBy;
+                currentSort.sortDirection = "desc";
+            }
 
-                    @Override
-                    public void onFailure(Call<StandardResponse<List<Category>>> call, Throwable t) {
-                        Log.e(TAG, "Failed to load categories", t);
-                    }
-                });
-    }
-
-    private void getCurrentLocation() {
-        if (locationManager.hasLocationPermission()) {
-            locationManager.getCurrentLocation();
+            boolean nearbyOnly = args.getBoolean("nearbyOnly", false);
+            if (nearbyOnly && currentFilter.latitude != null && currentFilter.longitude != null) {
+                currentFilter.radius = (int) Constants.DEFAULT_LOCATION_RADIUS;
+            }
         }
     }
 
-    @Override
-    public void onLocationReceived(android.location.Location location) {
-        currentFilter.latitude = location.getLatitude();
-        currentFilter.longitude = location.getLongitude();
-        prefsManager.saveLastLocation(location.getLatitude(), location.getLongitude());
-    }
+    private void scheduleSearch() {
+        if (searchRunnable != null) {
+            searchHandler.removeCallbacks(searchRunnable);
+        }
 
-    @Override
-    public void onLocationError(String error) {
-        // Use last known location
-        currentFilter.latitude = prefsManager.getLastLatitude();
-        currentFilter.longitude = prefsManager.getLastLongitude();
+        searchRunnable = this::performSearch;
+        searchHandler.postDelayed(searchRunnable, SEARCH_DELAY_MS);
     }
 
     private void performSearch() {
+        currentPage = 0;
+        isLastPage = false;
+        products.clear();
+        adapter.notifyDataSetChanged();
+
         if (currentQuery.isEmpty()) {
-            clearResults();
+            showEmptyState();
             return;
         }
 
-        currentPage = 0;
-        isLastPage = false;
-        setLoading(true);
-
-        searchProducts(false);
+        searchProducts();
     }
 
-    private void loadMoreProducts() {
-        if (isLoading || isLastPage || currentQuery.isEmpty()) return;
+    private void searchProducts() {
+        if (isLoading) return;
 
-        currentPage++;
-        setLoading(true);
-        searchProducts(true);
-    }
+        isLoading = true;
+        showLoading(currentPage == 0);
 
-    private void searchProducts(boolean isLoadMore) {
-        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getProductService().searchProducts(
-                currentQuery,
-                currentPage,
-                20, // page size
-                currentFilter.categoryId,
-                currentFilter.condition,
-                currentFilter.minPrice,
-                currentFilter.maxPrice,
-                currentFilter.latitude,
-                currentFilter.longitude,
-                currentFilter.radius,
-                currentSort.sortBy,
-                currentSort.sortDirection
-        );
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getProductService()
+                .searchProducts(
+                        currentQuery,
+                        currentPage,
+                        Constants.DEFAULT_PAGE_SIZE,
+                        currentFilter.categoryId,
+                        currentFilter.condition != null ? currentFilter.condition.name() : null,
+                        currentFilter.minPrice != null ? currentFilter.minPrice.doubleValue() : null,
+                        currentFilter.maxPrice != null ? currentFilter.maxPrice.doubleValue() : null
+                );
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-                setLoading(false);
-                swipeRefresh.setRefreshing(false);
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                isLoading = false;
+                hideLoading();
 
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> apiResponse = response.body();
-
-                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                        handleSearchResponse(apiResponse.getData(), isLoadMore);
-                    } else {
-                        showError(apiResponse.getMessage());
-                    }
-                } else {
-                    showError("Search failed");
-                }
+                handleSearchResponse(response);
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                setLoading(false);
-                swipeRefresh.setRefreshing(false);
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                  @NonNull Throwable t) {
+                isLoading = false;
+                hideLoading();
+
                 Log.e(TAG, "Search failed", t);
-                showError("Network error");
+                if (products.isEmpty()) {
+                    showEmptyState();
+                }
+                Toast.makeText(getContext(), "Search failed. Please try again.", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void handleSearchResponse(Map<String, Object> data, boolean isLoadMore) {
+    @SuppressWarnings("unchecked")
+    private void handleSearchResponse(Response<StandardResponse<Map<String, Object>>> response) {
         try {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> productsData = (List<Map<String, Object>>) data.get("content");
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                Map<String, Object> data = response.body().getData();
+                List<Map<String, Object>> productMaps = (List<Map<String, Object>>) data.get("content");
 
-            List<Product> newProducts = new ArrayList<>();
-            if (productsData != null) {
-                for (Map<String, Object> productData : productsData) {
-                    Product product = parseProductFromMap(productData);
-                    newProducts.add(product);
+                if (productMaps != null) {
+                    List<Product> newProducts = new ArrayList<>();
+                    for (Map<String, Object> productMap : productMaps) {
+                        Product product = parseProductFromMap(productMap);
+                        if (product != null) {
+                            newProducts.add(product);
+                        }
+                    }
+
+                    int oldSize = products.size();
+                    products.addAll(newProducts);
+                    adapter.notifyItemRangeInserted(oldSize, newProducts.size());
+
+                    // Update pagination
+                    Boolean isLast = (Boolean) data.get("last");
+                    isLastPage = isLast != null ? isLast : newProducts.size() < Constants.DEFAULT_PAGE_SIZE;
+
+                    // Update results count
+                    Object totalElements = data.get("totalElements");
+                    if (totalElements instanceof Number) {
+                        int total = ((Number) totalElements).intValue();
+                        updateResultsCount(total);
+                    }
+                }
+
+                if (products.isEmpty()) {
+                    showEmptyState();
+                } else {
+                    hideEmptyState();
+                }
+
+            } else {
+                Log.e(TAG, "Search failed: " + response.message());
+                if (products.isEmpty()) {
+                    showEmptyState();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing search response", e);
+            if (products.isEmpty()) {
+                showEmptyState();
+            }
+        }
+    }
+
+    private Product parseProductFromMap(Map<String, Object> productMap) {
+        try {
+            Product product = new Product();
+            product.setId(getLongFromMap(productMap, "id"));
+            product.setTitle((String) productMap.get("title"));
+            product.setDescription((String) productMap.get("description"));
+
+            // Parse price
+            Object priceObj = productMap.get("price");
+            if (priceObj instanceof Number) {
+                product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
+            }
+
+            product.setLocation((String) productMap.get("location"));
+            product.setCreatedAt((String) productMap.get("createdAt"));
+
+            // Parse view count
+            Object viewCountObj = productMap.get("viewCount");
+            if (viewCountObj instanceof Number) {
+                product.setViewCount(((Number) viewCountObj).intValue());
+            }
+
+            // Parse condition
+            String conditionStr = (String) productMap.get("condition");
+            if (conditionStr != null) {
+                try {
+                    product.setCondition(Product.ProductCondition.valueOf(conditionStr));
+                } catch (IllegalArgumentException e) {
+                    product.setCondition(Product.ProductCondition.GOOD);
                 }
             }
 
-            if (isLoadMore) {
-                int startPosition = products.size();
-                products.addAll(newProducts);
-                adapter.notifyItemRangeInserted(startPosition, newProducts.size());
-            } else {
-                products.clear();
-                products.addAll(newProducts);
-                adapter.notifyDataSetChanged();
+            // Parse status
+            String statusStr = (String) productMap.get("status");
+            if (statusStr != null) {
+                try {
+                    product.setStatus(Product.ProductStatus.valueOf(statusStr));
+                } catch (IllegalArgumentException e) {
+                    product.setStatus(Product.ProductStatus.AVAILABLE);
+                }
             }
 
-            // Update pagination info
-            Boolean isLast = (Boolean) data.get("last");
-            isLastPage = isLast != null && isLast;
-
-            // Update results count
-            Long totalElements = (Long) data.get("totalElements");
-            if (totalElements != null) {
-                tvResultsCount.setText(getString(R.string.results_count, totalElements.intValue()));
-                tvResultsCount.setVisibility(View.VISIBLE);
-            }
-
-            updateEmptyState();
-
+            return product;
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing search response", e);
-            showError("Error loading search results");
+            Log.e(TAG, "Error parsing product from map", e);
+            return null;
         }
     }
 
-    private Product parseProductFromMap(Map<String, Object> data) {
-        // Same parsing logic as in MyProductsFragment
-        Product product = new Product();
-
-        if (data.get("id") != null) {
-            product.setId(Long.valueOf(data.get("id").toString()));
+    private Long getLongFromMap(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
         }
-        product.setTitle((String) data.get("title"));
-        product.setDescription((String) data.get("description"));
-
-        if (data.get("price") != null) {
-            product.setPrice(new java.math.BigDecimal(data.get("price").toString()));
-        }
-
-        String conditionStr = (String) data.get("condition");
-        if (conditionStr != null) {
-            try {
-                product.setCondition(Product.ProductCondition.valueOf(conditionStr));
-            } catch (IllegalArgumentException e) {
-                product.setCondition(Product.ProductCondition.GOOD);
-            }
-        }
-
-        product.setLocation((String) data.get("location"));
-
-        if (data.get("viewCount") != null) {
-            product.setViewCount(Integer.valueOf(data.get("viewCount").toString()));
-        }
-
-        // Parse images
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> imagesData = (List<Map<String, Object>>) data.get("images");
-        if (imagesData != null) {
-            List<com.example.newtrade.models.ProductImage> images = new ArrayList<>();
-            for (Map<String, Object> imageData : imagesData) {
-                com.example.newtrade.models.ProductImage image = new com.example.newtrade.models.ProductImage();
-                image.setImageUrl((String) imageData.get("imageUrl"));
-                images.add(image);
-            }
-            product.setImages(images);
-        }
-
-        return product;
+        return null;
     }
 
-    private void showFilterDialog() {
-        SearchFilterBottomSheet filterSheet = SearchFilterBottomSheet.newInstance(currentFilter, categories);
-        filterSheet.setOnFilterAppliedListener(this);
-        filterSheet.show(getChildFragmentManager(), "filter");
+    private void loadMoreProducts() {
+        if (!isLoading && !isLastPage) {
+            currentPage++;
+            searchProducts();
+        }
     }
 
-    private void showSortDialog() {
-        SearchSortBottomSheet sortSheet = SearchSortBottomSheet.newInstance(currentSort);
-        sortSheet.setOnSortAppliedListener(this);
-        sortSheet.show(getChildFragmentManager(), "sort");
-    }
+    private void refreshSearch() {
+        currentPage = 0;
+        isLastPage = false;
+        products.clear();
+        adapter.notifyDataSetChanged();
 
-    @Override
-    public void onFilterApplied(SearchFilter filter) {
-        currentFilter = filter;
-        updateFilterChips();
         if (!currentQuery.isEmpty()) {
-            performSearch();
+            searchProducts();
+        } else {
+            swipeRefresh.setRefreshing(false);
         }
     }
 
-    @Override
-    public void onSortApplied(SearchSort sort) {
-        currentSort = sort;
-        if (!currentQuery.isEmpty()) {
-            performSearch();
-        }
+    private void loadCategories() {
+        Call<StandardResponse<List<Category>>> call = ApiClient.getProductService().getCategories();
+        call.enqueue(new Callback<StandardResponse<List<Category>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<List<Category>>> call,
+                                   @NonNull Response<StandardResponse<List<Category>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    categories.clear();
+                    categories.addAll(response.body().getData());
+                    Log.d(TAG, "Categories loaded: " + categories.size());
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<List<Category>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "Failed to load categories", t);
+            }
+        });
+    }
+
+    private void getCurrentLocation() {
+        locationManager.requestLocation();
+    }
+
+    private void showFilterBottomSheet() {
+        SearchFilterBottomSheet bottomSheet = SearchFilterBottomSheet.newInstance(currentFilter, categories);
+        bottomSheet.setOnFilterAppliedListener(this);
+        bottomSheet.show(getChildFragmentManager(), "filter_bottom_sheet");
+    }
+
+    private void showSortBottomSheet() {
+        SearchSortBottomSheet bottomSheet = SearchSortBottomSheet.newInstance(currentSort);
+        bottomSheet.setOnSortAppliedListener(this);
+        bottomSheet.show(getChildFragmentManager(), "sort_bottom_sheet");
     }
 
     private void updateFilterChips() {
@@ -414,7 +479,7 @@ public class SearchFragment extends Fragment implements
         if (currentFilter.categoryId != null) {
             Category category = findCategoryById(currentFilter.categoryId);
             if (category != null) {
-                addFilterChip("Category: " + category.getName(), () -> {
+                addFilterChip(category.getName(), () -> {
                     currentFilter.categoryId = null;
                     updateFilterChips();
                     performSearch();
@@ -423,7 +488,7 @@ public class SearchFragment extends Fragment implements
         }
 
         if (currentFilter.condition != null) {
-            addFilterChip("Condition: " + currentFilter.condition, () -> {
+            addFilterChip(currentFilter.condition.getDisplayName(), () -> {
                 currentFilter.condition = null;
                 updateFilterChips();
                 performSearch();
@@ -431,17 +496,20 @@ public class SearchFragment extends Fragment implements
         }
 
         if (currentFilter.minPrice != null || currentFilter.maxPrice != null) {
-            String priceText = "Price: ";
-            if (currentFilter.minPrice != null && currentFilter.maxPrice != null) {
-                priceText += "₫" + String.format("%,.0f", currentFilter.minPrice) +
-                        " - ₫" + String.format("%,.0f", currentFilter.maxPrice);
-            } else if (currentFilter.minPrice != null) {
-                priceText += "From ₫" + String.format("%,.0f", currentFilter.minPrice);
+            String priceRange = "Price: ";
+            if (currentFilter.minPrice != null) {
+                priceRange += Constants.CURRENCY_SYMBOL + currentFilter.minPrice.intValue();
             } else {
-                priceText += "Up to ₫" + String.format("%,.0f", currentFilter.maxPrice);
+                priceRange += "0";
+            }
+            priceRange += " - ";
+            if (currentFilter.maxPrice != null) {
+                priceRange += Constants.CURRENCY_SYMBOL + currentFilter.maxPrice.intValue();
+            } else {
+                priceRange += "∞";
             }
 
-            addFilterChip(priceText, () -> {
+            addFilterChip(priceRange, () -> {
                 currentFilter.minPrice = null;
                 currentFilter.maxPrice = null;
                 updateFilterChips();
@@ -449,7 +517,7 @@ public class SearchFragment extends Fragment implements
             });
         }
 
-        if (currentFilter.radius != null && currentFilter.radius < 100) {
+        if (currentFilter.radius != null) {
             addFilterChip("Within " + currentFilter.radius + "km", () -> {
                 currentFilter.radius = null;
                 updateFilterChips();
@@ -458,11 +526,11 @@ public class SearchFragment extends Fragment implements
         }
     }
 
-    private void addFilterChip(String text, Runnable onClose) {
+    private void addFilterChip(String text, Runnable removeAction) {
         Chip chip = new Chip(requireContext());
         chip.setText(text);
         chip.setCloseIconVisible(true);
-        chip.setOnCloseIconClickListener(v -> onClose.run());
+        chip.setOnCloseIconClickListener(v -> removeAction.run());
         chipGroupFilters.addView(chip);
     }
 
@@ -475,99 +543,81 @@ public class SearchFragment extends Fragment implements
         return null;
     }
 
-    private void clearResults() {
-        products.clear();
-        adapter.notifyDataSetChanged();
-        tvResultsCount.setVisibility(View.GONE);
-        updateEmptyState();
-    }
-
-    private void refreshSearch() {
-        if (!currentQuery.isEmpty()) {
-            performSearch();
-        } else {
-            swipeRefresh.setRefreshing(false);
-        }
-    }
-
-    private void updateEmptyState() {
-        if (products.isEmpty() && !currentQuery.isEmpty()) {
-            tvEmpty.setVisibility(View.VISIBLE);
-            tvEmpty.setText("No products found for \"" + currentQuery + "\"");
-            rvProducts.setVisibility(View.GONE);
-        } else if (products.isEmpty() && currentQuery.isEmpty()) {
-            tvEmpty.setVisibility(View.VISIBLE);
-            tvEmpty.setText("Search for products, brands, or categories");
-            rvProducts.setVisibility(View.GONE);
-        } else {
+    private void showLoading(boolean isInitialLoad) {
+        if (isInitialLoad) {
+            progressBar.setVisibility(View.VISIBLE);
             tvEmpty.setVisibility(View.GONE);
-            rvProducts.setVisibility(View.VISIBLE);
+        }
+        swipeRefresh.setRefreshing(false);
+    }
+
+    private void hideLoading() {
+        progressBar.setVisibility(View.GONE);
+        swipeRefresh.setRefreshing(false);
+    }
+
+    private void showEmptyState() {
+        tvEmpty.setVisibility(View.VISIBLE);
+        tvResultsCount.setVisibility(View.GONE);
+
+        if (currentQuery.isEmpty()) {
+            tvEmpty.setText("Search for products, brands, or categories");
+        } else {
+            tvEmpty.setText("No products found for \"" + currentQuery + "\"");
         }
     }
 
-    private void setLoading(boolean loading) {
-        isLoading = loading;
-        if (currentPage == 0) {
-            progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-        }
+    private void hideEmptyState() {
+        tvEmpty.setVisibility(View.GONE);
     }
 
-    private void showError(String message) {
-        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+    private void updateResultsCount(int count) {
+        tvResultsCount.setVisibility(View.VISIBLE);
+        tvResultsCount.setText(getString(R.string.search_results_count, count));
+    }
+
+    // Interface implementations
+    @Override
+    public void onProductClick(Product product) {
+        Intent intent = new Intent(requireContext(), ProductDetailActivity.class);
+        intent.putExtra(Constants.BUNDLE_PRODUCT_ID, product.getId());
+        startActivity(intent);
     }
 
     @Override
-    public void onProductClick(Product product) {
-        // Navigate to product detail
-        android.content.Intent intent = new android.content.Intent(getContext(),
-                com.example.newtrade.ui.product.ProductDetailActivity.class);
-        intent.putExtra("product_id", product.getId());
-        startActivity(intent);
+    public void onFilterApplied(SearchFilter filter) {
+        currentFilter = filter;
+        updateFilterChips();
+        performSearch();
+    }
+
+    @Override
+    public void onSortApplied(SearchSort sort) {
+        currentSort = sort;
+        performSearch();
+    }
+
+    @Override
+    public void onLocationReceived(Location location) {
+        currentFilter.latitude = location.getLatitude();
+        currentFilter.longitude = location.getLongitude();
+        prefsManager.saveLocation(location.getLatitude(), location.getLongitude(), null);
+        Log.d(TAG, "Location received for search");
+    }
+
+    @Override
+    public void onLocationError(String error) {
+        Log.e(TAG, "Location error: " + error);
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (searchHandler != null && searchRunnable != null) {
-            searchHandler.removeCallbacks(searchRunnable);
-        }
         if (locationManager != null) {
             locationManager.cleanup();
         }
-    }
-
-    // Search filter and sort classes
-    public static class SearchFilter {
-        public Long categoryId;
-        public String condition;
-        public Double minPrice;
-        public Double maxPrice;
-        public Double latitude;
-        public Double longitude;
-        public Integer radius;
-
-        public SearchFilter() {}
-
-        public SearchFilter(SearchFilter other) {
-            this.categoryId = other.categoryId;
-            this.condition = other.condition;
-            this.minPrice = other.minPrice;
-            this.maxPrice = other.maxPrice;
-            this.latitude = other.latitude;
-            this.longitude = other.longitude;
-            this.radius = other.radius;
-        }
-    }
-
-    public static class SearchSort {
-        public String sortBy = "createdAt"; // Default sort
-        public String sortDirection = "desc";
-
-        public SearchSort() {}
-
-        public SearchSort(String sortBy, String sortDirection) {
-            this.sortBy = sortBy;
-            this.sortDirection = sortDirection;
+        if (searchHandler != null) {
+            searchHandler.removeCallbacksAndMessages(null);
         }
     }
 }

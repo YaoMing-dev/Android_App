@@ -10,6 +10,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Category;
 
@@ -41,12 +42,18 @@ public class CategoriesAdapter extends RecyclerView.Adapter<CategoriesAdapter.Ca
     public void onBindViewHolder(@NonNull CategoryViewHolder holder, int position) {
         Category category = categories.get(position);
 
-        // Category name
         holder.tvName.setText(category.getName());
 
-        // Category icon (you can map category names to drawable resources)
-        int iconRes = getCategoryIcon(category.getName());
-        holder.ivIcon.setImageResource(iconRes);
+        // Load category icon
+        if (category.getIconUrl() != null && !category.getIconUrl().isEmpty()) {
+            Glide.with(holder.itemView.getContext())
+                    .load(category.getIconUrl())
+                    .placeholder(R.drawable.ic_category_default)
+                    .error(R.drawable.ic_category_default)
+                    .into(holder.ivIcon);
+        } else {
+            holder.ivIcon.setImageResource(R.drawable.ic_category_default);
+        }
 
         // Click listener
         holder.itemView.setOnClickListener(v -> {
@@ -54,21 +61,6 @@ public class CategoriesAdapter extends RecyclerView.Adapter<CategoriesAdapter.Ca
                 listener.onCategoryClick(category);
             }
         });
-    }
-
-    private int getCategoryIcon(String categoryName) {
-        // Map category names to drawable resources
-        switch (categoryName.toLowerCase()) {
-            case "electronics": return R.drawable.ic_category_electronics;
-            case "fashion": return R.drawable.ic_category_fashion;
-            case "home": return R.drawable.ic_category_home;
-            case "sports": return R.drawable.ic_category_sports;
-            case "books": return R.drawable.ic_category_books;
-            case "vehicles": return R.drawable.ic_category_vehicles;
-            case "toys": return R.drawable.ic_category_toys;
-            case "services": return R.drawable.ic_category_services;
-            default: return R.drawable.ic_category_other;
-        }
     }
 
     @Override

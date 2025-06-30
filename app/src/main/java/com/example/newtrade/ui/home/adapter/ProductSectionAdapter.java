@@ -52,19 +52,24 @@ public class ProductSectionAdapter extends RecyclerView.Adapter<ProductSectionAd
         holder.tvPrice.setText(product.getFormattedPrice());
 
         // Product location
-        holder.tvLocation.setText(product.getLocation());
+        if (product.getLocation() != null && !product.getLocation().isEmpty()) {
+            holder.tvLocation.setText(product.getLocation());
+            holder.tvLocation.setVisibility(View.VISIBLE);
+        } else {
+            holder.tvLocation.setVisibility(View.GONE);
+        }
 
         // Load product image
         String imageUrl = product.getFirstImageUrl();
         if (imageUrl != null && !imageUrl.isEmpty()) {
             Glide.with(holder.itemView.getContext())
                     .load(imageUrl)
-                    .transform(new RoundedCorners(12))
-                    .placeholder(R.drawable.placeholder_image)
-                    .error(R.drawable.placeholder_image)
-                    .into(holder.ivProduct);
+                    .transform(new RoundedCorners(16))
+                    .placeholder(R.drawable.placeholder_product)
+                    .error(R.drawable.ic_error_image)
+                    .into(holder.ivImage);
         } else {
-            holder.ivProduct.setImageResource(R.drawable.placeholder_image);
+            holder.ivImage.setImageResource(R.drawable.placeholder_product);
         }
 
         // Click listener
@@ -81,12 +86,12 @@ public class ProductSectionAdapter extends RecyclerView.Adapter<ProductSectionAd
     }
 
     static class ProductViewHolder extends RecyclerView.ViewHolder {
-        ImageView ivProduct;
+        ImageView ivImage;
         TextView tvTitle, tvPrice, tvLocation;
 
         public ProductViewHolder(@NonNull View itemView) {
             super(itemView);
-            ivProduct = itemView.findViewById(R.id.iv_product);
+            ivImage = itemView.findViewById(R.id.iv_image);
             tvTitle = itemView.findViewById(R.id.tv_title);
             tvPrice = itemView.findViewById(R.id.tv_price);
             tvLocation = itemView.findViewById(R.id.tv_location);

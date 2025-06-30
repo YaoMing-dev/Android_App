@@ -2,7 +2,6 @@
 package com.example.newtrade.utils;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -10,7 +9,6 @@ import android.os.Looper;
 import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -21,12 +19,15 @@ import com.google.android.gms.location.Priority;
 
 public class LocationManager {
     private static final String TAG = "LocationManager";
+    private static final long UPDATE_INTERVAL = 10000; // 10 seconds
+    private static final long FASTEST_INTERVAL = 5000; // 5 seconds
+    private static final long TIMEOUT = 30000; // 30 seconds
 
     private Context context;
-    private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
-    private LocationCallback callback;
-    private boolean isRequestingLocation = false;
+    private FusedLocationProviderClient fusedLocationClient;
+    private LocationRequest locationRequest;
+    private com.google.android.gms.location.LocationCallback googleLocationCallback;
 
     public interface LocationCallback {
         void onLocationReceived(Location location);
@@ -34,57 +35,55 @@ public class LocationManager {
     }
 
     public LocationManager(Context context, LocationCallback callback) {
-        this.context = context;
-        this.callback = callback;
+        this.context = context.getApplicationContext();
+        this.locationCallback = callback;
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(context);
+        createLocationRequest();
+        createLocationCallback();
+    }
 
-        locationCallback = new com.google.android.gms.location.LocationCallback() {
+    private void createLocationRequest() {
+        locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, UPDATE_INTERVAL)
+                .setWaitForAccurateLocation(false)
+                .setMinUpdateIntervalMillis(FASTEST_INTERVAL)
+                .setMaxUpdateDelayMillis(UPDATE_INTERVAL * 2)
+                .build();
+    }
+
+    private void createLocationCallback() {
+        googleLocationCallback = new com.google.android.gms.location.LocationCallback() {
             @Override
             public void onLocationResult(LocationResult locationResult) {
-                super.onLocationResult(locationResult);
+                if (locationResult == null) {
+                    if (locationCallback != null) {
+                        locationCallback.onLocationError("No location result received");
+                    }
+                    return;
+                }
 
-                if (locationResult != null && !locationResult.getLocations().isEmpty()) {
-                    Location location = locationResult.getLastLocation();
-                    Log.d(TAG, "Location received: " + location.getLatitude() + ", " + location.getLongitude());
+                Location lastLocation = locationResult.getLastLocation();
+                if (lastLocation != null) {
+                    Log.d(TAG, "Location received: " + lastLocation.getLatitude() + ", " + lastLocation.getLongitude());
 
+                    // Stop location updates after getting first result
                     stopLocationUpdates();
-                    if (LocationManager.this.callback != null) {
-                        LocationManager.this.callback.onLocationReceived(location);
+
+                    if (locationCallback != null) {
+                        locationCallback.onLocationReceived(lastLocation);
                     }
-                } else {
-                    if (LocationManager.this.callback != null) {
-                        LocationManager.this.callback.onLocationError("No location data received");
-                    }
+                } else if (locationCallback != null) {
+                    locationCallback.onLocationError("Location is null");
                 }
             }
         };
     }
 
-    public boolean hasLocationPermission() {
-        return ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    public void requestLocationPermission() {
-        if (context instanceof Activity) {
-            ActivityCompat.requestPermissions((Activity) context,
-                    new String[]{
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                    },
-                    Constants.REQUEST_LOCATION_PERMISSION);
-        }
-    }
-
-    public void getCurrentLocation() {
+    public void requestLocation() {
         if (!hasLocationPermission()) {
-            callback.onLocationError("Location permission not granted");
-            return;
-        }
-
-        if (isRequestingLocation) {
-            Log.d(TAG, "Location request already in progress");
+            if (locationCallback != null) {
+                locationCallback.onLocationError("Location permissions not granted");
+            }
             return;
         }
 
@@ -93,16 +92,18 @@ public class LocationManager {
             fusedLocationClient.getLastLocation()
                     .addOnSuccessListener(location -> {
                         if (location != null) {
-                            // Use cached location if it's recent (within 5 minutes)
+                            // Location is recent enough, use it
                             long locationAge = System.currentTimeMillis() - location.getTime();
                             if (locationAge < 5 * 60 * 1000) { // 5 minutes
                                 Log.d(TAG, "Using cached location");
-                                callback.onLocationReceived(location);
+                                if (locationCallback != null) {
+                                    locationCallback.onLocationReceived(location);
+                                }
                                 return;
                             }
                         }
 
-                        // Request fresh location
+                        // Need fresh location
                         requestLocationUpdates();
                     })
                     .addOnFailureListener(e -> {
@@ -111,54 +112,78 @@ public class LocationManager {
                     });
 
         } catch (SecurityException e) {
-            Log.e(TAG, "Security exception when requesting location", e);
-            callback.onLocationError("Location permission denied");
+            Log.e(TAG, "Location permission denied", e);
+            if (locationCallback != null) {
+                locationCallback.onLocationError("Location permission denied");
+            }
         }
     }
 
     private void requestLocationUpdates() {
         if (!hasLocationPermission()) {
-            callback.onLocationError("Location permission not granted");
+            if (locationCallback != null) {
+                locationCallback.onLocationError("Location permissions not granted");
+            }
             return;
         }
 
-        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
-                .setWaitForAccurateLocation(false)
-                .setMinUpdateIntervalMillis(5000)
-                .setMaxUpdateDelayMillis(15000)
-                .build();
-
         try {
-            isRequestingLocation = true;
-            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+            Log.d(TAG, "Requesting location updates");
+            fusedLocationClient.requestLocationUpdates(
+                    locationRequest,
+                    googleLocationCallback,
+                    Looper.getMainLooper()
+            );
 
-            // Set timeout for location request
-            new android.os.Handler(Looper.getMainLooper()).postDelayed(() -> {
-                if (isRequestingLocation) {
-                    stopLocationUpdates();
-                    callback.onLocationError("Location request timeout");
+            // Set timeout to stop location updates if no result
+            android.os.Handler handler = new android.os.Handler(Looper.getMainLooper());
+            handler.postDelayed(() -> {
+                stopLocationUpdates();
+                if (locationCallback != null) {
+                    locationCallback.onLocationError("Location request timeout");
                 }
-            }, 30000); // 30 seconds timeout
+            }, TIMEOUT);
 
         } catch (SecurityException e) {
-            Log.e(TAG, "Security exception when requesting location updates", e);
-            isRequestingLocation = false;
-            callback.onLocationError("Location permission denied");
+            Log.e(TAG, "Location permission denied during updates", e);
+            if (locationCallback != null) {
+                locationCallback.onLocationError("Location permission denied");
+            }
         }
     }
 
-    private void stopLocationUpdates() {
-        if (isRequestingLocation) {
-            fusedLocationClient.removeLocationUpdates(locationCallback);
-            isRequestingLocation = false;
+    public void stopLocationUpdates() {
+        if (fusedLocationClient != null && googleLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(googleLocationCallback);
+            Log.d(TAG, "Location updates stopped");
+        }
+    }
+
+    private boolean hasLocationPermission() {
+        return ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public boolean isLocationEnabled() {
+        try {
+            android.location.LocationManager locationManager = (android.location.LocationManager)
+                    context.getSystemService(Context.LOCATION_SERVICE);
+
+            return locationManager != null &&
+                    (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+                            locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER));
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking location enabled", e);
+            return false;
         }
     }
 
     public void cleanup() {
         stopLocationUpdates();
+        locationCallback = null;
     }
 
-    // Helper method to calculate distance between two points
+    // Static utility methods
     public static double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
         final int R = 6371; // Radius of the earth in km
 
@@ -168,8 +193,18 @@ public class LocationManager {
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double distance = R * c; // convert to kilometers
+        double distance = R * c; // Distance in km
 
         return distance;
+    }
+
+    public static String formatDistance(double distanceKm) {
+        if (distanceKm < 1) {
+            return String.format("%.0f m", distanceKm * 1000);
+        } else if (distanceKm < 10) {
+            return String.format("%.1f km", distanceKm);
+        } else {
+            return String.format("%.0f km", distanceKm);
+        }
     }
 }

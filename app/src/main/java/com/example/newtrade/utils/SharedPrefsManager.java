@@ -9,27 +9,31 @@ public class SharedPrefsManager {
     private SharedPreferences.Editor editor;
 
     public SharedPrefsManager(Context context) {
-        sharedPreferences = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
+        sharedPreferences = context.getSharedPreferences(Constants.PREF_NAME, Context.MODE_PRIVATE);
         editor = sharedPreferences.edit();
     }
 
-    // User authentication
-    public void saveUserLogin(Long userId, String email, String name, String avatar, String token) {
-        editor.putLong(Constants.PREF_USER_ID, userId);
-        editor.putString(Constants.PREF_USER_EMAIL, email);
-        editor.putString(Constants.PREF_USER_NAME, name);
-        editor.putString(Constants.PREF_USER_AVATAR, avatar);
-        editor.putString(Constants.PREF_AUTH_TOKEN, token);
-        editor.putBoolean(Constants.PREF_IS_LOGGED_IN, true);
-        editor.apply();
+    // Login/Logout
+    public void setLoggedIn(boolean isLoggedIn) {
+        editor.putBoolean(Constants.PREF_IS_LOGGED_IN, isLoggedIn).apply();
     }
 
     public boolean isLoggedIn() {
         return sharedPreferences.getBoolean(Constants.PREF_IS_LOGGED_IN, false);
     }
 
+    // User data
+    public void saveUserData(Long userId, String email, String name, String avatar) {
+        editor.putLong(Constants.PREF_USER_ID, userId)
+                .putString(Constants.PREF_USER_EMAIL, email)
+                .putString(Constants.PREF_USER_NAME, name)
+                .putString(Constants.PREF_USER_AVATAR, avatar)
+                .apply();
+    }
+
     public Long getUserId() {
-        return sharedPreferences.getLong(Constants.PREF_USER_ID, -1L);
+        long id = sharedPreferences.getLong(Constants.PREF_USER_ID, -1);
+        return id == -1 ? null : id;
     }
 
     public String getUserEmail() {
@@ -44,28 +48,43 @@ public class SharedPrefsManager {
         return sharedPreferences.getString(Constants.PREF_USER_AVATAR, null);
     }
 
-    public String getAuthToken() {
-        return sharedPreferences.getString(Constants.PREF_AUTH_TOKEN, null);
-    }
-
     // Location
-    public void saveLastLocation(double latitude, double longitude) {
-        editor.putFloat(Constants.PREF_LAST_LOCATION_LAT, (float) latitude);
-        editor.putFloat(Constants.PREF_LAST_LOCATION_LNG, (float) longitude);
+    public void saveLocation(Double latitude, Double longitude, String locationName) {
+        if (latitude != null && longitude != null) {
+            editor.putFloat(Constants.PREF_LAST_LOCATION_LAT, latitude.floatValue())
+                    .putFloat(Constants.PREF_LAST_LOCATION_LNG, longitude.floatValue());
+        }
+        if (locationName != null) {
+            editor.putString(Constants.PREF_LOCATION_NAME, locationName);
+        }
         editor.apply();
     }
 
-    public double getLastLatitude() {
-        return sharedPreferences.getFloat(Constants.PREF_LAST_LOCATION_LAT, (float) Constants.DEFAULT_LATITUDE);
+    public Double getLastLatitude() {
+        float lat = sharedPreferences.getFloat(Constants.PREF_LAST_LOCATION_LAT, Float.MIN_VALUE);
+        return lat == Float.MIN_VALUE ? null : (double) lat;
     }
 
-    public double getLastLongitude() {
-        return sharedPreferences.getFloat(Constants.PREF_LAST_LOCATION_LNG, (float) Constants.DEFAULT_LONGITUDE);
+    public Double getLastLongitude() {
+        float lng = sharedPreferences.getFloat(Constants.PREF_LAST_LOCATION_LNG, Float.MIN_VALUE);
+        return lng == Float.MIN_VALUE ? null : (double) lng;
     }
 
-    // Logout
-    public void clearUserSession() {
-        editor.clear();
-        editor.apply();
+    public String getLocationName() {
+        return sharedPreferences.getString(Constants.PREF_LOCATION_NAME, null);
+    }
+
+    // Email verification
+    public void setEmailVerified(boolean isVerified) {
+        editor.putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, isVerified).apply();
+    }
+
+    public boolean isEmailVerified() {
+        return sharedPreferences.getBoolean(Constants.PREF_IS_EMAIL_VERIFIED, false);
+    }
+
+    // Clear data
+    public void clearUserData() {
+        editor.clear().apply();
     }
 }
