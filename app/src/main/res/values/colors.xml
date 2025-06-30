@@ -1,139 +1,191 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Primary Colors -->
-    <color name="primary_color">#2196F3</color>
-    <color name="primary_dark">#1976D2</color>
-    <color name="primary_light">#BBDEFB</color>
-    <color name="primary_variant">#1565C0</color>
-    <color name="secondaryColor">#FF4081</color>
+    <!-- ===== PRIMARY BRAND COLORS ===== -->
+    <color name="primary_color">#1976D2</color>
+    <color name="primary_color_dark">#1565C0</color>
+    <color name="primary_color_light">#42A5F5</color>
+    <color name="primary_variant">#0D47A1</color>
 
-    <!-- Secondary Colors -->
+    <!-- ===== SECONDARY COLORS ===== -->
     <color name="secondary_color">#FF9800</color>
-    <color name="secondary_dark">#F57C00</color>
-    <color name="secondary_light">#FFE0B2</color>
+    <color name="secondary_color_dark">#F57C00</color>
+    <color name="secondary_color_light">#FFB74D</color>
+    <color name="secondary_variant">#E65100</color>
 
-    <!-- Background Colors -->
+    <!-- ===== ACCENT COLORS ===== -->
+    <color name="accent_color">#4CAF50</color>
+    <color name="accent_color_dark">#388E3C</color>
+    <color name="accent_color_light">#81C784</color>
+
+    <!-- ===== BACKGROUND COLORS ===== -->
     <color name="background_light">#FAFAFA</color>
-    <color name="background_white">#FFFFFF</color>
-    <color name="background_dark">#212121</color>
-    <color name="background_gray">#F5F5F5</color>
+    <color name="background_dark">#121212</color>
     <color name="background_card">#FFFFFF</color>
+    <color name="background_card_dark">#1E1E1E</color>
+    <color name="background_overlay">#80000000</color>
 
-    <!-- Text Colors -->
+    <!-- ===== SURFACE COLORS ===== -->
+    <color name="surface_light">#FFFFFF</color>
+    <color name="surface_dark">#1E1E1E</color>
+    <color name="surface_variant_light">#F5F5F5</color>
+    <color name="surface_variant_dark">#2C2C2C</color>
+
+    <!-- ===== TEXT COLORS ===== -->
     <color name="text_primary">#212121</color>
+    <color name="text_primary_dark">#FFFFFF</color>
     <color name="text_secondary">#757575</color>
+    <color name="text_secondary_dark">#AAAAAA</color>
     <color name="text_hint">#BDBDBD</color>
-    <color name="text_disabled">#E0E0E0</color>
-    <color name="text_white">#FFFFFF</color>
-    <color name="text_link">#2196F3</color>
-    <color name="text_light">#F5F5F5</color>
+    <color name="text_hint_dark">#666666</color>
+    <color name="text_disabled">#CCCCCC</color>
+    <color name="text_disabled_dark">#444444</color>
 
-    <!-- Status Colors -->
-    <color name="success_color">#4CAF50</color>
-    <color name="success_light">#C8E6C9</color>
-    <color name="success_dark">#2E7D32</color>
-
-    <color name="error_color">#F44336</color>
-    <color name="error_light">#FFCDD2</color>
-    <color name="error_dark">#C62828</color>
-
-    <color name="warning_color">#FF9800</color>
-    <color name="warning_light">#FFF3E0</color>
-    <color name="warning_dark">#E65100</color>
-
-    <color name="info_color">#2196F3</color>
-    <color name="info_light">#BBDEFB</color>
-    <color name="info_dark">#1565C0</color>
-
-    <color name="pending_color">#FFC107</color>
-
-    <!-- UI Colors -->
-    <color name="divider_color">#E0E0E0</color>
-    <color name="shadow_color">#1F000000</color>
-    <color name="overlay_color">#80000000</color>
-    <color name="transparent">#00000000</color>
-    <color name="ripple_color">#1F2196F3</color>
-
-    <!-- System Colors -->
+    <!-- ===== WHITE & BLACK ===== -->
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
-    <color name="gray">#9E9E9E</color>
-    <color name="light_gray">#F5F5F5</color>
-    <color name="dark_gray">#424242</color>
+    <color name="transparent">#00000000</color>
 
-    <!-- Bottom Navigation -->
-    <color name="bottom_nav_selected">#2196F3</color>
-    <color name="bottom_nav_unselected">#9E9E9E</color>
+    <!-- ===== DIVIDER & BORDER COLORS ===== -->
+    <color name="divider_color">#E0E0E0</color>
+    <color name="divider_color_dark">#333333</color>
+    <color name="border_color">#DDDDDD</color>
+    <color name="border_color_dark">#444444</color>
 
+    <!-- ===== STATUS COLORS ===== -->
     <!-- Product Status -->
     <color name="status_available">#4CAF50</color>
     <color name="status_sold">#9E9E9E</color>
-    <color name="status_pending">#FF9800</color>
-    <color name="status_paused">#FFC107</color>
+    <color name="status_paused">#FF9800</color>
+    <color name="status_reserved">#2196F3</color>
+    <color name="status_deleted">#F44336</color>
+    <color name="status_default">#607D8B</color>
 
-    <!-- Product Condition -->
-    <color name="condition_new">#4CAF50</color>
-    <color name="condition_like_new">#8BC34A</color>
-    <color name="condition_good">#FFC107</color>
-    <color name="condition_fair">#FF9800</color>
-    <color name="condition_poor">#F44336</color>
+    <!-- Message Status -->
+    <color name="message_sent">#90CAF9</color>
+    <color name="message_delivered">#4CAF50</color>
+    <color name="message_read">#2196F3</color>
+    <color name="message_failed">#F44336</color>
+
+    <!-- ===== SEMANTIC COLORS ===== -->
+    <color name="success">#4CAF50</color>
+    <color name="success_light">#C8E6C9</color>
+    <color name="success_dark">#2E7D32</color>
+
+    <color name="error">#F44336</color>
+    <color name="error_light">#FFCDD2</color>
+    <color name="error_dark">#C62828</color>
+
+    <color name="warning">#FF9800</color>
+    <color name="warning_light">#FFE0B2</color>
+    <color name="warning_dark">#F57C00</color>
+
+    <color name="info">#2196F3</color>
+    <color name="info_light">#BBDEFB</color>
+    <color name="info_dark">#1976D2</color>
+
+    <!-- ===== BUTTON COLORS ===== -->
+    <color name="btn_primary">#1976D2</color>
+    <color name="btn_primary_pressed">#1565C0</color>
+    <color name="btn_primary_disabled">#BBBBBB</color>
+
+    <color name="btn_secondary">#FF9800</color>
+    <color name="btn_secondary_pressed">#F57C00</color>
+    <color name="btn_secondary_disabled">#CCCCCC</color>
+
+    <color name="btn_danger">#F44336</color>
+    <color name="btn_danger_pressed">#D32F2F</color>
+
+    <!-- ===== SPECIAL UI COLORS ===== -->
+    <!-- Rating Stars -->
+    <color name="star_filled">#FFC107</color>
+    <color name="star_empty">#E0E0E0</color>
+
+    <!-- Price Colors -->
+    <color name="price_text">#1976D2</color>
+    <color name="price_discount">#F44336</color>
+    <color name="price_original">#9E9E9E</color>
 
     <!-- Chat Colors -->
-    <color name="chat_sent">#E3F2FD</color>
-    <color name="chat_received">#F5F5F5</color>
-    <color name="chat_timestamp">#9E9E9E</color>
+    <color name="chat_bubble_sent">#E3F2FD</color>
+    <color name="chat_bubble_received">#F5F5F5</color>
+    <color name="chat_bubble_sent_dark">#1565C0</color>
+    <color name="chat_bubble_received_dark">#424242</color>
+
+    <!-- Online Status -->
     <color name="online_status">#4CAF50</color>
     <color name="offline_status">#9E9E9E</color>
-    <color name="typing_indicator">#2196F3</color>
-    <color name="chat_background">#F5F5F5</color>
+    <color name="typing_indicator">#FF9800</color>
 
-    <!-- Offer Colors -->
-    <color name="offer_accepted">#4CAF50</color>
-    <color name="offer_rejected">#F44336</color>
-    <color name="offer_pending">#FF9800</color>
-    <color name="offer_countered">#2196F3</color>
-    <color name="offer_expired">#9E9E9E</color>
-
-    <!-- Rating Colors -->
-    <color name="star_color">#FFC107</color>
-    <color name="star_empty">#E0E0E0</color>
-    <color name="rating_excellent">#4CAF50</color>
-    <color name="rating_good">#8BC34A</color>
-    <color name="rating_average">#FFC107</color>
-    <color name="rating_poor">#FF5722</color>
-    <color name="rating_yellow">#FFC107</color>
-    <color name="rating_gray">#E0E0E0</color>
-
-    <!-- Special UI Colors -->
-    <color name="splash_gradient_start">#2196F3</color>
-    <color name="splash_gradient_end">#1976D2</color>
-    <color name="button_disabled">#E0E0E0</color>
-    <color name="input_error">#F44336</color>
-    <color name="input_success">#4CAF50</color>
-
-    <!-- Category Colors -->
+    <!-- ===== CATEGORY COLORS ===== -->
     <color name="category_electronics">#2196F3</color>
     <color name="category_fashion">#E91E63</color>
     <color name="category_home">#FF9800</color>
     <color name="category_sports">#4CAF50</color>
     <color name="category_books">#9C27B0</color>
-    <color name="category_automotive">#F44336</color>
+    <color name="category_vehicles">#607D8B</color>
     <color name="category_toys">#FF5722</color>
-    <color name="category_beauty">#E91E63</color>
+    <color name="category_services">#795548</color>
+    <color name="category_other">#9E9E9E</color>
 
-    <!-- App Specific Colors -->
-    <color name="primary">#2196F3</color>
-    <color name="success">#4CAF50</color>
-    <color name="error">#F44336</color>
-    <color name="warning">#FF9800</color>
+    <!-- ===== GRADIENT COLORS ===== -->
+    <color name="gradient_start">#1976D2</color>
+    <color name="gradient_end">#42A5F5</color>
 
-    <!-- Border Colors -->
-    <color name="border_light">#E0E0E0</color>
-    <color name="border_dark">#BDBDBD</color>
+    <!-- ===== SHADOW COLORS ===== -->
+    <color name="shadow_light">#1A000000</color>
+    <color name="shadow_medium">#33000000</color>
+    <color name="shadow_dark">#4D000000</color>
 
-    <!-- Status Colors for Offers -->
-    <color name="status_accepted">#4CAF50</color>
-    <color name="status_rejected">#F44336</color>
-    <color name="status_countered">#FF9800</color>
-    <color name="status_expired">#9E9E9E</color>
+    <!-- ===== RIPPLE COLORS ===== -->
+    <color name="ripple_light">#1A000000</color>
+    <color name="ripple_dark">#1AFFFFFF</color>
+    <color name="ripple_primary">#1A1976D2</color>
+
+    <!-- ===== NOTIFICATION COLORS ===== -->
+    <color name="notification_badge">#F44336</color>
+    <color name="notification_background">#FF5722</color>
+
+    <!-- ===== LOCATION COLORS ===== -->
+    <color name="location_marker">#F44336</color>
+    <color name="location_radius">#1A2196F3</color>
+    <color name="gps_active">#4CAF50</color>
+    <color name="gps_inactive">#9E9E9E</color>
+
+    <!-- ===== ANALYTICS COLORS ===== -->
+    <color name="chart_primary">#1976D2</color>
+    <color name="chart_secondary">#FF9800</color>
+    <color name="chart_tertiary">#4CAF50</color>
+    <color name="chart_quaternary">#E91E63</color>
+
+    <!-- ===== SELECTION COLORS ===== -->
+    <color name="selected_item">#E3F2FD</color>
+    <color name="selected_item_dark">#1A237E</color>
+    <color name="unselected_item">#F5F5F5</color>
+    <color name="unselected_item_dark">#2C2C2C</color>
+
+    <!-- ===== DARK THEME SPECIFIC ===== -->
+    <color name="dark_primary">#90CAF9</color>
+    <color name="dark_primary_variant">#1976D2</color>
+    <color name="dark_secondary">#FFB74D</color>
+    <color name="dark_surface">#121212</color>
+    <color name="dark_background">#121212</color>
+    <color name="dark_error">#CF6679</color>
+
+    <!-- ===== CONDITION BADGE COLORS ===== -->
+    <color name="condition_new">#4CAF50</color>
+    <color name="condition_like_new">#8BC34A</color>
+    <color name="condition_good">#FF9800</color>
+    <color name="condition_fair">#FF5722</color>
+    <color name="condition_poor">#F44336</color>
+
+    <!-- ===== PRIORITY COLORS ===== -->
+    <color name="priority_high">#F44336</color>
+    <color name="priority_medium">#FF9800</color>
+    <color name="priority_low">#4CAF50</color>
+
+    <!-- ===== SHIMMER COLORS ===== -->
+    <color name="shimmer_base">#F0F0F0</color>
+    <color name="shimmer_highlight">#FFFFFF</color>
+    <color name="shimmer_base_dark">#2C2C2C</color>
+    <color name="shimmer_highlight_dark">#3C3C3C</color>
 </resources>

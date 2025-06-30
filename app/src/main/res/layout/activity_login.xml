@@ -12,118 +12,116 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <!-- Header Section -->
-        <LinearLayout
+        <!-- Logo and Title -->
+        <ImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="16dp"
+            android:src="@drawable/ic_trade_logo"
+            android:contentDescription="@string/app_name" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="@string/welcome_back"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="@color/primary_color"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="@string/app_tagline"
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="32dp" />
+
+        <!-- Email Input -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_email"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:layout_marginTop="60dp">
+            android:layout_marginBottom="16dp"
+            app:boxStrokeColor="@color/primary_color"
+            app:hintTextColor="@color/primary_color"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
-            <ImageView
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:src="@drawable/ic_trade_logo" />
-
-            <TextView
-                android:layout_width="wrap_content"
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_email"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="Welcome Back!"
-                android:textSize="28sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary" />
+                android:hint="@string/email"
+                android:inputType="textEmailAddress"
+                android:maxLines="1" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Sign in to continue buying and selling"
-                android:textColor="@color/text_secondary"
-                android:textAlignment="center" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-        </LinearLayout>
-
-        <!-- Login Form -->
-        <LinearLayout
+        <!-- Password Input -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_password"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="48dp">
+            android:layout_marginBottom="8dp"
+            app:boxStrokeColor="@color/primary_color"
+            app:hintTextColor="@color/primary_color"
+            app:passwordToggleEnabled="true"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
-            <!-- Email Input -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/til_email"
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_password"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Email Address"
-                app:startIconDrawable="@drawable/ic_email"
-                app:boxStrokeColor="@color/primary_color"
-                app:hintTextColor="@color/primary_color"
-                app:errorEnabled="true">
+                android:hint="@string/password"
+                android:inputType="textPassword"
+                android:maxLines="1" />
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/et_email"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textEmailAddress" />
+        </com.google.android.material.textfield.TextInputLayout>
 
-            </com.google.android.material.textfield.TextInputLayout>
+        <!-- Forgot Password -->
+        <TextView
+            android:id="@+id/tv_forgot_password"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:text="@string/forgot_password"
+            android:textColor="@color/primary_color"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:layout_marginBottom="24dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
 
-            <!-- Password Input -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/til_password"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:hint="Password"
-                app:startIconDrawable="@drawable/ic_lock"
-                app:endIconMode="password_toggle"
-                app:boxStrokeColor="@color/primary_color"
-                app:hintTextColor="@color/primary_color"
-                app:errorEnabled="true">
+        <!-- Login Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_login"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/login"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"
+            app:cornerRadius="8dp" />
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/et_password"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textPassword" />
-
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- Forgot Password -->
-            <TextView
-                android:id="@+id/tv_forgot_password"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_marginTop="12dp"
-                android:text="Forgot Password?"
-                android:textColor="@color/primary_color"
-                android:textStyle="bold"
-                android:textSize="14sp" />
-
-            <!-- Login Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_login"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="32dp"
-                android:text="Sign In"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:enabled="false"
-                app:cornerRadius="12dp" />
-
-        </LinearLayout>
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
 
         <!-- Divider -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_marginVertical="16dp">
 
             <View
                 android:layout_width="0dp"
@@ -134,10 +132,9 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="16dp"
-                android:text="OR"
+                android:text="or"
                 android:textColor="@color/text_secondary"
-                android:textStyle="bold" />
+                android:layout_marginHorizontal="16dp" />
 
             <View
                 android:layout_width="0dp"
@@ -150,42 +147,49 @@
         <!-- Google Sign-In Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_google_signin"
-            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_marginTop="24dp"
-            android:text="Continue with Google"
+            android:text="@string/google_signin"
+            android:textSize="16sp"
             android:textColor="@color/text_primary"
-            android:textStyle="bold"
-            app:strokeColor="@color/primary_color"
-            app:cornerRadius="12dp"
+            android:backgroundTint="@color/white"
+            app:strokeColor="@color/divider_color"
+            app:strokeWidth="1dp"
+            app:cornerRadius="8dp"
             app:icon="@drawable/ic_google"
             app:iconGravity="textStart"
-            app:iconSize="20dp" />
+            app:iconTint="@null"
+            android:layout_marginBottom="32dp"
+            style="@style/Widget.Material3.Button.OutlinedButton" />
 
         <!-- Register Link -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
-            android:gravity="center"
+            android:layout_gravity="center_horizontal"
             android:orientation="horizontal">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Don't have an account? "
-                android:textColor="@color/text_secondary" />
+                android:text="@string/dont_have_account"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
 
             <TextView
                 android:id="@+id/tv_register"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Sign Up"
+                android:text="@string/register"
                 android:textColor="@color/primary_color"
-                android:textStyle="bold" />
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginStart="4dp"
+                android:padding="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless" />
 
         </LinearLayout>
 
     </LinearLayout>
+
 </ScrollView>

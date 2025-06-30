@@ -4,203 +4,138 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:background="@color/background_light">
 
-    <!-- Search Input -->
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Search products..."
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/et_search"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="text"
-            android:imeOptions="actionSearch" />
-
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <!-- Filter Buttons -->
+    <!-- Search Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="@color/white"
+        android:elevation="2dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_category_filter"
+        <!-- Search Input -->
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="Category"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
+            app:boxStrokeWidth="0dp"
+            app:boxStrokeWidthFocused="0dp"
+            app:startIconDrawable="@drawable/ic_search"
+            app:startIconTint="@color/text_secondary"
+            style="@style/Widget.Material3.TextInputLayout.FilledBox">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_price_filter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_search"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/search_hint"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:maxLines="1" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Filter Button -->
+        <ImageView
+            android:id="@+id/iv_filter"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_marginEnd="8dp"
-            android:text="Price"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
+            android:src="@drawable/ic_filter_list"
+            android:background="@drawable/bg_circle_ripple"
+            android:padding="8dp"
+            android:contentDescription="Filter"
+            app:tint="@color/primary_color" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_location_filter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="Location"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_condition_filter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Condition"
-            style="@style/Widget.Material3.Button.OutlinedButton" />
+        <!-- Sort Button -->
+        <ImageView
+            android:id="@+id/iv_sort"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_sort"
+            android:background="@drawable/bg_circle_ripple"
+            android:padding="8dp"
+            android:contentDescription="Sort"
+            app:tint="@color/primary_color" />
 
     </LinearLayout>
 
     <!-- Filter Chips -->
-    <com.google.android.material.chip.ChipGroup
-        android:id="@+id/chip_group_filters"
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp" />
+        android:scrollbars="none"
+        android:background="@color/white">
 
-    <!-- Results Header -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <!-- ✅ FIX: Add missing TextView -->
-        <TextView
-            android:id="@+id/tv_popular_products_title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Popular Products"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/tv_results_count"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="0 results found"
-            android:textSize="16sp"
-            android:visibility="visible" />
-
-        <TextView
-            android:id="@+id/tv_sort_option"
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chip_group_filters"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Sort: Relevance"
-            android:textColor="?attr/colorPrimary"
-            android:background="?attr/selectableItemBackground"
-            android:padding="8dp" />
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            app:singleLine="true" />
 
-    </LinearLayout>
+    </HorizontalScrollView>
 
-    <!-- Content Area -->
+    <!-- Results Count -->
+    <TextView
+        android:id="@+id/tv_results_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/results_count"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
+        android:visibility="gone" />
+
+    <!-- Content -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="8dp">
+        android:layout_weight="1">
 
-        <!-- Search Results -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_search_results"
+        <!-- SwipeRefreshLayout -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipe_refresh"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingBottom="16dp" />
+            android:layout_height="match_parent">
 
-        <!-- Loading State -->
-        <LinearLayout
-            android:id="@+id/ll_loading_state"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:visibility="gone">
+            <!-- Products RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_products"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="8dp"
+                android:clipToPadding="false" />
 
-            <ProgressBar
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp" />
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Searching..."
-                android:textSize="16sp" />
-
-        </LinearLayout>
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:visibility="gone" />
 
         <!-- Empty State -->
-        <LinearLayout
-            android:id="@+id/ll_empty_state"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <ImageView
-                android:layout_width="96dp"
-                android:layout_height="96dp"
-                android:layout_marginBottom="16dp"
-                android:src="@drawable/ic_search_empty"
-                android:alpha="0.5" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="No products found"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Try adjusting your search or filters"
-                android:textSize="14sp"
-                android:alpha="0.7" />
-
-        </LinearLayout>
-
-        <!-- Recent Searches -->
-        <LinearLayout
-            android:id="@+id/ll_recent_searches"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Recent Searches"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
-
-            <!-- Recent searches list would go here -->
-
-        </LinearLayout>
+        <TextView
+            android:id="@+id/tv_empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="Search for products, brands, or categories"
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:textAlignment="center"
+            android:drawableTop="@drawable/ic_search_big"
+            android:drawablePadding="16dp"
+            android:drawableTint="@color/text_hint" />
 
     </FrameLayout>
 

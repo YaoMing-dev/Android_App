@@ -1,0 +1,11 @@
+<!-- res/drawable/bg_dashed_border.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+    <stroke
+        android:width="2dp"
+        android:color="#FF000000"
+        android:dashWidth="8dp"
+        android:dashGap="4dp" />
+    <corners android:radius="8dp" />
+</shape>
