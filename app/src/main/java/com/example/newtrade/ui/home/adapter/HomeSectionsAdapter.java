@@ -11,16 +11,17 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.newtrade.R;
-import com.example.newtrade.ui.home.HomeFragment;
+import com.example.newtrade.models.HomeSection; // ✅ SỬA: Import từ models package
 
 import java.util.List;
 
 public class HomeSectionsAdapter extends RecyclerView.Adapter<HomeSectionsAdapter.SectionViewHolder> {
 
-    private List<HomeFragment.HomeSection> sections;
+    // ✅ SỬA: Thay HomeFragment.HomeSection thành HomeSection
+    private List<HomeSection> sections;
     private ProductSectionAdapter.OnProductClickListener listener;
 
-    public HomeSectionsAdapter(List<HomeFragment.HomeSection> sections,
+    public HomeSectionsAdapter(List<HomeSection> sections,
                                ProductSectionAdapter.OnProductClickListener listener) {
         this.sections = sections;
         this.listener = listener;
@@ -36,7 +37,7 @@ public class HomeSectionsAdapter extends RecyclerView.Adapter<HomeSectionsAdapte
 
     @Override
     public void onBindViewHolder(@NonNull SectionViewHolder holder, int position) {
-        HomeFragment.HomeSection section = sections.get(position);
+        HomeSection section = sections.get(position); // ✅ SỬA: HomeSection thay vì HomeFragment.HomeSection
 
         // Section title
         holder.tvTitle.setText(section.getTitle());

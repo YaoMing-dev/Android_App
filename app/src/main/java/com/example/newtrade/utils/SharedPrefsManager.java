@@ -160,4 +160,6 @@ public class SharedPrefsManager {
     public void clearAll() {
         prefs.edit().clear().apply();
     }
+
+
 }

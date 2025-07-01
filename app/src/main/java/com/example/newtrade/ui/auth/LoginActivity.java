@@ -21,6 +21,7 @@ import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.NetworkUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.ValidationUtils;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
@@ -105,14 +106,14 @@ public class LoginActivity extends AppCompatActivity {
         // Google Sign In
         btnGoogleSignIn.setOnClickListener(v -> signInWithGoogle());
 
-        // Regular login
-        btnLogin.setOnClickListener(v -> performLogin());
+        // Regular Login
+        btnLogin.setOnClickListener(v -> loginWithEmail());
 
         // Navigation
         tvRegister.setOnClickListener(v -> navigateToRegister());
         tvForgotPassword.setOnClickListener(v -> navigateToForgotPassword());
 
-        // Text validation
+        // Real-time validation
         etEmail.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -142,22 +143,61 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
-    // FR-1.1.4: Login button disabled unless both fields are filled correctly
     private void updateLoginButtonState() {
         String email = etEmail.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
-
-        boolean isValid = ValidationUtils.isValidEmail(email) &&
-                ValidationUtils.isValidPassword(password);
-
-        btnLogin.setEnabled(isValid && !isLoading);
+        btnLogin.setEnabled(!isLoading && !email.isEmpty() && !password.isEmpty());
     }
 
     private void signInWithGoogle() {
         if (isLoading) return;
 
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            showError("No internet connection");
+            return;
+        }
+
         Intent signInIntent = googleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_SIGN_IN);
+    }
+
+    private void loginWithEmail() {
+        if (isLoading) return;
+
+        String email = etEmail.getText().toString().trim();
+        String password = etPassword.getText().toString().trim();
+
+        if (!validateInput(email, password)) {
+            return;
+        }
+
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            showError("No internet connection");
+            return;
+        }
+
+        setLoading(true);
+
+        Map<String, String> request = new HashMap<>();
+        request.put("email", email);
+        request.put("password", password);
+
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getAuthService().login(request);
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                setLoading(false);
+                handleAuthResponse(response, email);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                setLoading(false);
+                Log.e(TAG, "Login failed", t);
+                showError("Login failed. Please try again.");
+            }
+        });
     }
 
     @Override
@@ -168,17 +208,17 @@ public class LoginActivity extends AppCompatActivity {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
-                handleGoogleSignInResult(account);
+                handleGoogleSignIn(account);
             } catch (ApiException e) {
                 Log.e(TAG, "Google sign in failed", e);
-                Toast.makeText(this, "Google sign in failed", Toast.LENGTH_SHORT).show();
+                showError("Google sign in failed. Please try again.");
             }
         }
     }
 
-    private void handleGoogleSignInResult(GoogleSignInAccount account) {
-        if (account == null) {
-            Toast.makeText(this, "Google sign in failed", Toast.LENGTH_SHORT).show();
+    private void handleGoogleSignIn(GoogleSignInAccount account) {
+        if (account == null || account.getIdToken() == null) {
+            showError("Failed to get Google ID token");
             return;
         }
 
@@ -187,48 +227,20 @@ public class LoginActivity extends AppCompatActivity {
         Map<String, String> request = new HashMap<>();
         request.put("idToken", account.getIdToken());
 
-        ApiClient.getAuthService().googleSignIn(request).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getAuthService().googleSignIn(request);
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call, Response<StandardResponse<Map<String, Object>>> response) {
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
                 setLoading(false);
-                handleAuthResponse(response, null);
+                handleAuthResponse(response, account.getEmail());
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 setLoading(false);
                 Log.e(TAG, "Google login failed", t);
-                showError("Network error. Please try again.");
-            }
-        });
-    }
-
-    private void performLogin() {
-        String email = etEmail.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
-
-        if (!validateInput(email, password)) {
-            return;
-        }
-
-        setLoading(true);
-
-        Map<String, String> request = new HashMap<>();
-        request.put("email", email);
-        request.put("password", password);
-
-        ApiClient.getAuthService().login(request).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call, Response<StandardResponse<Map<String, Object>>> response) {
-                setLoading(false);
-                handleAuthResponse(response, email);
-            }
-
-            @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                setLoading(false);
-                Log.e(TAG, "Login failed", t);
-                showError("Network error. Please try again.");
+                showError("Google login failed. Please try again.");
             }
         });
     }
@@ -242,7 +254,7 @@ public class LoginActivity extends AppCompatActivity {
                 boolean requiresOtp = (Boolean) data.getOrDefault("requiresOtp", false);
 
                 if (requiresOtp) {
-                    // FR-1.1.2: Email verification required
+                    // Email verification required
                     String userEmail = email != null ? email : (String) user.get("email");
                     navigateToOtpVerification(userEmail);
                 } else {

@@ -5,10 +5,11 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.util.Log;
-import androidx.exifinterface.media.ExifInterface;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -16,82 +17,96 @@ import java.io.InputStream;
 
 public class ImageUtils {
     private static final String TAG = "ImageUtils";
-    private static final int MAX_IMAGE_SIZE = 1024;
-    private static final int JPEG_QUALITY = 80;
+    private static final int MAX_IMAGE_SIZE = 1920;
+    private static final int JPEG_QUALITY = 85;
+    public static String generateImageFileName() {
+        return "IMG_" + System.currentTimeMillis() + ".jpg";
+    }
+    public static String generateImageFileName(String extension) {
+        if (extension == null || !extension.startsWith(".")) {
+            extension = ".jpg";
+        }
+        return "IMG_" + System.currentTimeMillis() + extension;
+    }
 
-    // FR-2.1.4: Image upload supports JPEG/PNG
-    public static String compressImage(Context context, Uri imageUri, String fileName) {
+    public static String compressImage(Context context, Uri imageUri, String outputPath) {
         try {
+            // Get input stream from URI
             InputStream inputStream = context.getContentResolver().openInputStream(imageUri);
-            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
-
-            if (bitmap == null) {
-                Log.e(TAG, "Failed to decode bitmap from URI");
+            if (inputStream == null) {
+                Log.e(TAG, "Failed to open input stream");
                 return null;
             }
 
-            // Handle image orientation
-            Bitmap rotatedBitmap = handleImageOrientation(context, imageUri, bitmap);
+            // Decode bitmap
+            Bitmap originalBitmap = BitmapFactory.decodeStream(inputStream);
+            inputStream.close();
 
-            // Resize if too large
-            Bitmap resizedBitmap = resizeImage(rotatedBitmap, MAX_IMAGE_SIZE);
-
-            // Save compressed image
-            File outputDir = new File(context.getCacheDir(), "temp_images");
-            if (!outputDir.exists()) {
-                outputDir.mkdirs();
+            if (originalBitmap == null) {
+                Log.e(TAG, "Failed to decode bitmap");
+                return null;
             }
 
-            File outputFile = new File(outputDir, fileName);
-            FileOutputStream fos = new FileOutputStream(outputFile);
+            // Get image orientation
+            int orientation = getImageOrientation(context, imageUri);
 
-            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, fos);
-            fos.close();
+            // Rotate if needed
+            Bitmap rotatedBitmap = rotateImageIfRequired(originalBitmap, orientation);
 
-            // Clean up bitmaps
-            if (bitmap != rotatedBitmap) {
-                bitmap.recycle();
+            // Compress and resize
+            Bitmap compressedBitmap = resizeImage(rotatedBitmap, MAX_IMAGE_SIZE);
+
+            // Save to file
+            String savedPath = saveBitmapToFile(compressedBitmap, outputPath);
+
+            // Clean up
+            if (originalBitmap != rotatedBitmap) {
+                originalBitmap.recycle();
             }
-            if (rotatedBitmap != resizedBitmap) {
+            if (rotatedBitmap != compressedBitmap) {
                 rotatedBitmap.recycle();
             }
-            resizedBitmap.recycle();
+            compressedBitmap.recycle();
 
-            return outputFile.getAbsolutePath();
+            return savedPath;
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             Log.e(TAG, "Error compressing image", e);
             return null;
         }
     }
 
-    private static Bitmap handleImageOrientation(Context context, Uri imageUri, Bitmap bitmap) {
+    private static int getImageOrientation(Context context, Uri imageUri) {
         try {
             InputStream inputStream = context.getContentResolver().openInputStream(imageUri);
-            ExifInterface exif = new ExifInterface(inputStream);
-            int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-
-            Matrix matrix = new Matrix();
-            switch (orientation) {
-                case ExifInterface.ORIENTATION_ROTATE_90:
-                    matrix.postRotate(90);
-                    break;
-                case ExifInterface.ORIENTATION_ROTATE_180:
-                    matrix.postRotate(180);
-                    break;
-                case ExifInterface.ORIENTATION_ROTATE_270:
-                    matrix.postRotate(270);
-                    break;
-                default:
-                    return bitmap;
+            if (inputStream != null) {
+                ExifInterface exif = new ExifInterface(inputStream);
+                inputStream.close();
+                return exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
             }
-
-            return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-
         } catch (IOException e) {
-            Log.e(TAG, "Error handling image orientation", e);
-            return bitmap;
+            Log.e(TAG, "Error reading EXIF data", e);
         }
+        return ExifInterface.ORIENTATION_NORMAL;
+    }
+
+    private static Bitmap rotateImageIfRequired(Bitmap bitmap, int orientation) {
+        switch (orientation) {
+            case ExifInterface.ORIENTATION_ROTATE_90:
+                return rotateImage(bitmap, 90);
+            case ExifInterface.ORIENTATION_ROTATE_180:
+                return rotateImage(bitmap, 180);
+            case ExifInterface.ORIENTATION_ROTATE_270:
+                return rotateImage(bitmap, 270);
+            default:
+                return bitmap;
+        }
+    }
+
+    private static Bitmap rotateImage(Bitmap bitmap, float angle) {
+        Matrix matrix = new Matrix();
+        matrix.postRotate(angle);
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
     }
 
     private static Bitmap resizeImage(Bitmap bitmap, int maxSize) {
@@ -102,20 +117,31 @@ public class ImageUtils {
             return bitmap;
         }
 
-        float scale = Math.min((float) maxSize / width, (float) maxSize / height);
-        int newWidth = Math.round(width * scale);
-        int newHeight = Math.round(height * scale);
+        float ratio = Math.min((float) maxSize / width, (float) maxSize / height);
+        int newWidth = Math.round(width * ratio);
+        int newHeight = Math.round(height * ratio);
 
         return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true);
     }
 
-    public static boolean isImageFile(String fileName) {
-        if (fileName == null) return false;
-        String extension = fileName.toLowerCase();
-        return extension.endsWith(".jpg") || extension.endsWith(".jpeg") || extension.endsWith(".png");
+    private static String saveBitmapToFile(Bitmap bitmap, String outputPath) throws IOException {
+        File outputFile = new File(outputPath);
+        File parentDir = outputFile.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+
+        FileOutputStream out = new FileOutputStream(outputFile);
+        bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out);
+        out.flush();
+        out.close();
+
+        return outputPath;
     }
 
-    public static String generateImageFileName() {
-        return "IMG_" + System.currentTimeMillis() + ".jpg";
+    public static byte[] bitmapToByteArray(Bitmap bitmap) {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, stream);
+        return stream.toByteArray();
     }
 }

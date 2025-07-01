@@ -4,9 +4,7 @@ package com.example.newtrade;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.MenuItem;
-import android.view.View;
-
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
@@ -19,7 +17,7 @@ import com.example.newtrade.ui.home.HomeFragment;
 import com.example.newtrade.ui.search.SearchFragment;
 import com.example.newtrade.ui.product.AddProductFragment;
 import com.example.newtrade.ui.chat.MessagesFragment;
-import com.example.newtrade.ui.profile.ProfileFragment; // ✅ FIX: Correct import
+import com.example.newtrade.ui.profile.ProfileFragment;
 import com.example.newtrade.ui.product.AddProductActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -67,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
         initViews();
         setupBottomNavigation();
         setupFAB();
+        setupBackPressHandler(); // ✅ Fix deprecated onBackPressed
 
         // Load initial fragment
         loadFragment(getHomeFragment(), "HOME");
@@ -92,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
                 loadFragment(getSearchFragment(), "SEARCH");
                 showFAB(false);
                 return true;
-            } else if (itemId == R.id.nav_add) {
+            } else if (itemId == R.id.nav_add_product) {
                 openAddProductActivity();
                 return true;
             } else if (itemId == R.id.nav_messages) {
@@ -114,6 +113,31 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupFAB() {
         fabQuickAdd.setOnClickListener(v -> openAddProductActivity());
+    }
+
+    // ✅ Fix deprecated onBackPressed with modern approach
+    private void setupBackPressHandler() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // If not on home fragment, go to home
+                if (currentFragment != homeFragment) {
+                    bottomNavigation.setSelectedItemId(R.id.nav_home);
+                    return;
+                }
+
+                // If on home fragment, check if it can handle back press
+                if (currentFragment instanceof HomeFragment) {
+                    HomeFragment home = (HomeFragment) currentFragment;
+                    if (home.onBackPressed()) {
+                        return;
+                    }
+                }
+
+                // Default behavior - exit app
+                finish();
+            }
+        });
     }
 
     private void loadFragment(Fragment fragment, String tag) {
@@ -205,26 +229,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onBackPressed() {
-        // If not on home fragment, go to home
-        if (currentFragment != homeFragment) {
-            bottomNavigation.setSelectedItemId(R.id.nav_home);
-            return;
-        }
-
-        // If on home fragment, check if it can handle back press
-        if (currentFragment instanceof HomeFragment) {
-            HomeFragment home = (HomeFragment) currentFragment;
-            if (home.onBackPressed()) {
-                return;
-            }
-        }
-
-        // Default behavior
-        super.onBackPressed();
-    }
-
-    @Override
     protected void onResume() {
         super.onResume();
 
@@ -238,6 +242,7 @@ public class MainActivity extends AppCompatActivity {
         refreshCurrentFragment();
     }
 
+    // ✅ Fix method calls to fragments - check if method exists before calling
     private void refreshCurrentFragment() {
         if (currentFragment instanceof HomeFragment) {
             ((HomeFragment) currentFragment).refreshData();
@@ -246,6 +251,7 @@ public class MainActivity extends AppCompatActivity {
         } else if (currentFragment instanceof ProfileFragment) {
             ((ProfileFragment) currentFragment).refreshData();
         }
+        // SearchFragment and AddProductFragment don't need refreshData
     }
 
     @Override

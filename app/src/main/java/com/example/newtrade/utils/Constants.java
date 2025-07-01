@@ -18,6 +18,7 @@ public class Constants {
     public static final String PREF_IS_EMAIL_VERIFIED = "is_email_verified";
     public static final String PREF_LAST_LOCATION_LAT = "last_location_lat";
     public static final String PREF_LAST_LOCATION_LNG = "last_location_lng";
+    public static final String BUNDLE_LOCATION_NAME = "location_name";
     public static final String PREF_LOCATION_NAME = "location_name";
 
     // ===== REQUEST CODES =====
@@ -32,6 +33,9 @@ public class Constants {
     public static final int PERMISSION_REQUEST_LOCATION = 2002;
     public static final int PERMISSION_REQUEST_STORAGE = 2003;
 
+    public static final float DEFAULT_MAP_ZOOM = 15.0f;
+    public static final float DEFAULT_LOCATION_RADIUS = 10.0f; // km
+
     // ===== BUNDLE KEYS =====
     public static final String BUNDLE_PRODUCT_ID = "product_id";
     public static final String BUNDLE_PRODUCT_TITLE = "product_title";
@@ -40,6 +44,7 @@ public class Constants {
     public static final String BUNDLE_CONVERSATION_ID = "conversation_id";
     public static final String BUNDLE_CATEGORY_ID = "category_id";
     public static final String BUNDLE_CATEGORY_NAME = "category_name";
+
 
     // ===== PAGINATION =====
     public static final int DEFAULT_PAGE_SIZE = 20;
@@ -71,6 +76,12 @@ public class Constants {
     public static final int MAX_PRODUCT_TITLE_LENGTH = 200;
     public static final int MIN_PRODUCT_DESCRIPTION_LENGTH = 10;
     public static final int MAX_PRODUCT_DESCRIPTION_LENGTH = 2000;
+
+    public static final String SORT_NEWEST = "createdAt_desc";
+    public static final String SORT_OLDEST = "createdAt_asc";
+    public static final String SORT_PRICE_LOW = "price_asc";
+    public static final String SORT_PRICE_HIGH = "price_desc";
+    public static final String SORT_POPULAR = "viewCount_desc";
 
     // ===== SEARCH =====
     public static final int SEARCH_DELAY_MS = 200; // FR-3.1.2: Search triggers 200ms after typing

@@ -124,7 +124,7 @@ public class MyProductsAdapter extends RecyclerView.Adapter<MyProductsAdapter.Pr
             case RESERVED:
                 chip.setChipBackgroundColorResource(R.color.status_reserved);
                 break;
-            case PAUSED:
+            case DELETED:
                 chip.setChipBackgroundColorResource(R.color.status_paused);
                 break;
             case ARCHIVED:

@@ -75,41 +75,38 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
-        // Register button
-        btnRegister.setOnClickListener(v -> performRegister());
-
-        // Login link
+        btnRegister.setOnClickListener(v -> register());
         tvLogin.setOnClickListener(v -> navigateToLogin());
 
-        // Terms checkbox
-        cbTerms.setOnCheckedChangeListener((buttonView, isChecked) -> updateRegisterButtonState());
+        // Real-time validation
+        TextWatcher validationWatcher = new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-        // Text validation listeners
-        etFullName.addTextChangedListener(new ValidationTextWatcher(tilFullName));
-        etDisplayName.addTextChangedListener(new ValidationTextWatcher(tilDisplayName));
-        etEmail.addTextChangedListener(new ValidationTextWatcher(tilEmail));
-        etPassword.addTextChangedListener(new ValidationTextWatcher(tilPassword));
-        etConfirmPassword.addTextChangedListener(new ValidationTextWatcher(tilConfirmPassword));
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                clearErrors();
+                updateRegisterButtonState();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        };
+
+        etFullName.addTextChangedListener(validationWatcher);
+        etDisplayName.addTextChangedListener(validationWatcher);
+        etEmail.addTextChangedListener(validationWatcher);
+        etPassword.addTextChangedListener(validationWatcher);
+        etConfirmPassword.addTextChangedListener(validationWatcher);
+        cbTerms.setOnCheckedChangeListener((buttonView, isChecked) -> updateRegisterButtonState());
     }
 
-    private class ValidationTextWatcher implements TextWatcher {
-        private TextInputLayout textInputLayout;
-
-        ValidationTextWatcher(TextInputLayout textInputLayout) {
-            this.textInputLayout = textInputLayout;
-        }
-
-        @Override
-        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-        @Override
-        public void onTextChanged(CharSequence s, int start, int before, int count) {
-            textInputLayout.setError(null);
-            updateRegisterButtonState();
-        }
-
-        @Override
-        public void afterTextChanged(Editable s) {}
+    private void clearErrors() {
+        tilFullName.setError(null);
+        tilDisplayName.setError(null);
+        tilEmail.setError(null);
+        tilPassword.setError(null);
+        tilConfirmPassword.setError(null);
     }
 
     private void updateRegisterButtonState() {
@@ -119,19 +116,25 @@ public class RegisterActivity extends AppCompatActivity {
         String password = etPassword.getText().toString().trim();
         String confirmPassword = etConfirmPassword.getText().toString().trim();
 
-        boolean isFormValid = ValidationUtils.isValidName(fullName) &&
-                ValidationUtils.isValidDisplayName(displayName) &&
-                ValidationUtils.isValidEmail(email) &&
-                ValidationUtils.isValidPassword(password) &&
-                password.equals(confirmPassword) &&
-                cbTerms.isChecked();
-
-        btnRegister.setEnabled(isFormValid && !isLoading);
+        btnRegister.setEnabled(!isLoading &&
+                !fullName.isEmpty() &&
+                !displayName.isEmpty() &&
+                !email.isEmpty() &&
+                !password.isEmpty() &&
+                !confirmPassword.isEmpty() &&
+                cbTerms.isChecked());
     }
 
-    // FR-1.1.1: Users register via email/password with format validation
-    private void performRegister() {
-        if (!validateForm()) {
+    private void register() {
+        if (isLoading) return;
+
+        String fullName = etFullName.getText().toString().trim();
+        String displayName = etDisplayName.getText().toString().trim();
+        String email = etEmail.getText().toString().trim();
+        String password = etPassword.getText().toString().trim();
+        String confirmPassword = etConfirmPassword.getText().toString().trim();
+
+        if (!validateInput(fullName, displayName, email, password, confirmPassword)) {
             return;
         }
 
@@ -142,18 +145,13 @@ public class RegisterActivity extends AppCompatActivity {
 
         setLoading(true);
 
-        String fullName = etFullName.getText().toString().trim();
-        String displayName = etDisplayName.getText().toString().trim();
-        String email = etEmail.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
+        Map<String, String> request = new HashMap<>();
+        request.put("fullName", fullName);
+        request.put("displayName", displayName);
+        request.put("email", email);
+        request.put("password", password);
 
-        Map<String, Object> registerData = new HashMap<>();
-        registerData.put("fullName", fullName);
-        registerData.put("displayName", displayName);
-        registerData.put("email", email);
-        registerData.put("password", password);
-
-        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getAuthService().register(registerData);
+        Call<StandardResponse<Map<String, Object>>> call = ApiClient.getAuthService().register(request);
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
@@ -163,83 +161,59 @@ public class RegisterActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                  @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 setLoading(false);
-                Log.e(TAG, "Registration request failed", t);
-                showError(NetworkUtils.getNetworkErrorMessage(t));
+                Log.e(TAG, "Registration failed", t);
+                showError("Registration failed. Please try again.");
             }
         });
     }
 
-    @SuppressWarnings("unchecked")
     private void handleRegisterResponse(Response<StandardResponse<Map<String, Object>>> response, String email) {
         try {
-            if (response.isSuccessful() && response.body() != null) {
-                StandardResponse<Map<String, Object>> apiResponse = response.body();
-
-                if (apiResponse.isSuccess()) {
-                    Toast.makeText(this, "Registration successful! Please verify your email.", Toast.LENGTH_LONG).show();
-
-                    // FR-1.1.2: Email verification required for account activation
-                    Intent intent = new Intent(this, OtpVerificationActivity.class);
-                    intent.putExtra("email", email);
-                    intent.putExtra("fromRegistration", true);
-                    startActivity(intent);
-                    finish();
-                } else {
-                    showError(apiResponse.getMessage());
-                }
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                // Registration successful, navigate to OTP verification
+                navigateToOtpVerification(email);
             } else {
-                String errorMsg = "Registration failed";
-                if (response.code() == 409) {
-                    errorMsg = "Email already exists";
-                } else if (response.code() == 400) {
-                    errorMsg = "Invalid registration data";
-                }
-                showError(errorMsg);
+                String message = response.body() != null ? response.body().getMessage() : "Registration failed";
+                showError(message);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error processing registration response", e);
-            showError("Registration failed");
+            Log.e(TAG, "Error processing register response", e);
+            showError("Registration failed. Please try again.");
         }
     }
 
-    private boolean validateForm() {
+    private boolean validateInput(String fullName, String displayName, String email, String password, String confirmPassword) {
         boolean isValid = true;
 
-        String fullName = etFullName.getText().toString().trim();
         if (!ValidationUtils.isValidName(fullName)) {
-            tilFullName.setError("Full name must be between 2-50 characters");
+            tilFullName.setError("Full name must be 2-50 characters");
             isValid = false;
         }
 
-        String displayName = etDisplayName.getText().toString().trim();
-        if (!ValidationUtils.isValidDisplayName(displayName)) {
-            tilDisplayName.setError("Display name must be between 2-50 characters");
+        if (!ValidationUtils.isValidName(displayName)) {
+            tilDisplayName.setError("Display name must be 2-50 characters");
             isValid = false;
         }
 
-        String email = etEmail.getText().toString().trim();
         if (!ValidationUtils.isValidEmail(email)) {
-            tilEmail.setError("Please enter a valid email address");
+            tilEmail.setError("Please enter a valid email");
             isValid = false;
         }
 
-        String password = etPassword.getText().toString().trim();
         if (!ValidationUtils.isValidPassword(password)) {
             tilPassword.setError("Password must be at least 6 characters");
             isValid = false;
         }
 
-        String confirmPassword = etConfirmPassword.getText().toString().trim();
         if (!password.equals(confirmPassword)) {
             tilConfirmPassword.setError("Passwords do not match");
             isValid = false;
         }
 
         if (!cbTerms.isChecked()) {
-            Toast.makeText(this, "Please accept the terms and conditions", Toast.LENGTH_SHORT).show();
+            showError("Please accept Terms and Conditions");
             isValid = false;
         }
 
@@ -260,6 +234,14 @@ public class RegisterActivity extends AppCompatActivity {
 
     private void navigateToLogin() {
         Intent intent = new Intent(this, LoginActivity.class);
+        startActivity(intent);
+        finish();
+    }
+
+    private void navigateToOtpVerification(String email) {
+        Intent intent = new Intent(this, OtpVerificationActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("fromRegister", true);
         startActivity(intent);
         finish();
     }

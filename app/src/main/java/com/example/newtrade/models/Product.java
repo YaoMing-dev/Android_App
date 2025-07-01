@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/newtrade/models/Product.java
+// ✅ FIXED: app/src/main/java/com/example/newtrade/models/Product.java
 package com.example.newtrade.models;
 
 import com.google.gson.annotations.SerializedName;
@@ -33,7 +33,11 @@ public class Product {
     @SerializedName("updatedAt")
     private Date updatedAt;
 
-    // Enums matching backend
+    // GPS Location fields
+    private Double latitude;
+    private Double longitude;
+
+    // Enums matching backend exactly
     public enum ProductCondition {
         NEW("New"),
         LIKE_NEW("Like New"),
@@ -52,6 +56,7 @@ public class Product {
         }
 
         public static ProductCondition fromString(String text) {
+            if (text == null) return null;
             for (ProductCondition condition : ProductCondition.values()) {
                 if (condition.name().equalsIgnoreCase(text)) {
                     return condition;
@@ -61,11 +66,13 @@ public class Product {
         }
     }
 
+    // ✅ FIXED: Match backend exactly - RESERVED and ARCHIVED added
     public enum ProductStatus {
         AVAILABLE("Available"),
         SOLD("Sold"),
-        PAUSED("Paused"),
-        DELETED("Deleted");
+        RESERVED("Reserved"),      // ✅ Added
+        DELETED("Deleted"),
+        ARCHIVED("Archived");      // ✅ Added
 
         private final String displayName;
 
@@ -78,6 +85,7 @@ public class Product {
         }
 
         public static ProductStatus fromString(String text) {
+            if (text == null) return null;
             for (ProductStatus status : ProductStatus.values()) {
                 if (status.name().equalsIgnoreCase(text)) {
                     return status;
@@ -117,34 +125,45 @@ public class Product {
         return status != null ? status.getDisplayName() : "Unknown";
     }
 
+    // Status helper methods
     public boolean isAvailable() {
-        return ProductStatus.AVAILABLE.equals(status);
+        return status == ProductStatus.AVAILABLE;
     }
 
     public boolean isSold() {
-        return ProductStatus.SOLD.equals(status);
+        return status == ProductStatus.SOLD;
     }
 
-    public String getSellerName() {
-        return seller != null ? seller.getDisplayOrFullName() : "Unknown Seller";
+    public boolean isReserved() {
+        return status == ProductStatus.RESERVED;
     }
-
-    public String getCategoryName() {
-        return category != null ? category.getName() : "Uncategorized";
+    public String getFormattedPrice() {
+        if (price == null) return "Price not set";
+        return String.format("$%.2f", price);
     }
-
-    public String getViewCountText() {
-        if (viewCount == null || viewCount == 0) {
-            return "No views";
-        } else if (viewCount == 1) {
-            return "1 view";
-        } else {
-            return viewCount + " views";
+    public String getFirstImageUrl() {
+        if (imageUrls != null && !imageUrls.isEmpty()) {
+            return imageUrls.get(0);
         }
+        if (images != null && !images.isEmpty()) {
+            return images.get(0);
+        }
+        return null;
     }
 
-    public String getSellerContactInfo() {
-        return seller != null ? seller.getContactInfo() : null;
+    // Alternative name (some adapters might use this)
+
+
+    public boolean isArchived() {
+        return status == ProductStatus.ARCHIVED;
+    }
+
+    public boolean isDeleted() {
+        return status == ProductStatus.DELETED;
+    }
+
+    public boolean isActive() {
+        return status == ProductStatus.AVAILABLE || status == ProductStatus.RESERVED;
     }
 
     // Getters and Setters
@@ -189,4 +208,10 @@ public class Product {
 
     public Date getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
 }

@@ -14,7 +14,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
-import com.example.newtrade.ui.home.HomeFragment;
+import com.example.newtrade.models.HomeSection; // ✅ SỬA: Import từ models package
 
 import java.util.List;
 
@@ -25,7 +25,8 @@ public class ProductSectionAdapter extends RecyclerView.Adapter<ProductSectionAd
 
     public interface OnProductClickListener {
         void onProductClick(Product product);
-        void onSeeAllClick(HomeFragment.HomeSection.SectionType type);
+        // ✅ SỬA: Thay HomeFragment.HomeSection.SectionType thành HomeSection.SectionType
+        void onSeeAllClick(HomeSection.SectionType type);
     }
 
     public ProductSectionAdapter(List<Product> products, OnProductClickListener listener) {

@@ -21,19 +21,19 @@ public class ChatMessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
 
     private static final int VIEW_TYPE_MESSAGE_SENT = 1;
     private static final int VIEW_TYPE_MESSAGE_RECEIVED = 2;
-    private static final int VIEW_TYPE_MESSAGE_SYSTEM = 3;
 
-    private List<ChatActivity.ChatMessage> messages;
+    // ✅ SỬA: Thay ChatActivity.ChatMessage thành ChatActivity.MessageItem
+    private List<ChatActivity.MessageItem> messages;
     private Long currentUserId;
     private OnMessageActionListener listener;
 
     public interface OnMessageActionListener {
-        void onMessageClick(ChatActivity.ChatMessage message);
-        void onMessageLongClick(ChatActivity.ChatMessage message);
-        void onAttachmentClick(ChatActivity.ChatMessage message);
+        void onMessageClick(ChatActivity.MessageItem message);
+        void onMessageLongClick(ChatActivity.MessageItem message);
     }
 
-    public ChatMessagesAdapter(List<ChatActivity.ChatMessage> messages, Long currentUserId, OnMessageActionListener listener) {
+    // ✅ SỬA: Constructor
+    public ChatMessagesAdapter(List<ChatActivity.MessageItem> messages, Long currentUserId, OnMessageActionListener listener) {
         this.messages = messages;
         this.currentUserId = currentUserId;
         this.listener = listener;
@@ -41,129 +41,65 @@ public class ChatMessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
 
     @Override
     public int getItemViewType(int position) {
-        ChatActivity.ChatMessage message = messages.get(position);
-
-        if (message.type == ChatActivity.ChatMessage.MessageType.SYSTEM) {
-            return VIEW_TYPE_MESSAGE_SYSTEM;
-        } else if (message.isSentByCurrentUser(currentUserId)) {
-            return VIEW_TYPE_MESSAGE_SENT;
-        } else {
-            return VIEW_TYPE_MESSAGE_RECEIVED;
-        }
+        ChatActivity.MessageItem message = messages.get(position);
+        // ✅ SỬA: Sử dụng MessageItem thay vì ChatMessage
+        return message.isFromMe ? VIEW_TYPE_MESSAGE_SENT : VIEW_TYPE_MESSAGE_RECEIVED;
     }
 
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view;
-        switch (viewType) {
-            case VIEW_TYPE_MESSAGE_SENT:
-                view = LayoutInflater.from(parent.getContext())
-                        .inflate(R.layout.item_message_sent, parent, false);
-                return new SentMessageViewHolder(view);
-            case VIEW_TYPE_MESSAGE_RECEIVED:
-                view = LayoutInflater.from(parent.getContext())
-                        .inflate(R.layout.item_message_received, parent, false);
-                return new ReceivedMessageViewHolder(view);
-            case VIEW_TYPE_MESSAGE_SYSTEM:
-                view = LayoutInflater.from(parent.getContext())
-                        .inflate(R.layout.item_message_system, parent, false);
-                return new SystemMessageViewHolder(view);
-            default:
-                throw new IllegalArgumentException("Unknown view type: " + viewType);
+        if (viewType == VIEW_TYPE_MESSAGE_SENT) {
+            view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_message_sent, parent, false);
+            return new SentMessageViewHolder(view);
+        } else {
+            view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_message_received, parent, false);
+            return new ReceivedMessageViewHolder(view);
         }
     }
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-        ChatActivity.ChatMessage message = messages.get(position);
+        ChatActivity.MessageItem message = messages.get(position);
 
-        switch (holder.getItemViewType()) {
-            case VIEW_TYPE_MESSAGE_SENT:
-                bindSentMessage((SentMessageViewHolder) holder, message);
-                break;
-            case VIEW_TYPE_MESSAGE_RECEIVED:
-                bindReceivedMessage((ReceivedMessageViewHolder) holder, message);
-                break;
-            case VIEW_TYPE_MESSAGE_SYSTEM:
-                bindSystemMessage((SystemMessageViewHolder) holder, message);
-                break;
-        }
-    }
-
-    private void bindSentMessage(SentMessageViewHolder holder, ChatActivity.ChatMessage message) {
-        holder.tvMessage.setText(message.content);
-
-        if (message.timestamp != null) {
-            holder.tvTime.setText(DateTimeUtils.formatMessageTime(message.timestamp));
-        }
-
-        // Read status
-        if (message.isRead) {
-            holder.ivReadStatus.setImageResource(R.drawable.ic_message_read);
+        if (holder.getItemViewType() == VIEW_TYPE_MESSAGE_SENT) {
+            bindSentMessage((SentMessageViewHolder) holder, message);
         } else {
-            holder.ivReadStatus.setImageResource(R.drawable.ic_message_sent);
+            bindReceivedMessage((ReceivedMessageViewHolder) holder, message);
         }
-
-        // Click listeners
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onMessageClick(message);
-            }
-        });
-
-        holder.itemView.setOnLongClickListener(v -> {
-            if (listener != null) {
-                listener.onMessageLongClick(message);
-            }
-            return true;
-        });
     }
 
-    private void bindReceivedMessage(ReceivedMessageViewHolder holder, ChatActivity.ChatMessage message) {
+    private void bindSentMessage(SentMessageViewHolder holder, ChatActivity.MessageItem message) {
         holder.tvMessage.setText(message.content);
-
         if (message.timestamp != null) {
             holder.tvTime.setText(DateTimeUtils.formatMessageTime(message.timestamp));
         }
+        // Set read status icon
+        holder.ivReadStatus.setImageResource(message.isRead ?
+                R.drawable.ic_message_read : R.drawable.ic_message_sent);
+    }
 
-        // Sender info
+    private void bindReceivedMessage(ReceivedMessageViewHolder holder, ChatActivity.MessageItem message) {
+        holder.tvMessage.setText(message.content);
+        if (message.timestamp != null) {
+            holder.tvTime.setText(DateTimeUtils.formatMessageTime(message.timestamp));
+        }
         if (message.senderName != null) {
             holder.tvSenderName.setText(message.senderName);
         }
 
-        // Avatar
+        // Load sender avatar
         if (message.senderAvatar != null && !message.senderAvatar.isEmpty()) {
             Glide.with(holder.itemView.getContext())
                     .load(message.senderAvatar)
-                    .placeholder(R.drawable.ic_person_placeholder)
-                    .error(R.drawable.ic_person_placeholder)
                     .circleCrop()
+                    .placeholder(R.drawable.ic_person_placeholder)
                     .into(holder.ivAvatar);
         } else {
             holder.ivAvatar.setImageResource(R.drawable.ic_person_placeholder);
-        }
-
-        // Click listeners
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onMessageClick(message);
-            }
-        });
-
-        holder.itemView.setOnLongClickListener(v -> {
-            if (listener != null) {
-                listener.onMessageLongClick(message);
-            }
-            return true;
-        });
-    }
-
-    private void bindSystemMessage(SystemMessageViewHolder holder, ChatActivity.ChatMessage message) {
-        holder.tvMessage.setText(message.content);
-
-        if (message.timestamp != null) {
-            holder.tvTime.setText(DateTimeUtils.formatMessageTime(message.timestamp));
         }
     }
 
@@ -195,16 +131,6 @@ public class ChatMessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             tvTime = itemView.findViewById(R.id.tv_time);
             tvSenderName = itemView.findViewById(R.id.tv_sender_name);
             ivAvatar = itemView.findViewById(R.id.iv_avatar);
-        }
-    }
-
-    static class SystemMessageViewHolder extends RecyclerView.ViewHolder {
-        TextView tvMessage, tvTime;
-
-        SystemMessageViewHolder(@NonNull View itemView) {
-            super(itemView);
-            tvMessage = itemView.findViewById(R.id.tv_message);
-            tvTime = itemView.findViewById(R.id.tv_time);
         }
     }
 }

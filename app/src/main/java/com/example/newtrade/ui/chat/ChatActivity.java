@@ -277,7 +277,7 @@ public class ChatActivity extends AppCompatActivity {
         }
 
         Call<StandardResponse<Map<String, Object>>> call = ApiClient.getChatService()
-                .getMessages(conversationId, currentPage, Constants.CHAT_PAGE_SIZE, prefsManager.getUserId());
+                .getMessages(conversationId, currentPage, Constants.CHAT_PAGE_SIZE, null, prefsManager.getUserId());
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
