@@ -27,13 +27,33 @@
 
     </LinearLayout>
 
-    <!-- Content -->
+    <!-- Loading View -->
+    <include
+        android:id="@+id/view_loading"
+        layout="@layout/layout_loading"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone" />
+
+    <!-- Error View -->
+    <include
+        android:id="@+id/view_error"
+        layout="@layout/layout_error"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone" />
+
+    <!-- Content View -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
-        <RelativeLayout
+        <FrameLayout
+            android:id="@+id/view_content"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
@@ -45,55 +65,29 @@
                 android:background="@color/white"
                 tools:listitem="@layout/item_conversation" />
 
+            <!-- Progress Bar -->
+            <ProgressBar
+                android:id="@+id/progress_bar"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
             <!-- Empty State -->
-            <LinearLayout
-                android:id="@+id/ll_empty_state"
+            <TextView
+                android:id="@+id/tv_empty"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="vertical"
+                android:text="No messages yet\n\nStart chatting with sellers!"
+                android:textSize="16sp"
+                android:textColor="@color/text_secondary"
+                android:textAlignment="center"
                 android:gravity="center"
-                android:padding="32dp"
-                android:visibility="gone">
+                android:drawableTop="@drawable/ic_message"
+                android:drawablePadding="24dp"
+                android:visibility="gone" />
 
-                <ImageView
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:src="@drawable/ic_message"
-                    app:tint="@color/text_secondary"
-                    android:layout_marginBottom="24dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="No messages yet"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_primary"
-                    android:gravity="center"
-                    android:layout_marginBottom="8dp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Start shopping to connect with sellers"
-                    android:textSize="16sp"
-                    android:textColor="@color/text_secondary"
-                    android:gravity="center"
-                    android:layout_marginBottom="24dp" />
-
-                <!-- Start Shopping Button -->
-                <Button
-                    android:id="@+id/btn_start_shopping"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="🛍️ Start Shopping"
-                    android:textSize="16sp"
-                    android:paddingHorizontal="24dp" />
-
-            </LinearLayout>
-
-        </RelativeLayout>
+        </FrameLayout>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 

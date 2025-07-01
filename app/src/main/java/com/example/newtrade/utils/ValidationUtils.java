@@ -56,8 +56,14 @@ public class ValidationUtils {
                 description.trim().length() <= Constants.MAX_PRODUCT_DESCRIPTION_LENGTH;
     }
 
-    public static boolean isValidOtp(String otp) {
+    // ✅ FIX: Add missing isValidOTP method
+    public static boolean isValidOTP(String otp) {
         return otp != null && otp.trim().length() == Constants.OTP_LENGTH &&
                 otp.trim().matches("^[0-9]+$");
+    }
+
+    // ✅ FIX: Add isValidOtp method (lowercase variant)
+    public static boolean isValidOtp(String otp) {
+        return isValidOTP(otp);
     }
 }
