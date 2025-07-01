@@ -63,13 +63,13 @@ public class ConversationsAdapter extends RecyclerView.Adapter<ConversationsAdap
         public ConversationViewHolder(@NonNull View itemView) {
             super(itemView);
             cardConversation = itemView.findViewById(R.id.card_conversation);
-            ivOtherUserAvatar = itemView.findViewById(R.id.iv_other_user_avatar);
+            ivOtherUserAvatar = itemView.findViewById(R.id.iv_avatar); // Fixed ID
             ivProductImage = itemView.findViewById(R.id.iv_product_image);
-            tvOtherUserName = itemView.findViewById(R.id.tv_other_user_name);
+            tvOtherUserName = itemView.findViewById(R.id.tv_user_name); // Fixed ID
             tvLastMessage = itemView.findViewById(R.id.tv_last_message);
-            tvTimeAgo = itemView.findViewById(R.id.tv_time_ago);
+            tvTimeAgo = itemView.findViewById(R.id.tv_time); // Fixed ID
             tvProductTitle = itemView.findViewById(R.id.tv_product_title);
-            badgeUnread = itemView.findViewById(R.id.badge_unread);
+            badgeUnread = itemView.findViewById(R.id.v_unread_indicator); // Fixed ID
             tvUnreadCount = itemView.findViewById(R.id.tv_unread_count);
         }
 

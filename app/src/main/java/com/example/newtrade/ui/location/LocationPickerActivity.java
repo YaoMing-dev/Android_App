@@ -130,6 +130,16 @@ public class LocationPickerActivity extends AppCompatActivity implements
         fabMyLocation.setOnClickListener(v -> getCurrentLocation());
     }
 
+    private void requestLocation() {
+        if (!locationManager.hasLocationPermission()) {
+            locationManager.requestLocationPermission();
+            return;
+        }
+
+        // Show loading indicator if needed
+        locationManager.getCurrentLocation();
+    }
+
     @Override
     public void onMapReady(@NonNull GoogleMap map) {
         googleMap = map;

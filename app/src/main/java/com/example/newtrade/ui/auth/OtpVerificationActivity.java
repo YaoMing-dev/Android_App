@@ -119,11 +119,6 @@ public class OtpVerificationActivity extends AppCompatActivity {
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 tilOTP.setError(null);
                 updateVerifyButtonState();
-
-                // Auto-verify when OTP is complete
-                if (s.length() == Constants.OTP_LENGTH) {
-                    verifyOTP();
-                }
             }
 
             @Override
@@ -134,22 +129,19 @@ public class OtpVerificationActivity extends AppCompatActivity {
         tvResendOTP.setOnClickListener(v -> resendOTP());
     }
 
-    private void updateUI() {
-        if (fromRegistration) {
-            tvTitle.setText("Verify Your Email");
-            tvSubtitle.setText("We've sent a 6-digit code to\n" + email + "\n\nEnter the code to activate your account");
-        } else if (fromLogin) {
-            tvTitle.setText("Account Verification Required");
-            tvSubtitle.setText("Please verify your email address\n" + email + "\n\nEnter the 6-digit code sent to your email");
-        } else if (fromForgotPassword) {
-            tvTitle.setText("Reset Password");
-            tvSubtitle.setText("Enter the 6-digit code sent to\n" + email + "\n\nThis will allow you to reset your password");
-        }
+    /**
+     * Validates if the OTP is in the correct format
+     * @param otp the OTP string to validate
+     * @return true if the OTP is valid, false otherwise
+     */
+    private boolean isValidOTP(String otp) {
+        // Check if OTP is 6 digits
+        return otp != null && otp.matches("^[0-9]{6}$");
     }
 
     private void updateVerifyButtonState() {
         String otp = etOTP.getText().toString().trim();
-        btnVerify.setEnabled(ValidationUtils.isValidOTP(otp) && !isLoading);
+        btnVerify.setEnabled(isValidOTP(otp) && !isLoading);
     }
 
     private void startCountdown() {

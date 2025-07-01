@@ -66,14 +66,14 @@ public class AddProductActivity extends AppCompatActivity implements LocationMan
     private static final String TAG = "AddProductActivity";
 
     // UI Components
-    private Toolbar toolbar;
-    private TextInputLayout tilTitle, tilDescription, tilPrice, tilLocation;
-    private EditText etTitle, etDescription, etPrice, etLocation;
-    private AutoCompleteTextView actvCategory, actvCondition;
-    private RecyclerView rvImages;
-    private Button btnAddImage, btnGetLocation, btnPreview, btnPublish;
-    private ImageView ivLocationIcon;
-    private ProgressBar progressBar;
+    protected Toolbar toolbar;
+    protected TextInputLayout tilTitle, tilDescription, tilPrice, tilLocation;
+    protected EditText etTitle, etDescription, etPrice, etLocation;
+    protected AutoCompleteTextView actvCategory, actvCondition;
+    protected RecyclerView rvImages;
+    protected Button btnAddImage, btnGetLocation, btnPreview, btnPublish;
+    protected ImageView ivLocationIcon;
+    protected ProgressBar progressBar;
 
     // Data
     private List<Category> categories = new ArrayList<>();

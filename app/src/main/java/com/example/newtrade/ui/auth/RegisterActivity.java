@@ -145,7 +145,7 @@ public class RegisterActivity extends AppCompatActivity {
 
         setLoading(true);
 
-        Map<String, String> request = new HashMap<>();
+        Map<String, Object> request = new HashMap<>();
         request.put("fullName", fullName);
         request.put("displayName", displayName);
         request.put("email", email);

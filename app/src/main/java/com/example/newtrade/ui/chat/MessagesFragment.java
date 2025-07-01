@@ -66,6 +66,7 @@ public class MessagesFragment extends Fragment {
         public Date lastMessageTime;
         public int unreadCount;
         public boolean isActive;
+        public boolean isLastMessageFromMe;
 
         public ConversationItem() {}
     }
@@ -275,6 +276,14 @@ public class MessagesFragment extends Fragment {
                 conversation.isActive = (Boolean) isActive;
             } else {
                 conversation.isActive = true; // Default to active
+            }
+
+            // Parse last message from me status
+            Object isLastMessageFromMe = conversationMap.get("isLastMessageFromMe");
+            if (isLastMessageFromMe instanceof Boolean) {
+                conversation.isLastMessageFromMe = (Boolean) isLastMessageFromMe;
+            } else {
+                conversation.isLastMessageFromMe = false; // Default to false
             }
 
             return conversation;

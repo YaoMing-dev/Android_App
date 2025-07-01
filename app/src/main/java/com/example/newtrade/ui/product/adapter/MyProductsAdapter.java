@@ -14,9 +14,11 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
+import com.example.newtrade.utils.DateTimeUtils;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 
+import java.util.Date;
 import java.util.List;
 
 public class MyProductsAdapter extends RecyclerView.Adapter<MyProductsAdapter.ProductViewHolder> {
@@ -194,16 +196,10 @@ public class MyProductsAdapter extends RecyclerView.Adapter<MyProductsAdapter.Pr
         }
     }
 
-    private String formatDate(String dateString) {
-        // TODO: Implement proper date formatting
-        try {
-            if (dateString.length() >= 10) {
-                return dateString.substring(0, 10);
-            }
-        } catch (Exception e) {
-            // Ignore
-        }
-        return dateString;
+    // Format date for display
+    private String formatDate(Date date) {
+        if (date == null) return "";
+        return DateTimeUtils.formatProductDate(date);
     }
 
     static class ProductViewHolder extends RecyclerView.ViewHolder {

@@ -18,7 +18,6 @@ public class Constants {
     public static final String PREF_IS_EMAIL_VERIFIED = "is_email_verified";
     public static final String PREF_LAST_LOCATION_LAT = "last_location_lat";
     public static final String PREF_LAST_LOCATION_LNG = "last_location_lng";
-    public static final String BUNDLE_LOCATION_NAME = "location_name";
     public static final String PREF_LOCATION_NAME = "location_name";
 
     // ===== REQUEST CODES =====
@@ -44,7 +43,9 @@ public class Constants {
     public static final String BUNDLE_CONVERSATION_ID = "conversation_id";
     public static final String BUNDLE_CATEGORY_ID = "category_id";
     public static final String BUNDLE_CATEGORY_NAME = "category_name";
-
+    public static final String BUNDLE_LOCATION_LAT = "location_lat";
+    public static final String BUNDLE_LOCATION_LNG = "location_lng";
+    public static final String BUNDLE_LOCATION_NAME = "location_name";
 
     // ===== PAGINATION =====
     public static final int DEFAULT_PAGE_SIZE = 20;

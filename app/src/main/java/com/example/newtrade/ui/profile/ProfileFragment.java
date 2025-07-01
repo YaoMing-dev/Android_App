@@ -332,7 +332,7 @@ public class ProfileFragment extends Fragment {
                 }
 
                 @Override
-                public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                public void onFailure(@NonNull Call<StandardResponse<Void>> call, @NonNull Throwable t) {
                     // Even if API call fails, clear local data
                     completeLogout();
                 }

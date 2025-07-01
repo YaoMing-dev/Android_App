@@ -77,9 +77,8 @@ public class ChatMessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         if (message.timestamp != null) {
             holder.tvTime.setText(DateTimeUtils.formatMessageTime(message.timestamp));
         }
-        // Set read status icon
-        holder.ivReadStatus.setImageResource(message.isRead ?
-                R.drawable.ic_message_read : R.drawable.ic_message_sent);
+        // Set read status text
+        holder.tvStatus.setText(message.isRead ? "✓✓" : "✓");
     }
 
     private void bindReceivedMessage(ReceivedMessageViewHolder holder, ChatActivity.MessageItem message) {
@@ -110,14 +109,13 @@ public class ChatMessagesAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
 
     // ViewHolder classes
     static class SentMessageViewHolder extends RecyclerView.ViewHolder {
-        TextView tvMessage, tvTime;
-        ImageView ivReadStatus;
+        TextView tvMessage, tvTime, tvStatus;
 
         SentMessageViewHolder(@NonNull View itemView) {
             super(itemView);
             tvMessage = itemView.findViewById(R.id.tv_message);
             tvTime = itemView.findViewById(R.id.tv_time);
-            ivReadStatus = itemView.findViewById(R.id.iv_read_status);
+            tvStatus = itemView.findViewById(R.id.tv_status);
         }
     }
 
