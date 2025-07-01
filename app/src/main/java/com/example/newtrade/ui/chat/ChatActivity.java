@@ -1,6 +1,7 @@
 // app/src/main/java/com/example/newtrade/ui/chat/ChatActivity.java
 package com.example.newtrade.ui.chat;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -9,6 +10,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,12 +24,16 @@ import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.ui.chat.adapter.ChatMessagesAdapter;
+import com.example.newtrade.ui.product.ProductDetailActivity;
+import com.example.newtrade.ui.profile.UserProfileActivity;
 import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.NetworkUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,53 +42,47 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class ChatActivity extends AppCompatActivity implements ChatMessagesAdapter.OnMessageActionListener {
+public class ChatActivity extends AppCompatActivity {
     private static final String TAG = "ChatActivity";
 
     // UI Components
     private Toolbar toolbar;
-    private TextView tvSellerName, tvProductTitle, tvOnlineStatus;
-    private ImageView ivSellerAvatar;
+    private TextView tvOtherUserName;
+    private ImageView ivOtherUserAvatar;
+    private MaterialCardView cardProduct;
+    private TextView tvProductTitle, tvProductPrice;
+    private ImageView ivProductImage;
     private RecyclerView rvMessages;
     private EditText etMessage;
     private MaterialButton btnSend;
-    private View layoutTypingIndicator;
+    private ProgressBar progressBar;
+    private View loadingView, contentView;
 
     // Data
-    private ChatMessagesAdapter adapter;
-    private List<ChatMessage> messages = new ArrayList<>();
-    private Long conversationId;
+    private Long conversationId = -1L;
+    private Long otherUserId;
+    private String otherUserName;
     private Long productId;
-    private String sellerName;
     private String productTitle;
-
-    // Utils
+    private List<MessageItem> messages = new ArrayList<>();
     private SharedPrefsManager prefsManager;
 
-    // State
-    private boolean isLoading = false;
+    // Pagination
     private int currentPage = 0;
+    private boolean isLoading = false;
     private boolean isLastPage = false;
 
-    public static class ChatMessage {
+    // Message data class
+    public static class MessageItem {
         public Long id;
         public String content;
-        public String timestamp;
-        public Long senderId;
+        public Date timestamp;
+        public boolean isFromMe;
         public String senderName;
         public String senderAvatar;
         public boolean isRead;
-        public MessageType type = MessageType.TEXT;
-        public String attachmentUrl;
 
-        public enum MessageType {
-            TEXT, IMAGE, OFFER, SYSTEM
-        }
-
-        // Helper method
-        public boolean isSentByCurrentUser(Long currentUserId) {
-            return currentUserId != null && currentUserId.equals(senderId);
-        }
+        public MessageItem() {}
     }
 
     @Override
@@ -90,40 +90,53 @@ public class ChatActivity extends AppCompatActivity implements ChatMessagesAdapt
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        prefsManager = new SharedPrefsManager(this);
-
-        // Get data from intent
-        conversationId = getIntent().getLongExtra(Constants.BUNDLE_CONVERSATION_ID, -1);
-        productId = getIntent().getLongExtra(Constants.BUNDLE_PRODUCT_ID, -1);
-        sellerName = getIntent().getStringExtra("sellerName");
-        productTitle = getIntent().getStringExtra("productTitle");
-
+        getIntentData();
         initViews();
+        initUtils();
         setupToolbar();
-        setupRecyclerView();
         setupListeners();
+        setupRecyclerView();
 
         if (conversationId != -1) {
             loadMessages();
-        } else if (productId != -1) {
-            // Create new conversation for product
-            createConversationForProduct();
         } else {
-            Toast.makeText(this, "Invalid conversation", Toast.LENGTH_SHORT).show();
+            createConversation();
+        }
+
+        setupProductCard();
+    }
+
+    private void getIntentData() {
+        conversationId = getIntent().getLongExtra(Constants.BUNDLE_CONVERSATION_ID, -1);
+        otherUserId = getIntent().getLongExtra(Constants.BUNDLE_USER_ID, -1);
+        otherUserName = getIntent().getStringExtra("otherUserName");
+        productId = getIntent().getLongExtra(Constants.BUNDLE_PRODUCT_ID, -1);
+        productTitle = getIntent().getStringExtra("productTitle");
+
+        if (otherUserId == -1 || otherUserName == null) {
+            Toast.makeText(this, "Invalid chat data", Toast.LENGTH_SHORT).show();
             finish();
         }
     }
 
     private void initViews() {
         toolbar = findViewById(R.id.toolbar);
-        tvSellerName = findViewById(R.id.tv_seller_name);
+        tvOtherUserName = findViewById(R.id.tv_other_user_name);
+        ivOtherUserAvatar = findViewById(R.id.iv_other_user_avatar);
+        cardProduct = findViewById(R.id.card_product);
         tvProductTitle = findViewById(R.id.tv_product_title);
-        tvOnlineStatus = findViewById(R.id.tv_online_status);
-        ivSellerAvatar = findViewById(R.id.iv_seller_avatar);
+        tvProductPrice = findViewById(R.id.tv_product_price);
+        ivProductImage = findViewById(R.id.iv_product_image);
         rvMessages = findViewById(R.id.rv_messages);
         etMessage = findViewById(R.id.et_message);
         btnSend = findViewById(R.id.btn_send);
-        layoutTypingIndicator = findViewById(R.id.layout_typing_indicator);
+        progressBar = findViewById(R.id.progress_bar);
+        loadingView = findViewById(R.id.view_loading);
+        contentView = findViewById(R.id.view_content);
+    }
+
+    private void initUtils() {
+        prefsManager = new SharedPrefsManager(this);
     }
 
     private void setupToolbar() {
@@ -133,42 +146,53 @@ public class ChatActivity extends AppCompatActivity implements ChatMessagesAdapt
             getSupportActionBar().setTitle("");
         }
 
-        // Set chat info
-        if (sellerName != null) {
-            tvSellerName.setText(sellerName);
-        }
-        if (productTitle != null) {
-            tvProductTitle.setText(productTitle);
-            tvProductTitle.setVisibility(View.VISIBLE);
-        } else {
-            tvProductTitle.setVisibility(View.GONE);
-        }
+        tvOtherUserName.setText(otherUserName);
+
+        // Make toolbar clickable to view profile
+        toolbar.setOnClickListener(v -> viewOtherUserProfile());
+    }
+
+    private void setupListeners() {
+        etMessage.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateSendButtonState();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        btnSend.setOnClickListener(v -> sendMessage());
+
+        // Product card click
+        cardProduct.setOnClickListener(v -> viewProduct());
     }
 
     private void setupRecyclerView() {
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setStackFromEnd(true);
+        layoutManager.setReverseLayout(true); // Show latest messages at bottom
         rvMessages.setLayoutManager(layoutManager);
 
-        adapter = new ChatMessagesAdapter(messages, prefsManager.getUserId(), this);
-        rvMessages.setAdapter(adapter);
+        // TODO: Create MessagesAdapter
+        // MessagesAdapter adapter = new MessagesAdapter(messages, prefsManager.getUserId());
+        // rvMessages.setAdapter(adapter);
 
-        // Scroll to bottom when new message is added
-        adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
-            @Override
-            public void onItemRangeInserted(int positionStart, int itemCount) {
-                super.onItemRangeInserted(positionStart, itemCount);
-                rvMessages.scrollToPosition(adapter.getItemCount() - 1);
-            }
-        });
-
-        // Load more messages when scrolling up
+        // Pagination scroll listener
         rvMessages.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-                if (dy < 0 && !isLoading && !isLastPage) {
-                    LinearLayoutManager lm = (LinearLayoutManager) recyclerView.getLayoutManager();
-                    if (lm != null && lm.findFirstVisibleItemPosition() == 0) {
+                super.onScrolled(recyclerView, dx, dy);
+
+                if (!isLoading && !isLastPage && dy < 0) { // Scrolling up to load older messages
+                    int visibleItemCount = layoutManager.getChildCount();
+                    int totalItemCount = layoutManager.getItemCount();
+                    int pastVisibleItems = layoutManager.findFirstVisibleItemPosition();
+
+                    if (pastVisibleItems <= 2) { // Load when near top
                         loadMoreMessages();
                     }
                 }
@@ -176,180 +200,207 @@ public class ChatActivity extends AppCompatActivity implements ChatMessagesAdapt
         });
     }
 
-    private void setupListeners() {
-        // Send button
-        btnSend.setOnClickListener(v -> sendMessage());
-
-        // Text input
-        etMessage.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                boolean hasText = s.toString().trim().length() > 0;
-                btnSend.setEnabled(hasText);
-
-                // TODO: Send typing indicator
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {}
-        });
-
-        // Enter key to send
-        etMessage.setOnEditorActionListener((v, actionId, event) -> {
-            sendMessage();
-            return true;
-        });
+    private void setupProductCard() {
+        if (productId != -1 && productTitle != null) {
+            cardProduct.setVisibility(View.VISIBLE);
+            tvProductTitle.setText(productTitle);
+            // TODO: Load product details if needed
+        } else {
+            cardProduct.setVisibility(View.GONE);
+        }
     }
 
-    private void createConversationForProduct() {
-        if (productId == -1) return;
+    // FR-4.1.1: Secure chat between users
+    private void createConversation() {
+        if (productId == -1) {
+            Toast.makeText(this, "Cannot start conversation without product", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
 
-        Map<String, Object> messageData = new HashMap<>();
-        messageData.put("content", "Hi, I'm interested in your product.");
+        showLoadingState();
+
+        Map<String, Object> conversationData = new HashMap<>();
+        conversationData.put("productId", productId);
+        conversationData.put("message", "Hi! I'm interested in your product.");
 
         Call<StandardResponse<Map<String, Object>>> call = ApiClient.getChatService()
-                .createConversationForProduct(productId, messageData, prefsManager.getUserId());
+                .startConversationForProduct(productId, conversationData, prefsManager.getUserId());
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
                                    @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Map<String, Object> data = response.body().getData();
-                    Object convIdObj = data.get("conversationId");
-                    if (convIdObj instanceof Number) {
-                        conversationId = ((Number) convIdObj).longValue();
-                        loadMessages();
-                    }
-                } else {
-                    Toast.makeText(ChatActivity.this, "Failed to start conversation", Toast.LENGTH_SHORT).show();
-                    finish();
-                }
+                handleCreateConversationResponse(response);
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 Log.e(TAG, "Failed to create conversation", t);
-                Toast.makeText(ChatActivity.this, "Failed to start conversation", Toast.LENGTH_SHORT).show();
+                showError("Failed to start conversation");
                 finish();
             }
         });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void handleCreateConversationResponse(Response<StandardResponse<Map<String, Object>>> response) {
+        try {
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                Map<String, Object> data = response.body().getData();
+                Object convIdObj = data.get("conversationId");
+                if (convIdObj instanceof Number) {
+                    conversationId = ((Number) convIdObj).longValue();
+                    loadMessages();
+                } else {
+                    showError("Invalid conversation data");
+                    finish();
+                }
+            } else {
+                String message = response.body() != null ? response.body().getMessage() : "Failed to start conversation";
+                showError(message);
+                finish();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing create conversation response", e);
+            showError("Failed to start conversation");
+            finish();
+        }
     }
 
     private void loadMessages() {
         if (isLoading || conversationId == -1) return;
 
         isLoading = true;
+        if (currentPage == 0) {
+            showLoadingState();
+        }
 
         Call<StandardResponse<Map<String, Object>>> call = ApiClient.getChatService()
-                .getMessages(conversationId, currentPage, Constants.CHAT_PAGE_SIZE, null, prefsManager.getUserId());
+                .getMessages(conversationId, currentPage, Constants.CHAT_PAGE_SIZE, prefsManager.getUserId());
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
                                    @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                isLoading = false;
                 handleMessagesResponse(response);
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                isLoading = false;
-                Log.e(TAG, "Failed to load messages", t);
+                handleLoadingError(t);
             }
         });
     }
 
+    private void loadMoreMessages() {
+        if (isLoading || isLastPage) return;
+
+        currentPage++;
+        loadMessages();
+    }
+
     @SuppressWarnings("unchecked")
     private void handleMessagesResponse(Response<StandardResponse<Map<String, Object>>> response) {
+        isLoading = false;
+
         try {
             if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                 Map<String, Object> data = response.body().getData();
                 List<Map<String, Object>> messageMaps = (List<Map<String, Object>>) data.get("content");
 
                 if (messageMaps != null) {
-                    List<ChatMessage> newMessages = new ArrayList<>();
-                    for (Map<String, Object> messageMap : messageMaps) {
-                        ChatMessage message = parseMessageFromMap(messageMap);
-                        if (message != null) {
-                            newMessages.add(message);
-                        }
-                    }
+                    int oldSize = messages.size();
 
-                    if (currentPage == 0) {
-                        messages.clear();
-                        messages.addAll(newMessages);
-                        adapter.notifyDataSetChanged();
-                    } else {
-                        // Insert at beginning for pagination
-                        messages.addAll(0, newMessages);
-                        adapter.notifyItemRangeInserted(0, newMessages.size());
+                    for (Map<String, Object> messageMap : messageMaps) {
+                        MessageItem message = parseMessageFromMap(messageMap);
+                        if (message != null) {
+                            if (currentPage == 0) {
+                                messages.add(message); // Add to end for first page
+                            } else {
+                                messages.add(0, message); // Add to beginning for pagination
+                            }
+                        }
                     }
 
                     // Update pagination
                     Boolean isLast = (Boolean) data.get("last");
-                    isLastPage = isLast != null ? isLast : newMessages.size() < Constants.CHAT_PAGE_SIZE;
+                    isLastPage = isLast != null ? isLast : true;
+
+                    // Update UI
+                    showContentState();
+                    // TODO: Notify adapter
+                    // adapter.notifyDataSetChanged();
+
+                    // Scroll to bottom for first load
+                    if (currentPage == 0 && !messages.isEmpty()) {
+                        rvMessages.scrollToPosition(messages.size() - 1);
+                    }
                 }
+            } else {
+                showError("Failed to load messages");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing messages response", e);
+            showError("Error loading messages");
         }
     }
 
-    private ChatMessage parseMessageFromMap(Map<String, Object> messageMap) {
+    private MessageItem parseMessageFromMap(Map<String, Object> messageMap) {
         try {
-            ChatMessage message = new ChatMessage();
-            message.id = getLongFromMap(messageMap, "id");
-            message.content = (String) messageMap.get("content");
-            message.timestamp = (String) messageMap.get("timestamp");
-            message.senderId = getLongFromMap(messageMap, "senderId");
+            MessageItem message = new MessageItem();
 
-            Object isReadObj = messageMap.get("isRead");
-            message.isRead = isReadObj instanceof Boolean ? (Boolean) isReadObj : false;
+            message.id = ((Number) messageMap.get("id")).longValue();
+            message.content = (String) messageMap.get("content");
+            message.isRead = (Boolean) messageMap.getOrDefault("isRead", false);
 
             // Parse sender info
-            Object senderObj = messageMap.get("sender");
-            if (senderObj instanceof Map) {
-                Map<String, Object> senderMap = (Map<String, Object>) senderObj;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> senderMap = (Map<String, Object>) messageMap.get("sender");
+            if (senderMap != null) {
+                Long senderId = ((Number) senderMap.get("id")).longValue();
+                message.isFromMe = senderId.equals(prefsManager.getUserId());
                 message.senderName = (String) senderMap.get("displayName");
                 message.senderAvatar = (String) senderMap.get("avatarUrl");
             }
 
+            // Parse timestamp
+            String timestampStr = (String) messageMap.get("timestamp");
+            if (timestampStr != null) {
+                // TODO: Parse date from string
+                message.timestamp = new Date();
+            }
+
             return message;
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing message from map", e);
+            Log.e(TAG, "Error parsing message", e);
             return null;
         }
     }
 
-    private Long getLongFromMap(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Number) {
-            return ((Number) value).longValue();
-        }
-        return null;
-    }
-
-    private void loadMoreMessages() {
-        if (!isLoading && !isLastPage) {
-            currentPage++;
-            loadMessages();
-        }
-    }
-
+    // FR-4.1.2: Support text, emojis, and optional image sharing
     private void sendMessage() {
-        String content = etMessage.getText().toString().trim();
-        if (content.isEmpty() || conversationId == -1) return;
+        String messageText = etMessage.getText().toString().trim();
 
-        // Clear input immediately
-        etMessage.setText("");
+        if (messageText.isEmpty() || conversationId == -1) {
+            return;
+        }
 
-        // Create message data
+        if (messageText.length() > Constants.MAX_MESSAGE_LENGTH) {
+            showError("Message too long");
+            return;
+        }
+
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            showError("No internet connection");
+            return;
+        }
+
+        // Disable send button
+        btnSend.setEnabled(false);
+
         Map<String, Object> messageData = new HashMap<>();
-        messageData.put("content", content);
+        messageData.put("content", messageText);
 
         Call<StandardResponse<Map<String, Object>>> call = ApiClient.getChatService()
                 .sendMessage(conversationId, messageData, prefsManager.getUserId());
@@ -358,80 +409,110 @@ public class ChatActivity extends AppCompatActivity implements ChatMessagesAdapt
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
                                    @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    // Message sent successfully
-                    // In a real app, we'd add the message to the list immediately
-                    // and update it when we get the server response
-                    Map<String, Object> data = response.body().getData();
-                    ChatMessage newMessage = parseMessageFromMap(data);
-                    if (newMessage != null) {
-                        messages.add(newMessage);
-                        adapter.notifyItemInserted(messages.size() - 1);
-                    }
-                } else {
-                    Toast.makeText(ChatActivity.this, "Failed to send message", Toast.LENGTH_SHORT).show();
-                    // Restore message to input
-                    etMessage.setText(content);
-                }
+                handleSendMessageResponse(response, messageText);
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                btnSend.setEnabled(true);
                 Log.e(TAG, "Failed to send message", t);
-                Toast.makeText(ChatActivity.this, "Failed to send message", Toast.LENGTH_SHORT).show();
-                // Restore message to input
-                etMessage.setText(content);
+                showError("Failed to send message");
             }
         });
     }
 
-    // ChatMessagesAdapter.OnMessageActionListener implementation
-    @Override
-    public void onMessageClick(ChatMessage message) {
-        // Handle message click (e.g., show details, copy text)
+    @SuppressWarnings("unchecked")
+    private void handleSendMessageResponse(Response<StandardResponse<Map<String, Object>>> response, String messageText) {
+        btnSend.setEnabled(true);
+
+        try {
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                // Clear input
+                etMessage.setText("");
+
+                // Add message to list optimistically
+                MessageItem newMessage = new MessageItem();
+                Map<String, Object> messageData = response.body().getData();
+                if (messageData != null && messageData.get("id") != null) {
+                    newMessage.id = ((Number) messageData.get("id")).longValue();
+                } else {
+                    newMessage.id = System.currentTimeMillis(); // Temporary ID
+                }
+                newMessage.content = messageText;
+                newMessage.timestamp = new Date();
+                newMessage.isFromMe = true;
+                newMessage.isRead = false;
+
+                messages.add(newMessage);
+
+                // TODO: Notify adapter and scroll to bottom
+                // adapter.notifyItemInserted(messages.size() - 1);
+                rvMessages.scrollToPosition(messages.size() - 1);
+
+            } else {
+                String message = response.body() != null ? response.body().getMessage() : "Failed to send message";
+                showError(message);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing send message response", e);
+            showError("Failed to send message");
+        }
     }
 
-    @Override
-    public void onMessageLongClick(ChatMessage message) {
-        // Handle long click (e.g., show context menu)
+    private void updateSendButtonState() {
+        String messageText = etMessage.getText().toString().trim();
+        btnSend.setEnabled(!messageText.isEmpty() && conversationId != -1);
     }
 
-    @Override
-    public void onAttachmentClick(ChatMessage message) {
-        // Handle attachment click
+    private void viewOtherUserProfile() {
+        Intent intent = new Intent(this, UserProfileActivity.class);
+        intent.putExtra(Constants.BUNDLE_USER_ID, otherUserId);
+        startActivity(intent);
+    }
+
+    private void viewProduct() {
+        if (productId != -1) {
+            Intent intent = new Intent(this, ProductDetailActivity.class);
+            intent.putExtra(Constants.BUNDLE_PRODUCT_ID, productId);
+            startActivity(intent);
+        }
+    }
+
+    private void handleLoadingError(Throwable t) {
+        isLoading = false;
+        Log.e(TAG, "Failed to load messages", t);
+
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            showError("No internet connection");
+        } else {
+            showError(NetworkUtils.getNetworkErrorMessage(t));
+        }
+
+        if (messages.isEmpty()) {
+            finish();
+        }
+    }
+
+    private void showLoadingState() {
+        loadingView.setVisibility(View.VISIBLE);
+        contentView.setVisibility(View.GONE);
+    }
+
+    private void showContentState() {
+        loadingView.setVisibility(View.GONE);
+        contentView.setVisibility(View.VISIBLE);
+    }
+
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            finish();
+            onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Mark conversation as read
-        if (conversationId != -1) {
-            markConversationAsRead();
-        }
-    }
-
-    private void markConversationAsRead() {
-        Call<StandardResponse<Void>> call = ApiClient.getChatService()
-                .markConversationAsRead(conversationId, prefsManager.getUserId());
-        call.enqueue(new Callback<StandardResponse<Void>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Void>> call, @NonNull Response<StandardResponse<Void>> response) {
-                // Success
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Void>> call, @NonNull Throwable t) {
-                // Ignore failure
-            }
-        });
     }
 }

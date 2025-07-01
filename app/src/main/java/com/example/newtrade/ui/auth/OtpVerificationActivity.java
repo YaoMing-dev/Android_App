@@ -7,6 +7,7 @@ import android.os.CountDownTimer;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -16,12 +17,14 @@ import android.widget.ProgressBar;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
 import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.NetworkUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.ValidationUtils;
 import com.google.android.material.textfield.TextInputLayout;
@@ -38,6 +41,7 @@ public class OtpVerificationActivity extends AppCompatActivity {
     private static final long COUNTDOWN_TIME = 300000; // 5 minutes
 
     // UI Components
+    private Toolbar toolbar;
     private TextView tvTitle, tvSubtitle, tvResendOTP, tvCountdown;
     private TextInputLayout tilOTP;
     private EditText etOTP;
@@ -66,26 +70,28 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
         getIntentData();
         initViews();
+        setupToolbar();
         setupListeners();
+        updateUI();
         startCountdown();
 
         Log.d(TAG, "OtpVerificationActivity initialized for email: " + email);
     }
 
     private void getIntentData() {
-        Intent intent = getIntent();
-        email = intent.getStringExtra("email");
-        fromRegistration = intent.getBooleanExtra("fromRegistration", false);
-        fromLogin = intent.getBooleanExtra("fromLogin", false);
-        fromForgotPassword = intent.getBooleanExtra("fromForgotPassword", false);
+        email = getIntent().getStringExtra("email");
+        fromRegistration = getIntent().getBooleanExtra("fromRegistration", false);
+        fromLogin = getIntent().getBooleanExtra("fromLogin", false);
+        fromForgotPassword = getIntent().getBooleanExtra("fromForgotPassword", false);
 
         if (email == null) {
-            showError("Invalid email address");
+            Toast.makeText(this, "Invalid verification request", Toast.LENGTH_SHORT).show();
             finish();
         }
     }
 
     private void initViews() {
+        toolbar = findViewById(R.id.toolbar);
         tvTitle = findViewById(R.id.tv_title);
         tvSubtitle = findViewById(R.id.tv_subtitle);
         tvResendOTP = findViewById(R.id.tv_resend_otp);
@@ -94,26 +100,17 @@ public class OtpVerificationActivity extends AppCompatActivity {
         etOTP = findViewById(R.id.et_otp);
         btnVerify = findViewById(R.id.btn_verify);
         progressBar = findViewById(R.id.progress_bar);
+    }
 
-        // Set initial state
-        btnVerify.setEnabled(false);
-        tvResendOTP.setEnabled(false);
-
-        // Set content based on source
-        if (fromRegistration) {
-            tvTitle.setText("Verify Your Email");
-            tvSubtitle.setText("We've sent a verification code to " + email);
-        } else if (fromForgotPassword) {
-            tvTitle.setText("Reset Your Password");
-            tvSubtitle.setText("We've sent a reset code to " + email);
-        } else {
-            tvTitle.setText("Verify Your Account");
-            tvSubtitle.setText("We've sent a verification code to " + email);
+    private void setupToolbar() {
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("Verify Account");
         }
     }
 
     private void setupListeners() {
-        // OTP text watcher
         etOTP.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -121,43 +118,59 @@ public class OtpVerificationActivity extends AppCompatActivity {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 tilOTP.setError(null);
-                btnVerify.setEnabled(s.length() == Constants.OTP_LENGTH && !isLoading);
+                updateVerifyButtonState();
+
+                // Auto-verify when OTP is complete
+                if (s.length() == Constants.OTP_LENGTH) {
+                    verifyOTP();
+                }
             }
 
             @Override
             public void afterTextChanged(Editable s) {}
         });
 
-        // Verify button
         btnVerify.setOnClickListener(v -> verifyOTP());
+        tvResendOTP.setOnClickListener(v -> resendOTP());
+    }
 
-        // Resend OTP
-        tvResendOTP.setOnClickListener(v -> {
-            if (canResend) {
-                resendOTP();
-            }
-        });
+    private void updateUI() {
+        if (fromRegistration) {
+            tvTitle.setText("Verify Your Email");
+            tvSubtitle.setText("We've sent a 6-digit code to\n" + email + "\n\nEnter the code to activate your account");
+        } else if (fromLogin) {
+            tvTitle.setText("Account Verification Required");
+            tvSubtitle.setText("Please verify your email address\n" + email + "\n\nEnter the 6-digit code sent to your email");
+        } else if (fromForgotPassword) {
+            tvTitle.setText("Reset Password");
+            tvSubtitle.setText("Enter the 6-digit code sent to\n" + email + "\n\nThis will allow you to reset your password");
+        }
+    }
+
+    private void updateVerifyButtonState() {
+        String otp = etOTP.getText().toString().trim();
+        btnVerify.setEnabled(ValidationUtils.isValidOTP(otp) && !isLoading);
     }
 
     private void startCountdown() {
         canResend = false;
         tvResendOTP.setEnabled(false);
-        tvResendOTP.setText("Resend OTP");
+        tvResendOTP.setAlpha(0.5f);
 
         countDownTimer = new CountDownTimer(COUNTDOWN_TIME, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
                 long minutes = millisUntilFinished / 60000;
                 long seconds = (millisUntilFinished % 60000) / 1000;
-                tvCountdown.setText(String.format("Resend available in %02d:%02d", minutes, seconds));
+                tvCountdown.setText(String.format("Resend code in %02d:%02d", minutes, seconds));
             }
 
             @Override
             public void onFinish() {
                 canResend = true;
+                tvCountdown.setText("Didn't receive the code?");
                 tvResendOTP.setEnabled(true);
-                tvResendOTP.setText("Resend OTP");
-                tvCountdown.setText("Didn't receive code?");
+                tvResendOTP.setAlpha(1.0f);
             }
         };
 
@@ -167,8 +180,13 @@ public class OtpVerificationActivity extends AppCompatActivity {
     private void verifyOTP() {
         String otpCode = etOTP.getText().toString().trim();
 
-        if (otpCode.length() != Constants.OTP_LENGTH) {
+        if (!ValidationUtils.isValidOTP(otpCode)) {
             tilOTP.setError("Please enter the 6-digit code");
+            return;
+        }
+
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            showError("No internet connection");
             return;
         }
 
@@ -188,11 +206,10 @@ public class OtpVerificationActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                  @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 setLoading(false);
                 Log.e(TAG, "OTP verification request failed", t);
-                showError("Verification failed: " + t.getMessage());
+                showError(NetworkUtils.getNetworkErrorMessage(t));
             }
         });
     }
@@ -200,49 +217,53 @@ public class OtpVerificationActivity extends AppCompatActivity {
     @SuppressWarnings("unchecked")
     private void handleVerificationResponse(Response<StandardResponse<Map<String, Object>>> response) {
         try {
-            if (response.isSuccessful() && response.body() != null) {
-                StandardResponse<Map<String, Object>> apiResponse = response.body();
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                Toast.makeText(this, "Verification successful!", Toast.LENGTH_SHORT).show();
 
-                if (apiResponse.isSuccess()) {
-                    Toast.makeText(this, "Verification successful!", Toast.LENGTH_SHORT).show();
-
-                    if (fromRegistration || fromLogin) {
-                        // Save user data if provided
-                        Map<String, Object> data = apiResponse.getData();
-                        if (data != null && data.get("user") != null) {
-                            Map<String, Object> userData = (Map<String, Object>) data.get("user");
-                            prefsManager.saveLoginData(userData);
-                        }
-
-                        // Navigate to main activity
-                        Intent intent = new Intent(this, MainActivity.class);
-                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                        startActivity(intent);
-                        finish();
-                    } else if (fromForgotPassword) {
-                        // Navigate to reset password activity
-                        // TODO: Create ResetPasswordActivity
-                        Toast.makeText(this, "Please check your email for password reset link",
-                                Toast.LENGTH_LONG).show();
-                        finish();
+                if (fromRegistration || fromLogin) {
+                    // Save user data if provided
+                    Map<String, Object> data = response.body().getData();
+                    if (data != null && data.get("user") != null) {
+                        Map<String, Object> userData = (Map<String, Object>) data.get("user");
+                        prefsManager.saveLoginData(userData);
                     }
-                } else {
-                    showError(apiResponse.getMessage());
+
+                    // Navigate to main activity
+                    navigateToMain();
+                } else if (fromForgotPassword) {
+                    // Navigate to reset password activity
+                    navigateToResetPassword();
                 }
             } else {
-                String errorMsg = "Verification failed";
-                if (response.code() == 400) {
-                    errorMsg = "Invalid or expired code";
-                }
-                showError(errorMsg);
+                String message = response.body() != null ? response.body().getMessage() : "Verification failed";
+                handleVerificationError(message, response.code());
             }
         } catch (Exception e) {
             Log.e(TAG, "Error processing verification response", e);
-            showError("Verification failed");
+            showError("Verification failed. Please try again.");
+        }
+    }
+
+    private void handleVerificationError(String message, int responseCode) {
+        if (responseCode == 400 || message.toLowerCase().contains("invalid") || message.toLowerCase().contains("expired")) {
+            tilOTP.setError("Invalid or expired code");
+        } else if (responseCode == 429 || message.toLowerCase().contains("attempts")) {
+            tilOTP.setError("Too many attempts. Please try again later");
+        } else {
+            showError(message);
         }
     }
 
     private void resendOTP() {
+        if (!canResend || isLoading) {
+            return;
+        }
+
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            showError("No internet connection");
+            return;
+        }
+
         setLoading(true);
 
         Map<String, String> resendData = new HashMap<>();
@@ -254,36 +275,67 @@ public class OtpVerificationActivity extends AppCompatActivity {
             public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
                                    @NonNull Response<StandardResponse<Map<String, String>>> response) {
                 setLoading(false);
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Toast.makeText(OtpVerificationActivity.this, "OTP sent successfully",
-                            Toast.LENGTH_SHORT).show();
-                    etOTP.setText("");
-                    startCountdown();
-                } else {
-                    showError("Failed to resend OTP");
-                }
+                handleResendResponse(response);
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call,
-                                  @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
                 setLoading(false);
-                Log.e(TAG, "Resend OTP request failed", t);
-                showError("Failed to resend OTP");
+                Log.e(TAG, "Resend OTP failed", t);
+                showError(NetworkUtils.getNetworkErrorMessage(t));
             }
         });
     }
 
+    private void handleResendResponse(Response<StandardResponse<Map<String, String>>> response) {
+        try {
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                Toast.makeText(this, "Verification code sent!", Toast.LENGTH_SHORT).show();
+                etOTP.setText(""); // Clear previous code
+                startCountdown(); // Restart countdown
+            } else {
+                String message = response.body() != null ? response.body().getMessage() : "Failed to resend code";
+                showError(message);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing resend response", e);
+            showError("Failed to resend code");
+        }
+    }
+
     private void setLoading(boolean loading) {
         isLoading = loading;
-        btnVerify.setEnabled(!loading && etOTP.getText().length() == Constants.OTP_LENGTH);
-        btnVerify.setText(loading ? "Verifying..." : "Verify");
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
+        btnVerify.setEnabled(!loading);
+        btnVerify.setText(loading ? "Verifying..." : "Verify");
+        tvResendOTP.setEnabled(!loading && canResend);
+        updateVerifyButtonState();
     }
 
     private void showError(String message) {
-        Log.e(TAG, "Showing error: " + message);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    private void navigateToMain() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void navigateToResetPassword() {
+        // TODO: Create ResetPasswordActivity
+        Toast.makeText(this, "Please check your email for password reset link", Toast.LENGTH_LONG).show();
+        finish();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override

@@ -4,6 +4,7 @@ package com.example.newtrade.ui.product;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ProgressBar;
@@ -22,12 +23,15 @@ import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.ui.product.adapter.MyProductsAdapter;
 import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.NetworkUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.tabs.TabLayout;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,7 +39,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class MyProductsActivity extends AppCompatActivity implements MyProductsAdapter.OnProductActionListener {
+public class MyProductsActivity extends AppCompatActivity {
     private static final String TAG = "MyProductsActivity";
 
     // UI Components
@@ -45,33 +49,32 @@ public class MyProductsActivity extends AppCompatActivity implements MyProductsA
     private SwipeRefreshLayout swipeRefresh;
     private ProgressBar progressBar;
     private TextView tvEmpty;
+    private FloatingActionButton fabAdd;
+    private View loadingView, contentView;
 
     // Data
-    private MyProductsAdapter adapter;
     private List<Product> products = new ArrayList<>();
-    private String currentStatus = "all";
+    private SharedPrefsManager prefsManager;
 
-    // Pagination
+    // State
+    private String currentTab = "ACTIVE"; // ACTIVE, SOLD, PAUSED
     private int currentPage = 0;
     private boolean isLoading = false;
     private boolean isLastPage = false;
-
-    // Utils
-    private SharedPrefsManager prefsManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_my_products);
 
-        prefsManager = new SharedPrefsManager(this);
-
         initViews();
+        initUtils();
         setupToolbar();
-        setupTabs();
-        setupRecyclerView();
         setupListeners();
-        loadProducts();
+        setupRecyclerView();
+        setupTabs();
+
+        loadMyProducts();
     }
 
     private void initViews() {
@@ -81,6 +84,13 @@ public class MyProductsActivity extends AppCompatActivity implements MyProductsA
         swipeRefresh = findViewById(R.id.swipe_refresh);
         progressBar = findViewById(R.id.progress_bar);
         tvEmpty = findViewById(R.id.tv_empty);
+        fabAdd = findViewById(R.id.fab_add);
+        loadingView = findViewById(R.id.view_loading);
+        contentView = findViewById(R.id.view_content);
+    }
+
+    private void initUtils() {
+        prefsManager = new SharedPrefsManager(this);
     }
 
     private void setupToolbar() {
@@ -91,30 +101,58 @@ public class MyProductsActivity extends AppCompatActivity implements MyProductsA
         }
     }
 
+    private void setupListeners() {
+        swipeRefresh.setOnRefreshListener(this::refreshData);
+        fabAdd.setOnClickListener(v -> openAddProduct());
+    }
+
+    private void setupRecyclerView() {
+        rvProducts.setLayoutManager(new LinearLayoutManager(this));
+
+        // TODO: Create MyProductsAdapter with action buttons (edit, delete, mark sold, etc.)
+        // MyProductsAdapter adapter = new MyProductsAdapter(products, this);
+        // rvProducts.setAdapter(adapter);
+
+        // Pagination scroll listener
+        rvProducts.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (!isLoading && !isLastPage && layoutManager != null && dy > 0) {
+                    int visibleItemCount = layoutManager.getChildCount();
+                    int totalItemCount = layoutManager.getItemCount();
+                    int pastVisibleItems = layoutManager.findFirstVisibleItemPosition();
+
+                    if (visibleItemCount + pastVisibleItems >= totalItemCount) {
+                        loadMoreProducts();
+                    }
+                }
+            }
+        });
+    }
+
     private void setupTabs() {
-        tabLayout.addTab(tabLayout.newTab().setText("All"));
-        tabLayout.addTab(tabLayout.newTab().setText("Available"));
+        tabLayout.addTab(tabLayout.newTab().setText("Active"));
         tabLayout.addTab(tabLayout.newTab().setText("Sold"));
-        tabLayout.addTab(tabLayout.newTab().setText("Archived"));
+        tabLayout.addTab(tabLayout.newTab().setText("Paused"));
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 switch (tab.getPosition()) {
                     case 0:
-                        currentStatus = "all";
+                        currentTab = "ACTIVE";
                         break;
                     case 1:
-                        currentStatus = "AVAILABLE";
+                        currentTab = "SOLD";
                         break;
                     case 2:
-                        currentStatus = "SOLD";
-                        break;
-                    case 3:
-                        currentStatus = "ARCHIVED";
+                        currentTab = "PAUSED";
                         break;
                 }
-                refreshProducts();
+                refreshData();
             }
 
             @Override
@@ -125,141 +163,138 @@ public class MyProductsActivity extends AppCompatActivity implements MyProductsA
         });
     }
 
-    private void setupRecyclerView() {
-        adapter = new MyProductsAdapter(products, this);
-        rvProducts.setLayoutManager(new LinearLayoutManager(this));
-        rvProducts.setAdapter(adapter);
-
-        // Pagination scroll listener
-        rvProducts.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-                super.onScrolled(recyclerView, dx, dy);
-
-                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
-                if (layoutManager != null && !isLoading && !isLastPage) {
-                    int visibleItemCount = layoutManager.getChildCount();
-                    int totalItemCount = layoutManager.getItemCount();
-                    int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
-
-                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount
-                            && firstVisibleItemPosition >= 0) {
-                        loadMoreProducts();
-                    }
-                }
-            }
-        });
-    }
-
-    private void setupListeners() {
-        swipeRefresh.setOnRefreshListener(this::refreshProducts);
-    }
-
-    private void loadProducts() {
+    // FR-2.2.1: View/edit/delete listings from user dashboard
+    private void loadMyProducts() {
         if (isLoading) return;
 
         isLoading = true;
-        showLoading(currentPage == 0);
+        if (currentPage == 0) {
+            showLoadingState();
+        }
 
-        String status = currentStatus.equals("all") ? null : currentStatus;
         Call<StandardResponse<Map<String, Object>>> call = ApiClient.getProductService()
-                .getMyProducts(currentPage, Constants.DEFAULT_PAGE_SIZE, status, prefsManager.getUserId());
+                .getUserProducts(prefsManager.getUserId(), currentPage, Constants.DEFAULT_PAGE_SIZE);
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
                                    @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                isLoading = false;
-                hideLoading();
-
                 handleProductsResponse(response);
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                  @NonNull Throwable t) {
-                isLoading = false;
-                hideLoading();
-
-                Log.e(TAG, "Failed to load products", t);
-                if (products.isEmpty()) {
-                    showEmptyState();
-                }
-                Toast.makeText(MyProductsActivity.this, "Failed to load products", Toast.LENGTH_SHORT).show();
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                handleLoadingError(t);
             }
         });
     }
 
+    private void loadMoreProducts() {
+        if (isLoading || isLastPage) return;
+
+        currentPage++;
+        loadMyProducts();
+    }
+
+    private void refreshData() {
+        currentPage = 0;
+        isLastPage = false;
+        products.clear();
+        loadMyProducts();
+    }
+
     @SuppressWarnings("unchecked")
     private void handleProductsResponse(Response<StandardResponse<Map<String, Object>>> response) {
+        isLoading = false;
+        swipeRefresh.setRefreshing(false);
+
         try {
             if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                 Map<String, Object> data = response.body().getData();
                 List<Map<String, Object>> productMaps = (List<Map<String, Object>>) data.get("content");
 
                 if (productMaps != null) {
-                    List<Product> newProducts = new ArrayList<>();
+                    int oldSize = products.size();
+
                     for (Map<String, Object> productMap : productMaps) {
                         Product product = parseProductFromMap(productMap);
                         if (product != null) {
-                            newProducts.add(product);
+                            // Filter by current tab
+                            if (matchesCurrentTab(product)) {
+                                products.add(product);
+                            }
                         }
                     }
 
-                    int oldSize = products.size();
-                    products.addAll(newProducts);
-                    adapter.notifyItemRangeInserted(oldSize, newProducts.size());
-
                     // Update pagination
                     Boolean isLast = (Boolean) data.get("last");
-                    isLastPage = isLast != null ? isLast : newProducts.size() < Constants.DEFAULT_PAGE_SIZE;
-                }
+                    isLastPage = isLast != null ? isLast : true;
 
-                if (products.isEmpty()) {
-                    showEmptyState();
-                } else {
-                    hideEmptyState();
-                }
+                    // Update UI
+                    showContentState();
 
+                    if (products.isEmpty()) {
+                        showEmptyState();
+                    } else {
+                        hideEmptyState();
+                        // TODO: Notify adapter
+                        // adapter.notifyItemRangeInserted(oldSize, products.size() - oldSize);
+                    }
+                }
             } else {
-                Log.e(TAG, "Failed to load products: " + response.message());
-                if (products.isEmpty()) {
-                    showEmptyState();
-                }
+                handleLoadingError(new Exception("Failed to load products"));
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing products response", e);
-            if (products.isEmpty()) {
-                showEmptyState();
-            }
+            handleLoadingError(e);
+        }
+    }
+
+    private boolean matchesCurrentTab(Product product) {
+        switch (currentTab) {
+            case "ACTIVE":
+                return product.isAvailable();
+            case "SOLD":
+                return product.isSold();
+            case "PAUSED":
+                return Product.ProductStatus.PAUSED.equals(product.getStatus());
+            default:
+                return true;
         }
     }
 
     private Product parseProductFromMap(Map<String, Object> productMap) {
-        // TODO: Implement proper product parsing
-        // This is a simplified version
         try {
             Product product = new Product();
-            product.setId(getLongFromMap(productMap, "id"));
+            product.setId(((Number) productMap.get("id")).longValue());
             product.setTitle((String) productMap.get("title"));
             product.setDescription((String) productMap.get("description"));
+            product.setLocation((String) productMap.get("location"));
 
-            // Parse price
-            Object priceObj = productMap.get("price");
-            if (priceObj instanceof Number) {
-                product.setPrice(java.math.BigDecimal.valueOf(((Number) priceObj).doubleValue()));
+            Object price = productMap.get("price");
+            if (price instanceof Number) {
+                product.setPrice(new BigDecimal(price.toString()));
             }
 
-            product.setCreatedAt((String) productMap.get("createdAt"));
+            Object viewCount = productMap.get("viewCount");
+            if (viewCount instanceof Number) {
+                product.setViewCount(((Number) viewCount).intValue());
+            }
 
-            // Parse status
+            String conditionStr = (String) productMap.get("condition");
+            if (conditionStr != null) {
+                product.setCondition(Product.ProductCondition.fromString(conditionStr));
+            }
+
             String statusStr = (String) productMap.get("status");
             if (statusStr != null) {
-                try {
-                    product.setStatus(Product.ProductStatus.valueOf(statusStr));
-                } catch (IllegalArgumentException e) {
-                    product.setStatus(Product.ProductStatus.AVAILABLE);
-                }
+                product.setStatus(Product.ProductStatus.fromString(statusStr));
+            }
+
+            @SuppressWarnings("unchecked")
+            List<String> imageUrls = (List<String>) productMap.get("imageUrls");
+            if (imageUrls != null) {
+                product.setImageUrls(imageUrls);
             }
 
             return product;
@@ -269,116 +304,79 @@ public class MyProductsActivity extends AppCompatActivity implements MyProductsA
         }
     }
 
-    private Long getLongFromMap(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Number) {
-            return ((Number) value).longValue();
-        }
-        return null;
-    }
-
-    private void loadMoreProducts() {
-        if (!isLoading && !isLastPage) {
-            currentPage++;
-            loadProducts();
-        }
-    }
-
-    private void refreshProducts() {
-        currentPage = 0;
-        isLastPage = false;
-        products.clear();
-        adapter.notifyDataSetChanged();
-        loadProducts();
-    }
-
-    private void showLoading(boolean isInitialLoad) {
-        if (isInitialLoad) {
-            progressBar.setVisibility(View.VISIBLE);
-            tvEmpty.setVisibility(View.GONE);
-        }
-        swipeRefresh.setRefreshing(false);
-    }
-
-    private void hideLoading() {
-        progressBar.setVisibility(View.GONE);
-        swipeRefresh.setRefreshing(false);
-    }
-
-    private void showEmptyState() {
-        tvEmpty.setVisibility(View.VISIBLE);
-        String emptyMessage;
-        switch (currentStatus) {
-            case "AVAILABLE":
-                emptyMessage = "No available products";
-                break;
-            case "SOLD":
-                emptyMessage = "No sold products";
-                break;
-            case "ARCHIVED":
-                emptyMessage = "No archived products";
-                break;
-            default:
-                emptyMessage = "No products yet";
-                break;
-        }
-        tvEmpty.setText(emptyMessage);
-    }
-
-    private void hideEmptyState() {
-        tvEmpty.setVisibility(View.GONE);
-    }
-
-    // MyProductsAdapter.OnProductActionListener implementation
-    @Override
+    // Product action methods
     public void onProductClick(Product product) {
         Intent intent = new Intent(this, ProductDetailActivity.class);
         intent.putExtra(Constants.BUNDLE_PRODUCT_ID, product.getId());
         startActivity(intent);
     }
 
-    @Override
-    public void onEditClick(Product product) {
+    public void onEditProduct(Product product) {
         Intent intent = new Intent(this, AddProductActivity.class);
         intent.putExtra(Constants.BUNDLE_PRODUCT_ID, product.getId());
-        intent.putExtra("editMode", true);
+        intent.putExtra("isEdit", true);
         startActivity(intent);
     }
 
-    @Override
-    public void onDeleteClick(Product product) {
+    // FR-2.2.2: Listing status options: Available, Sold, Paused
+    public void onToggleProductStatus(Product product) {
+        String[] statusOptions;
+        Product.ProductStatus[] statusValues;
+
+        if (product.isAvailable()) {
+            statusOptions = new String[]{"Mark as Sold", "Pause Listing"};
+            statusValues = new Product.ProductStatus[]{Product.ProductStatus.SOLD, Product.ProductStatus.PAUSED};
+        } else if (product.isSold()) {
+            statusOptions = new String[]{"Mark as Available", "Pause Listing"};
+            statusValues = new Product.ProductStatus[]{Product.ProductStatus.AVAILABLE, Product.ProductStatus.PAUSED};
+        } else {
+            statusOptions = new String[]{"Mark as Available", "Mark as Sold"};
+            statusValues = new Product.ProductStatus[]{Product.ProductStatus.AVAILABLE, Product.ProductStatus.SOLD};
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Change Status")
+                .setItems(statusOptions, (dialog, which) -> {
+                    updateProductStatus(product, statusValues[which]);
+                })
+                .show();
+    }
+
+    private void updateProductStatus(Product product, Product.ProductStatus newStatus) {
+        Map<String, String> statusData = new HashMap<>();
+        statusData.put("status", newStatus.name());
+
+        Call<StandardResponse<Product>> call = ApiClient.getProductService()
+                .updateProductStatus(product.getId(), statusData, prefsManager.getUserId());
+
+        call.enqueue(new Callback<StandardResponse<Product>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Product>> call,
+                                   @NonNull Response<StandardResponse<Product>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    Toast.makeText(MyProductsActivity.this, "Status updated", Toast.LENGTH_SHORT).show();
+                    refreshData();
+                } else {
+                    String message = response.body() != null ? response.body().getMessage() : "Failed to update status";
+                    Toast.makeText(MyProductsActivity.this, message, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Product>> call, @NonNull Throwable t) {
+                Log.e(TAG, "Failed to update product status", t);
+                Toast.makeText(MyProductsActivity.this, "Failed to update status", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    public void onDeleteProduct(Product product) {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Product")
-                .setMessage("Are you sure you want to delete \"" + product.getTitle() + "\"?")
+                .setMessage("Are you sure you want to delete \"" + product.getTitle() + "\"?\n\nThis action cannot be undone.")
                 .setPositiveButton("Delete", (dialog, which) -> deleteProduct(product))
                 .setNegativeButton("Cancel", null)
                 .show();
-    }
-
-    @Override
-    public void onMarkSoldClick(Product product) {
-        new AlertDialog.Builder(this)
-                .setTitle("Mark as Sold")
-                .setMessage("Mark \"" + product.getTitle() + "\" as sold?")
-                .setPositiveButton("Mark Sold", (dialog, which) -> markProductAsSold(product))
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    @Override
-    public void onArchiveClick(Product product) {
-        archiveProduct(product);
-    }
-
-    @Override
-    public void onRestoreClick(Product product) {
-        restoreProduct(product);
-    }
-
-    @Override
-    public void onViewAnalyticsClick(Product product) {
-        // TODO: Open analytics screen
-        Toast.makeText(this, "Analytics coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void deleteProduct(Product product) {
@@ -391,9 +389,10 @@ public class MyProductsActivity extends AppCompatActivity implements MyProductsA
                                    @NonNull Response<StandardResponse<Void>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                     Toast.makeText(MyProductsActivity.this, "Product deleted", Toast.LENGTH_SHORT).show();
-                    removeProductFromList(product);
+                    refreshData();
                 } else {
-                    Toast.makeText(MyProductsActivity.this, "Failed to delete product", Toast.LENGTH_SHORT).show();
+                    String message = response.body() != null ? response.body().getMessage() : "Failed to delete product";
+                    Toast.makeText(MyProductsActivity.this, message, Toast.LENGTH_SHORT).show();
                 }
             }
 
@@ -405,106 +404,99 @@ public class MyProductsActivity extends AppCompatActivity implements MyProductsA
         });
     }
 
-    private void markProductAsSold(Product product) {
-        Call<StandardResponse<Void>> call = ApiClient.getProductService()
-                .markProductAsSold(product.getId(), prefsManager.getUserId());
-
-        call.enqueue(new Callback<StandardResponse<Void>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Void>> call,
-                                   @NonNull Response<StandardResponse<Void>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Toast.makeText(MyProductsActivity.this, "Product marked as sold", Toast.LENGTH_SHORT).show();
-                    product.setStatus(Product.ProductStatus.SOLD);
-                    updateProductInList(product);
-                } else {
-                    Toast.makeText(MyProductsActivity.this, "Failed to mark as sold", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Void>> call, @NonNull Throwable t) {
-                Log.e(TAG, "Failed to mark product as sold", t);
-                Toast.makeText(MyProductsActivity.this, "Failed to mark as sold", Toast.LENGTH_SHORT).show();
-            }
-        });
+    public void onViewAnalytics(Product product) {
+        Intent intent = new Intent(this, ProductAnalyticsActivity.class);
+        intent.putExtra(Constants.BUNDLE_PRODUCT_ID, product.getId());
+        startActivity(intent);
     }
 
-    private void archiveProduct(Product product) {
-        Call<StandardResponse<Void>> call = ApiClient.getProductService()
-                .archiveProduct(product.getId(), prefsManager.getUserId());
-
-        call.enqueue(new Callback<StandardResponse<Void>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Void>> call,
-                                   @NonNull Response<StandardResponse<Void>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Toast.makeText(MyProductsActivity.this, "Product archived", Toast.LENGTH_SHORT).show();
-                    product.setStatus(Product.ProductStatus.ARCHIVED);
-                    updateProductInList(product);
-                } else {
-                    Toast.makeText(MyProductsActivity.this, "Failed to archive product", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Void>> call, @NonNull Throwable t) {
-                Log.e(TAG, "Failed to archive product", t);
-                Toast.makeText(MyProductsActivity.this, "Failed to archive product", Toast.LENGTH_SHORT).show();
-            }
-        });
+    private void openAddProduct() {
+        Intent intent = new Intent(this, AddProductActivity.class);
+        startActivity(intent);
     }
 
-    private void restoreProduct(Product product) {
-        Call<StandardResponse<Void>> call = ApiClient.getProductService()
-                .restoreArchivedProduct(product.getId(), prefsManager.getUserId());
+    private void handleLoadingError(Throwable t) {
+        isLoading = false;
+        swipeRefresh.setRefreshing(false);
 
-        call.enqueue(new Callback<StandardResponse<Void>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Void>> call,
-                                   @NonNull Response<StandardResponse<Void>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Toast.makeText(MyProductsActivity.this, "Product restored", Toast.LENGTH_SHORT).show();
-                    product.setStatus(Product.ProductStatus.AVAILABLE);
-                    updateProductInList(product);
-                } else {
-                    Toast.makeText(MyProductsActivity.this, "Failed to restore product", Toast.LENGTH_SHORT).show();
-                }
-            }
+        Log.e(TAG, "Failed to load products", t);
 
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Void>> call, @NonNull Throwable t) {
-                Log.e(TAG, "Failed to restore product", t);
-                Toast.makeText(MyProductsActivity.this, "Failed to restore product", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void removeProductFromList(Product product) {
-        int position = products.indexOf(product);
-        if (position != -1) {
-            products.remove(position);
-            adapter.notifyItemRemoved(position);
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            Toast.makeText(this, "No internet connection", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, NetworkUtils.getNetworkErrorMessage(t), Toast.LENGTH_SHORT).show();
         }
 
         if (products.isEmpty()) {
             showEmptyState();
+        } else {
+            showContentState();
         }
     }
 
-    private void updateProductInList(Product product) {
-        int position = products.indexOf(product);
-        if (position != -1) {
-            adapter.notifyItemChanged(position);
+    private void showLoadingState() {
+        loadingView.setVisibility(View.VISIBLE);
+        contentView.setVisibility(View.GONE);
+    }
+
+    private void showContentState() {
+        loadingView.setVisibility(View.GONE);
+        contentView.setVisibility(View.VISIBLE);
+    }
+
+    private void showEmptyState() {
+        rvProducts.setVisibility(View.GONE);
+        tvEmpty.setVisibility(View.VISIBLE);
+
+        String emptyMessage;
+        switch (currentTab) {
+            case "SOLD":
+                emptyMessage = "No sold items\n\nItems you've sold will appear here";
+                break;
+            case "PAUSED":
+                emptyMessage = "No paused listings\n\nPaused listings will appear here";
+                break;
+            default:
+                emptyMessage = "No active listings\n\nTap + to create your first listing";
+                break;
         }
+        tvEmpty.setText(emptyMessage);
+    }
+
+    private void hideEmptyState() {
+        rvProducts.setVisibility(View.VISIBLE);
+        tvEmpty.setVisibility(View.GONE);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_my_products, menu);
+        return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            finish();
+        int itemId = item.getItemId();
+
+        if (itemId == android.R.id.home) {
+            onBackPressed();
+            return true;
+        } else if (itemId == R.id.action_add) {
+            openAddProduct();
+            return true;
+        } else if (itemId == R.id.action_analytics) {
+            // TODO: Open overall analytics
+            Toast.makeText(this, "Overall analytics - Coming soon", Toast.LENGTH_SHORT).show();
             return true;
         }
+
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh data when returning from edit/add
+        refreshData();
     }
 }

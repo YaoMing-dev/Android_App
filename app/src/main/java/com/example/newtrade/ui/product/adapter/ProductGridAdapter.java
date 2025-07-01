@@ -11,10 +11,10 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
-import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.DateTimeUtils;
+import com.google.android.material.card.MaterialCardView;
 
 import java.util.List;
 
@@ -43,57 +43,7 @@ public class ProductGridAdapter extends RecyclerView.Adapter<ProductGridAdapter.
     @Override
     public void onBindViewHolder(@NonNull ProductViewHolder holder, int position) {
         Product product = products.get(position);
-
-        // Product title
-        holder.tvTitle.setText(product.getTitle());
-
-        // Product price
-        holder.tvPrice.setText(product.getFormattedPrice());
-
-        // Product location
-        if (product.getLocation() != null && !product.getLocation().isEmpty()) {
-            holder.tvLocation.setText(product.getLocation());
-            holder.tvLocation.setVisibility(View.VISIBLE);
-        } else {
-            holder.tvLocation.setVisibility(View.GONE);
-        }
-
-        // Product condition
-        if (product.getCondition() != null) {
-            holder.tvCondition.setText(product.getCondition().getDisplayName());
-            holder.tvCondition.setVisibility(View.VISIBLE);
-        } else {
-            holder.tvCondition.setVisibility(View.GONE);
-        }
-
-        // Load product image
-        String imageUrl = product.getFirstImageUrl();
-        if (imageUrl != null && !imageUrl.isEmpty()) {
-            Glide.with(holder.itemView.getContext())
-                    .load(imageUrl)
-                    .transform(new RoundedCorners(12))
-                    .placeholder(R.drawable.placeholder_product)
-                    .error(R.drawable.ic_error_image)
-                    .into(holder.ivImage);
-        } else {
-            holder.ivImage.setImageResource(R.drawable.placeholder_product);
-        }
-
-        // Status indicator
-        if (product.getStatus() == Product.ProductStatus.SOLD) {
-            holder.viewSoldOverlay.setVisibility(View.VISIBLE);
-            holder.tvSoldLabel.setVisibility(View.VISIBLE);
-        } else {
-            holder.viewSoldOverlay.setVisibility(View.GONE);
-            holder.tvSoldLabel.setVisibility(View.GONE);
-        }
-
-        // Click listener
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onProductClick(product);
-            }
-        });
+        holder.bind(product, listener);
     }
 
     @Override
@@ -101,25 +51,84 @@ public class ProductGridAdapter extends RecyclerView.Adapter<ProductGridAdapter.
         return products.size();
     }
 
+    static class ProductViewHolder extends RecyclerView.ViewHolder {
+        private MaterialCardView cardProduct;
+        private ImageView ivProductImage;
+        private TextView tvTitle, tvPrice, tvLocation, tvCondition, tvTimeAgo;
+        private View viewSold;
+
+        public ProductViewHolder(@NonNull View itemView) {
+            super(itemView);
+            cardProduct = itemView.findViewById(R.id.card_product);
+            ivProductImage = itemView.findViewById(R.id.iv_product_image);
+            tvTitle = itemView.findViewById(R.id.tv_title);
+            tvPrice = itemView.findViewById(R.id.tv_price);
+            tvLocation = itemView.findViewById(R.id.tv_location);
+            tvCondition = itemView.findViewById(R.id.tv_condition);
+            tvTimeAgo = itemView.findViewById(R.id.tv_time_ago);
+            viewSold = itemView.findViewById(R.id.view_sold);
+        }
+
+        public void bind(Product product, OnProductClickListener listener) {
+            // Product image
+            String imageUrl = product.getFirstImage();
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                Glide.with(itemView.getContext())
+                        .load(imageUrl)
+                        .placeholder(R.drawable.placeholder_product)
+                        .error(R.drawable.placeholder_product)
+                        .centerCrop()
+                        .into(ivProductImage);
+            } else {
+                ivProductImage.setImageResource(R.drawable.placeholder_product);
+            }
+
+            // Product details
+            tvTitle.setText(product.getTitle());
+            tvPrice.setText(product.getPriceString());
+            tvLocation.setText(product.getLocation());
+            tvCondition.setText(product.getConditionDisplay());
+
+            // Time ago
+            if (product.getCreatedAt() != null) {
+                tvTimeAgo.setText(DateTimeUtils.getRelativeTimeString(product.getCreatedAt()));
+            } else {
+                tvTimeAgo.setText("");
+            }
+
+            // Sold overlay
+            if (product.isSold()) {
+                viewSold.setVisibility(View.VISIBLE);
+                cardProduct.setAlpha(0.7f);
+            } else {
+                viewSold.setVisibility(View.GONE);
+                cardProduct.setAlpha(1.0f);
+            }
+
+            // Click listener
+            cardProduct.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onProductClick(product);
+                }
+            });
+        }
+    }
+
     public void updateProducts(List<Product> newProducts) {
         this.products = newProducts;
         notifyDataSetChanged();
     }
 
-    static class ProductViewHolder extends RecyclerView.ViewHolder {
-        ImageView ivImage;
-        TextView tvTitle, tvPrice, tvLocation, tvCondition, tvSoldLabel;
-        View viewSoldOverlay;
+    public void addProducts(List<Product> newProducts) {
+        int oldSize = products.size();
+        products.addAll(newProducts);
+        notifyItemRangeInserted(oldSize, newProducts.size());
+    }
 
-        public ProductViewHolder(@NonNull View itemView) {
-            super(itemView);
-            ivImage = itemView.findViewById(R.id.iv_image);
-            tvTitle = itemView.findViewById(R.id.tv_title);
-            tvPrice = itemView.findViewById(R.id.tv_price);
-            tvLocation = itemView.findViewById(R.id.tv_location);
-            tvCondition = itemView.findViewById(R.id.tv_condition);
-            tvSoldLabel = itemView.findViewById(R.id.tv_sold_label);
-            viewSoldOverlay = itemView.findViewById(R.id.view_sold_overlay);
+    public void removeProduct(int position) {
+        if (position >= 0 && position < products.size()) {
+            products.remove(position);
+            notifyItemRemoved(position);
         }
     }
 }

@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -15,10 +16,12 @@ import android.widget.ProgressBar;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.NetworkUtils;
 import com.example.newtrade.utils.ValidationUtils;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -33,9 +36,11 @@ public class ForgotPasswordActivity extends AppCompatActivity {
     private static final String TAG = "ForgotPasswordActivity";
 
     // UI Components
+    private Toolbar toolbar;
+    private TextView tvInstructions;
     private TextInputLayout tilEmail;
     private EditText etEmail;
-    private Button btnSendOTP;
+    private Button btnSendCode;
     private TextView tvBackToLogin;
     private ProgressBar progressBar;
 
@@ -49,23 +54,31 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         ApiClient.init(this);
 
         initViews();
+        setupToolbar();
         setupListeners();
 
         Log.d(TAG, "ForgotPasswordActivity initialized");
     }
 
     private void initViews() {
+        toolbar = findViewById(R.id.toolbar);
+        tvInstructions = findViewById(R.id.tv_instructions);
         tilEmail = findViewById(R.id.til_email);
         etEmail = findViewById(R.id.et_email);
-        btnSendOTP = findViewById(R.id.btn_send_otp);
+        btnSendCode = findViewById(R.id.btn_send_code);
         tvBackToLogin = findViewById(R.id.tv_back_to_login);
         progressBar = findViewById(R.id.progress_bar);
+    }
 
-        btnSendOTP.setEnabled(false);
+    private void setupToolbar() {
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("Reset Password");
+        }
     }
 
     private void setupListeners() {
-        // Email text watcher
         etEmail.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -80,27 +93,26 @@ public class ForgotPasswordActivity extends AppCompatActivity {
             public void afterTextChanged(Editable s) {}
         });
 
-        // Send OTP button
-        btnSendOTP.setOnClickListener(v -> sendPasswordResetOTP());
-
-        // Back to login
-        tvBackToLogin.setOnClickListener(v -> {
-            startActivity(new Intent(this, LoginActivity.class));
-            finish();
-        });
+        btnSendCode.setOnClickListener(v -> sendResetCode());
+        tvBackToLogin.setOnClickListener(v -> finish());
     }
 
     private void updateSendButtonState() {
         String email = etEmail.getText().toString().trim();
-        btnSendOTP.setEnabled(!email.isEmpty() && !isLoading);
+        btnSendCode.setEnabled(ValidationUtils.isValidEmail(email) && !isLoading);
     }
 
-    private void sendPasswordResetOTP() {
+    // FR-1.1.3: Password recovery through email
+    private void sendResetCode() {
         String email = etEmail.getText().toString().trim();
 
-        // Validate email
         if (!ValidationUtils.isValidEmail(email)) {
             tilEmail.setError("Please enter a valid email address");
+            return;
+        }
+
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            showError("No internet connection");
             return;
         }
 
@@ -123,7 +135,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
                                   @NonNull Throwable t) {
                 setLoading(false);
                 Log.e(TAG, "Forgot password request failed", t);
-                showError("Request failed: " + t.getMessage());
+                showError(NetworkUtils.getNetworkErrorMessage(t));
             }
         });
     }
@@ -143,14 +155,11 @@ public class ForgotPasswordActivity extends AppCompatActivity {
                     startActivity(intent);
                     finish();
                 } else {
-                    showError(apiResponse.getMessage());
+                    String message = apiResponse.getMessage();
+                    handleForgotPasswordError(message, response.code());
                 }
             } else {
-                String errorMsg = "Failed to send reset code";
-                if (response.code() == 404) {
-                    errorMsg = "Email address not found";
-                }
-                showError(errorMsg);
+                handleForgotPasswordError("Failed to send reset code", response.code());
             }
         } catch (Exception e) {
             Log.e(TAG, "Error processing forgot password response", e);
@@ -158,15 +167,34 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         }
     }
 
+    private void handleForgotPasswordError(String message, int responseCode) {
+        if (responseCode == 404 || message.toLowerCase().contains("not found") || message.toLowerCase().contains("email")) {
+            tilEmail.setError("Email address not found");
+        } else if (responseCode == 429 || message.toLowerCase().contains("limit") || message.toLowerCase().contains("attempts")) {
+            showError("Too many requests. Please try again later.");
+        } else {
+            showError(message);
+        }
+    }
+
     private void setLoading(boolean loading) {
         isLoading = loading;
-        updateSendButtonState();
-        btnSendOTP.setText(loading ? "Sending..." : "Send Reset Code");
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
+        btnSendCode.setEnabled(!loading);
+        btnSendCode.setText(loading ? "Sending..." : "Send Reset Code");
+        updateSendButtonState();
     }
 
     private void showError(String message) {
-        Log.e(TAG, "Showing error: " + message);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

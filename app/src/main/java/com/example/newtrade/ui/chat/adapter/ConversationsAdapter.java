@@ -1,7 +1,6 @@
 // app/src/main/java/com/example/newtrade/ui/chat/adapter/ConversationsAdapter.java
 package com.example.newtrade.ui.chat.adapter;
 
-import android.text.format.DateUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,7 +15,7 @@ import com.example.newtrade.R;
 import com.example.newtrade.ui.chat.MessagesFragment;
 import com.example.newtrade.utils.DateTimeUtils;
 import com.google.android.material.badge.BadgeDrawable;
-import com.google.android.material.badge.BadgeUtils;
+import com.google.android.material.card.MaterialCardView;
 
 import java.util.List;
 
@@ -46,87 +45,7 @@ public class ConversationsAdapter extends RecyclerView.Adapter<ConversationsAdap
     @Override
     public void onBindViewHolder(@NonNull ConversationViewHolder holder, int position) {
         MessagesFragment.ConversationItem conversation = conversations.get(position);
-
-        // Other user name
-        holder.tvUserName.setText(conversation.otherUserName != null ?
-                conversation.otherUserName : "Unknown User");
-
-        // Product title
-        if (conversation.productTitle != null && !conversation.productTitle.isEmpty()) {
-            holder.tvProductTitle.setText(conversation.productTitle);
-            holder.tvProductTitle.setVisibility(View.VISIBLE);
-        } else {
-            holder.tvProductTitle.setVisibility(View.GONE);
-        }
-
-        // Last message
-        if (conversation.lastMessage != null && !conversation.lastMessage.isEmpty()) {
-            holder.tvLastMessage.setText(conversation.lastMessage);
-        } else {
-            holder.tvLastMessage.setText("No messages yet");
-        }
-
-        // Time
-        if (conversation.lastMessageTime != null) {
-            String formattedTime = DateTimeUtils.formatMessageTime(conversation.lastMessageTime);
-            holder.tvTime.setText(formattedTime);
-        } else {
-            holder.tvTime.setText("");
-        }
-
-        // Read status styling
-        if (conversation.isRead) {
-            holder.tvUserName.setTextColor(holder.itemView.getContext()
-                    .getColor(R.color.text_secondary));
-            holder.tvLastMessage.setTextColor(holder.itemView.getContext()
-                    .getColor(R.color.text_secondary));
-            holder.itemView.setBackgroundResource(R.color.transparent);
-        } else {
-            holder.tvUserName.setTextColor(holder.itemView.getContext()
-                    .getColor(R.color.text_primary));
-            holder.tvLastMessage.setTextColor(holder.itemView.getContext()
-                    .getColor(R.color.text_primary));
-            holder.itemView.setBackgroundResource(R.color.unread_message_bg);
-        }
-
-        // Unread count badge
-        if (conversation.unreadCount > 0) {
-            holder.tvUnreadCount.setText(String.valueOf(conversation.unreadCount));
-            holder.tvUnreadCount.setVisibility(View.VISIBLE);
-        } else {
-            holder.tvUnreadCount.setVisibility(View.GONE);
-        }
-
-        // User avatar
-        if (conversation.otherUserAvatar != null && !conversation.otherUserAvatar.isEmpty()) {
-            Glide.with(holder.itemView.getContext())
-                    .load(conversation.otherUserAvatar)
-                    .placeholder(R.drawable.ic_person_placeholder)
-                    .error(R.drawable.ic_person_placeholder)
-                    .circleCrop()
-                    .into(holder.ivAvatar);
-        } else {
-            holder.ivAvatar.setImageResource(R.drawable.ic_person_placeholder);
-        }
-
-        // Product image
-        if (conversation.productImage != null && !conversation.productImage.isEmpty()) {
-            Glide.with(holder.itemView.getContext())
-                    .load(conversation.productImage)
-                    .placeholder(R.drawable.placeholder_product)
-                    .error(R.drawable.placeholder_product)
-                    .into(holder.ivProductImage);
-            holder.ivProductImage.setVisibility(View.VISIBLE);
-        } else {
-            holder.ivProductImage.setVisibility(View.GONE);
-        }
-
-        // Click listener
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onConversationClick(conversation);
-            }
-        });
+        holder.bind(conversation, listener);
     }
 
     @Override
@@ -135,18 +54,127 @@ public class ConversationsAdapter extends RecyclerView.Adapter<ConversationsAdap
     }
 
     static class ConversationViewHolder extends RecyclerView.ViewHolder {
-        ImageView ivAvatar, ivProductImage;
-        TextView tvUserName, tvProductTitle, tvLastMessage, tvTime, tvUnreadCount;
+        private MaterialCardView cardConversation;
+        private ImageView ivOtherUserAvatar, ivProductImage;
+        private TextView tvOtherUserName, tvLastMessage, tvTimeAgo, tvProductTitle;
+        private View badgeUnread;
+        private TextView tvUnreadCount;
 
         public ConversationViewHolder(@NonNull View itemView) {
             super(itemView);
-            ivAvatar = itemView.findViewById(R.id.iv_avatar);
+            cardConversation = itemView.findViewById(R.id.card_conversation);
+            ivOtherUserAvatar = itemView.findViewById(R.id.iv_other_user_avatar);
             ivProductImage = itemView.findViewById(R.id.iv_product_image);
-            tvUserName = itemView.findViewById(R.id.tv_user_name);
-            tvProductTitle = itemView.findViewById(R.id.tv_product_title);
+            tvOtherUserName = itemView.findViewById(R.id.tv_other_user_name);
             tvLastMessage = itemView.findViewById(R.id.tv_last_message);
-            tvTime = itemView.findViewById(R.id.tv_time);
+            tvTimeAgo = itemView.findViewById(R.id.tv_time_ago);
+            tvProductTitle = itemView.findViewById(R.id.tv_product_title);
+            badgeUnread = itemView.findViewById(R.id.badge_unread);
             tvUnreadCount = itemView.findViewById(R.id.tv_unread_count);
+        }
+
+        public void bind(MessagesFragment.ConversationItem conversation, OnConversationClickListener listener) {
+            // Other user name
+            tvOtherUserName.setText(conversation.otherUserName != null ?
+                    conversation.otherUserName : "Unknown User");
+
+            // Other user avatar
+            if (conversation.otherUserAvatar != null && !conversation.otherUserAvatar.isEmpty()) {
+                Glide.with(itemView.getContext())
+                        .load(conversation.otherUserAvatar)
+                        .placeholder(R.drawable.ic_person_placeholder)
+                        .error(R.drawable.ic_person_placeholder)
+                        .circleCrop()
+                        .into(ivOtherUserAvatar);
+            } else {
+                ivOtherUserAvatar.setImageResource(R.drawable.ic_person_placeholder);
+            }
+
+            // Last message
+            if (conversation.lastMessage != null && !conversation.lastMessage.isEmpty()) {
+                String messagePrefix = conversation.isLastMessageFromMe ? "You: " : "";
+                tvLastMessage.setText(messagePrefix + conversation.lastMessage);
+            } else {
+                tvLastMessage.setText("No messages yet");
+            }
+
+            // Time ago
+            if (conversation.lastMessageTime != null) {
+                tvTimeAgo.setText(DateTimeUtils.formatMessageTime(conversation.lastMessageTime));
+            } else {
+                tvTimeAgo.setText("");
+            }
+
+            // Product info
+            if (conversation.productTitle != null) {
+                tvProductTitle.setText(conversation.productTitle);
+                tvProductTitle.setVisibility(View.VISIBLE);
+
+                // Product image
+                if (conversation.productImage != null && !conversation.productImage.isEmpty()) {
+                    Glide.with(itemView.getContext())
+                            .load(conversation.productImage)
+                            .placeholder(R.drawable.placeholder_product)
+                            .error(R.drawable.placeholder_product)
+                            .centerCrop()
+                            .into(ivProductImage);
+                    ivProductImage.setVisibility(View.VISIBLE);
+                } else {
+                    ivProductImage.setVisibility(View.GONE);
+                }
+            } else {
+                tvProductTitle.setVisibility(View.GONE);
+                ivProductImage.setVisibility(View.GONE);
+            }
+
+            // Unread badge
+            if (conversation.unreadCount > 0) {
+                badgeUnread.setVisibility(View.VISIBLE);
+                tvUnreadCount.setText(String.valueOf(conversation.unreadCount));
+
+                // Style for unread conversations
+                cardConversation.setCardBackgroundColor(
+                        itemView.getContext().getColor(R.color.conversation_unread_background));
+                tvOtherUserName.setTypeface(null, android.graphics.Typeface.BOLD);
+                tvLastMessage.setTypeface(null, android.graphics.Typeface.BOLD);
+            } else {
+                badgeUnread.setVisibility(View.GONE);
+
+                // Style for read conversations
+                cardConversation.setCardBackgroundColor(
+                        itemView.getContext().getColor(R.color.conversation_read_background));
+                tvOtherUserName.setTypeface(null, android.graphics.Typeface.NORMAL);
+                tvLastMessage.setTypeface(null, android.graphics.Typeface.NORMAL);
+            }
+
+            // Click listener
+            cardConversation.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onConversationClick(conversation);
+                }
+            });
+        }
+    }
+
+    public void updateConversations(List<MessagesFragment.ConversationItem> newConversations) {
+        this.conversations = newConversations;
+        notifyDataSetChanged();
+    }
+
+    public void addConversations(List<MessagesFragment.ConversationItem> newConversations) {
+        int oldSize = conversations.size();
+        conversations.addAll(newConversations);
+        notifyItemRangeInserted(oldSize, newConversations.size());
+    }
+
+    public void markConversationAsRead(Long conversationId) {
+        for (int i = 0; i < conversations.size(); i++) {
+            MessagesFragment.ConversationItem conversation = conversations.get(i);
+            if (conversation.id.equals(conversationId)) {
+                conversation.unreadCount = 0;
+                notifyItemChanged(i);
+                break;
+            }
         }
     }
 }

@@ -8,6 +8,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,55 +27,54 @@ import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.models.User;
 import com.example.newtrade.ui.chat.ChatActivity;
 import com.example.newtrade.ui.product.ProductDetailActivity;
-import com.example.newtrade.ui.product.adapter.ProductGridAdapter;
 import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.NetworkUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.tabs.TabLayout;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class UserProfileActivity extends AppCompatActivity implements ProductGridAdapter.OnProductClickListener {
+public class UserProfileActivity extends AppCompatActivity {
     private static final String TAG = "UserProfileActivity";
 
     // UI Components
     private Toolbar toolbar;
     private ImageView ivAvatar;
     private TextView tvName, tvJoinDate, tvRating, tvLocation, tvBio;
-    private MaterialButton btnMessage, btnFollow;
+    private MaterialButton btnMessage, btnCall;
     private TabLayout tabLayout;
     private RecyclerView rvProducts;
     private SwipeRefreshLayout swipeRefresh;
+    private ProgressBar progressBar;
     private TextView tvEmpty;
+    private View loadingView, contentView, errorView;
 
     // Data
     private User user;
     private Long userId;
-    private ProductGridAdapter adapter;
-    private List<Product> products = new ArrayList<>();
-    private String currentTab = "products";
+    private List<Product> userProducts = new ArrayList<>();
+    private SharedPrefsManager prefsManager;
 
     // State
-    private boolean isFollowing = false;
-    private boolean isOwnProfile = false;
-
-    // Utils
-    private SharedPrefsManager prefsManager;
+    private String currentTab = "ACTIVE"; // ACTIVE, SOLD
+    private int currentPage = 0;
+    private boolean isLoading = false;
+    private boolean isLastPage = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_user_profile);
 
-        prefsManager = new SharedPrefsManager(this);
-
-        // Get user ID from intent
         userId = getIntent().getLongExtra(Constants.BUNDLE_USER_ID, -1);
         if (userId == -1) {
             Toast.makeText(this, "Invalid user", Toast.LENGTH_SHORT).show();
@@ -82,17 +82,14 @@ public class UserProfileActivity extends AppCompatActivity implements ProductGri
             return;
         }
 
-        // Check if viewing own profile
-        Long currentUserId = prefsManager.getUserId();
-        isOwnProfile = currentUserId != null && currentUserId.equals(userId);
-
         initViews();
+        initUtils();
         setupToolbar();
-        setupTabs();
-        setupRecyclerView();
         setupListeners();
+        setupRecyclerView();
+        setupTabs();
+
         loadUserProfile();
-        loadUserProducts();
     }
 
     private void initViews() {
@@ -104,38 +101,71 @@ public class UserProfileActivity extends AppCompatActivity implements ProductGri
         tvLocation = findViewById(R.id.tv_location);
         tvBio = findViewById(R.id.tv_bio);
         btnMessage = findViewById(R.id.btn_message);
-        btnFollow = findViewById(R.id.btn_follow);
+        btnCall = findViewById(R.id.btn_call);
         tabLayout = findViewById(R.id.tab_layout);
         rvProducts = findViewById(R.id.rv_products);
         swipeRefresh = findViewById(R.id.swipe_refresh);
+        progressBar = findViewById(R.id.progress_bar);
         tvEmpty = findViewById(R.id.tv_empty);
+        loadingView = findViewById(R.id.view_loading);
+        contentView = findViewById(R.id.view_content);
+        errorView = findViewById(R.id.view_error);
+    }
+
+    private void initUtils() {
+        prefsManager = new SharedPrefsManager(this);
     }
 
     private void setupToolbar() {
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("");
+            getSupportActionBar().setTitle("Profile");
         }
     }
 
+    private void setupListeners() {
+        swipeRefresh.setOnRefreshListener(this::refreshData);
+        btnMessage.setOnClickListener(v -> startConversation());
+        btnCall.setOnClickListener(v -> callUser());
+    }
+
+    private void setupRecyclerView() {
+        rvProducts.setLayoutManager(new GridLayoutManager(this, 2));
+
+        // TODO: Create ProductGridAdapter
+        // ProductGridAdapter adapter = new ProductGridAdapter(userProducts, this::onProductClick);
+        // rvProducts.setAdapter(adapter);
+
+        // Pagination scroll listener
+        rvProducts.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+
+                GridLayoutManager layoutManager = (GridLayoutManager) recyclerView.getLayoutManager();
+                if (!isLoading && !isLastPage && layoutManager != null && dy > 0) {
+                    int visibleItemCount = layoutManager.getChildCount();
+                    int totalItemCount = layoutManager.getItemCount();
+                    int pastVisibleItems = layoutManager.findFirstVisibleItemPosition();
+
+                    if (visibleItemCount + pastVisibleItems >= totalItemCount) {
+                        loadMoreProducts();
+                    }
+                }
+            }
+        });
+    }
+
     private void setupTabs() {
-        tabLayout.addTab(tabLayout.newTab().setText("Products"));
-        tabLayout.addTab(tabLayout.newTab().setText("Reviews"));
+        tabLayout.addTab(tabLayout.newTab().setText("Active"));
+        tabLayout.addTab(tabLayout.newTab().setText("Sold"));
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
-                switch (tab.getPosition()) {
-                    case 0:
-                        currentTab = "products";
-                        loadUserProducts();
-                        break;
-                    case 1:
-                        currentTab = "reviews";
-                        loadUserReviews();
-                        break;
-                }
+                currentTab = tab.getPosition() == 0 ? "ACTIVE" : "SOLD";
+                refreshProducts();
             }
 
             @Override
@@ -146,60 +176,79 @@ public class UserProfileActivity extends AppCompatActivity implements ProductGri
         });
     }
 
-    private void setupRecyclerView() {
-        adapter = new ProductGridAdapter(products, this);
-        rvProducts.setLayoutManager(new GridLayoutManager(this, 2));
-        rvProducts.setAdapter(adapter);
-    }
-
-    private void setupListeners() {
-        swipeRefresh.setOnRefreshListener(this::refreshCurrentTab);
-
-        // Hide action buttons for own profile
-        if (isOwnProfile) {
-            btnMessage.setVisibility(View.GONE);
-            btnFollow.setVisibility(View.GONE);
-        } else {
-            btnMessage.setOnClickListener(v -> startChatWithUser());
-            btnFollow.setOnClickListener(v -> toggleFollowUser());
-        }
-    }
-
     private void loadUserProfile() {
+        showLoadingState();
+
+        // FR-1.2.4: Allow viewing other users' public profiles
         Call<StandardResponse<User>> call = ApiClient.getUserService().getUserById(userId);
         call.enqueue(new Callback<StandardResponse<User>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<User>> call,
                                    @NonNull Response<StandardResponse<User>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    user = response.body().getData();
-                    updateUserUI();
-                } else {
-                    Log.e(TAG, "Failed to load user profile: " + response.message());
-                    Toast.makeText(UserProfileActivity.this, "Failed to load profile", Toast.LENGTH_SHORT).show();
-                    finish();
-                }
+                handleUserProfileResponse(response);
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<User>> call, @NonNull Throwable t) {
-                Log.e(TAG, "Error loading user profile", t);
-                Toast.makeText(UserProfileActivity.this, "Error loading profile", Toast.LENGTH_SHORT).show();
-                finish();
+                handleLoadingError(t);
             }
         });
+    }
+
+    private void handleUserProfileResponse(Response<StandardResponse<User>> response) {
+        try {
+            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                user = response.body().getData();
+                if (user != null) {
+                    updateUserUI();
+                    loadUserProducts();
+                } else {
+                    showErrorState("User not found");
+                }
+            } else {
+                String message = response.body() != null ? response.body().getMessage() : "Failed to load profile";
+                showErrorState(message);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing user profile response", e);
+            showErrorState("Error loading profile");
+        }
     }
 
     private void updateUserUI() {
         if (user == null) return;
 
-        // User basic info
-        tvName.setText(user.getDisplayNameOrFullName());
-
-        if (user.getCreatedAt() != null) {
-            tvJoinDate.setText("Joined " + user.getCreatedAt().substring(0, 4));
+        // Profile picture
+        String avatarUrl = user.getProfileImageUrl();
+        if (avatarUrl != null && !avatarUrl.isEmpty()) {
+            Glide.with(this)
+                    .load(avatarUrl)
+                    .placeholder(R.drawable.ic_person_placeholder)
+                    .error(R.drawable.ic_person_placeholder)
+                    .into(ivAvatar);
+        } else {
+            ivAvatar.setImageResource(R.drawable.ic_person_placeholder);
         }
 
+        // Basic info
+        tvName.setText(user.getDisplayOrFullName());
+
+        // Join date
+        if (user.getCreatedAt() != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM yyyy", Locale.getDefault());
+            tvJoinDate.setText("Member since " + sdf.format(user.getCreatedAt()));
+        }
+
+        // Rating - FR-7.2.1: Profile shows average rating, total transactions
+        if (user.getRating() != null && user.getRating() > 0) {
+            tvRating.setText(user.getRatingString() + " ⭐ (" + user.getTransactionCountText() + ")");
+            tvRating.setVisibility(View.VISIBLE);
+        } else {
+            tvRating.setText(user.getTransactionCountText());
+            tvRating.setVisibility(View.VISIBLE);
+        }
+
+        // Location
         if (user.getLocation() != null && !user.getLocation().isEmpty()) {
             tvLocation.setText(user.getLocation());
             tvLocation.setVisibility(View.VISIBLE);
@@ -207,6 +256,7 @@ public class UserProfileActivity extends AppCompatActivity implements ProductGri
             tvLocation.setVisibility(View.GONE);
         }
 
+        // Bio
         if (user.getBio() != null && !user.getBio().isEmpty()) {
             tvBio.setText(user.getBio());
             tvBio.setVisibility(View.VISIBLE);
@@ -214,92 +264,152 @@ public class UserProfileActivity extends AppCompatActivity implements ProductGri
             tvBio.setVisibility(View.GONE);
         }
 
-        // Rating
-        if (user.getAverageRating() != null && user.getAverageRating() > 0) {
-            tvRating.setText(user.getFormattedRating());
-            tvRating.setVisibility(View.VISIBLE);
+        // Hide message/call buttons if viewing own profile
+        boolean isOwnProfile = user.getId().equals(prefsManager.getUserId());
+        if (isOwnProfile) {
+            btnMessage.setVisibility(View.GONE);
+            btnCall.setVisibility(View.GONE);
         } else {
-            tvRating.setVisibility(View.GONE);
-        }
+            btnMessage.setVisibility(View.VISIBLE);
+            btnCall.setVisibility(View.VISIBLE);
 
-        // Avatar
-        if (user.getAvatarUrl() != null && !user.getAvatarUrl().isEmpty()) {
-            Glide.with(this)
-                    .load(user.getAvatarUrl())
-                    .placeholder(R.drawable.ic_person_placeholder)
-                    .error(R.drawable.ic_person_placeholder)
-                    .circleCrop()
-                    .into(ivAvatar);
-        } else {
-            ivAvatar.setImageResource(R.drawable.ic_person_placeholder);
+            // Hide call button if no contact info
+            if (user.getContactInfo() == null || user.getContactInfo().isEmpty()) {
+                btnCall.setVisibility(View.GONE);
+            }
         }
 
         // Update toolbar title
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(user.getDisplayNameOrFullName());
+            getSupportActionBar().setTitle(user.getDisplayOrFullName());
         }
     }
 
     private void loadUserProducts() {
-        products.clear();
-        adapter.notifyDataSetChanged();
+        if (isLoading) return;
+
+        isLoading = true;
+        if (currentPage == 0) {
+            progressBar.setVisibility(View.VISIBLE);
+        }
 
         Call<StandardResponse<Map<String, Object>>> call = ApiClient.getProductService()
-                .getUserProducts(userId, 0, 20);
+                .getUserProducts(userId, currentPage, Constants.DEFAULT_PAGE_SIZE);
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
                                    @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                swipeRefresh.setRefreshing(false);
                 handleProductsResponse(response);
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                  @NonNull Throwable t) {
-                swipeRefresh.setRefreshing(false);
-                Log.e(TAG, "Failed to load user products", t);
-                showEmptyState("Failed to load products");
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                handleProductsError(t);
             }
         });
     }
 
+    private void loadMoreProducts() {
+        if (isLoading || isLastPage) return;
+
+        currentPage++;
+        loadUserProducts();
+    }
+
+    private void refreshData() {
+        currentPage = 0;
+        isLastPage = false;
+        userProducts.clear();
+        loadUserProfile();
+    }
+
+    private void refreshProducts() {
+        currentPage = 0;
+        isLastPage = false;
+        userProducts.clear();
+        loadUserProducts();
+    }
+
     @SuppressWarnings("unchecked")
     private void handleProductsResponse(Response<StandardResponse<Map<String, Object>>> response) {
+        isLoading = false;
+        progressBar.setVisibility(View.GONE);
+        swipeRefresh.setRefreshing(false);
+
         try {
             if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                 Map<String, Object> data = response.body().getData();
                 List<Map<String, Object>> productMaps = (List<Map<String, Object>>) data.get("content");
 
-                if (productMaps != null && !productMaps.isEmpty()) {
-                    products.clear();
+                if (productMaps != null) {
+                    int oldSize = userProducts.size();
+
                     for (Map<String, Object> productMap : productMaps) {
                         Product product = parseProductFromMap(productMap);
                         if (product != null) {
-                            products.add(product);
+                            // Filter by current tab
+                            if ((currentTab.equals("ACTIVE") && product.isAvailable()) ||
+                                    (currentTab.equals("SOLD") && product.isSold())) {
+                                userProducts.add(product);
+                            }
                         }
                     }
-                    adapter.notifyDataSetChanged();
-                    hideEmptyState();
-                } else {
-                    showEmptyState("No products found");
+
+                    // Update pagination
+                    Boolean isLast = (Boolean) data.get("last");
+                    isLastPage = isLast != null ? isLast : true;
+
+                    // Update UI
+                    showContentState();
+
+                    if (userProducts.isEmpty()) {
+                        showEmptyState();
+                    } else {
+                        hideEmptyState();
+                        // TODO: Notify adapter
+                        // adapter.notifyItemRangeInserted(oldSize, userProducts.size() - oldSize);
+                    }
                 }
             } else {
-                showEmptyState("Failed to load products");
+                handleProductsError(new Exception("Failed to load products"));
             }
         } catch (Exception e) {
             Log.e(TAG, "Error parsing products response", e);
-            showEmptyState("Error loading products");
+            handleProductsError(e);
         }
     }
 
     private Product parseProductFromMap(Map<String, Object> productMap) {
-        // TODO: Implement proper product parsing
+        // Same implementation as in other activities
         try {
             Product product = new Product();
-            product.setId(getLongFromMap(productMap, "id"));
+            product.setId(((Number) productMap.get("id")).longValue());
             product.setTitle((String) productMap.get("title"));
+            product.setDescription((String) productMap.get("description"));
+            product.setLocation((String) productMap.get("location"));
+
+            Object price = productMap.get("price");
+            if (price instanceof Number) {
+                product.setPrice(new java.math.BigDecimal(price.toString()));
+            }
+
+            String conditionStr = (String) productMap.get("condition");
+            if (conditionStr != null) {
+                product.setCondition(Product.ProductCondition.fromString(conditionStr));
+            }
+
+            String statusStr = (String) productMap.get("status");
+            if (statusStr != null) {
+                product.setStatus(Product.ProductStatus.fromString(statusStr));
+            }
+
+            @SuppressWarnings("unchecked")
+            List<String> imageUrls = (List<String>) productMap.get("imageUrls");
+            if (imageUrls != null) {
+                product.setImageUrls(imageUrls);
+            }
+
             return product;
         } catch (Exception e) {
             Log.e(TAG, "Error parsing product", e);
@@ -307,78 +417,93 @@ public class UserProfileActivity extends AppCompatActivity implements ProductGri
         }
     }
 
-    private Long getLongFromMap(Map<String, Object> map, String key) {
-        Object value = map.get(key);
-        if (value instanceof Number) {
-            return ((Number) value).longValue();
-        }
-        return null;
-    }
+    private void handleProductsError(Throwable t) {
+        isLoading = false;
+        progressBar.setVisibility(View.GONE);
+        swipeRefresh.setRefreshing(false);
 
-    private void loadUserReviews() {
-        // TODO: Implement reviews loading
-        showEmptyState("Reviews coming soon");
-    }
+        Log.e(TAG, "Failed to load products", t);
 
-    private void refreshCurrentTab() {
-        if (currentTab.equals("products")) {
-            loadUserProducts();
-        } else {
-            loadUserReviews();
+        if (userProducts.isEmpty()) {
+            showEmptyState();
         }
     }
 
-    private void startChatWithUser() {
+    private void startConversation() {
         if (user == null) return;
 
         Intent intent = new Intent(this, ChatActivity.class);
-        intent.putExtra("sellerId", user.getId());
-        intent.putExtra("sellerName", user.getDisplayNameOrFullName());
+        intent.putExtra(Constants.BUNDLE_USER_ID, userId);
+        intent.putExtra("otherUserName", user.getDisplayOrFullName());
         startActivity(intent);
     }
 
-    private void toggleFollowUser() {
-        // TODO: Implement follow/unfollow functionality
-        isFollowing = !isFollowing;
-        updateFollowButton();
-
-        String message = isFollowing ? "Following " + user.getDisplayNameOrFullName() : "Unfollowed";
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-    }
-
-    private void updateFollowButton() {
-        if (isFollowing) {
-            btnFollow.setText("Unfollow");
-            btnFollow.setBackgroundColor(getColor(R.color.secondary_color));
-        } else {
-            btnFollow.setText("Follow");
-            btnFollow.setBackgroundColor(getColor(R.color.primary_color));
+    private void callUser() {
+        if (user == null || user.getContactInfo() == null) {
+            Toast.makeText(this, "Contact information not available", Toast.LENGTH_SHORT).show();
+            return;
         }
+
+        // TODO: Implement call functionality
+        Toast.makeText(this, "Call feature - Coming soon", Toast.LENGTH_SHORT).show();
     }
 
-    private void showEmptyState(String message) {
-        tvEmpty.setText(message);
-        tvEmpty.setVisibility(View.VISIBLE);
-        rvProducts.setVisibility(View.GONE);
-    }
-
-    private void hideEmptyState() {
-        tvEmpty.setVisibility(View.GONE);
-        rvProducts.setVisibility(View.VISIBLE);
-    }
-
-    @Override
-    public void onProductClick(Product product) {
+    private void onProductClick(Product product) {
         Intent intent = new Intent(this, ProductDetailActivity.class);
         intent.putExtra(Constants.BUNDLE_PRODUCT_ID, product.getId());
         startActivity(intent);
     }
 
+    private void handleLoadingError(Throwable t) {
+        Log.e(TAG, "Failed to load user profile", t);
+
+        if (!NetworkUtils.isNetworkAvailable(this)) {
+            showErrorState("No internet connection");
+        } else {
+            showErrorState(NetworkUtils.getNetworkErrorMessage(t));
+        }
+    }
+
+    private void showLoadingState() {
+        loadingView.setVisibility(View.VISIBLE);
+        contentView.setVisibility(View.GONE);
+        errorView.setVisibility(View.GONE);
+    }
+
+    private void showContentState() {
+        loadingView.setVisibility(View.GONE);
+        contentView.setVisibility(View.VISIBLE);
+        errorView.setVisibility(View.GONE);
+    }
+
+    private void showErrorState(String message) {
+        loadingView.setVisibility(View.GONE);
+        contentView.setVisibility(View.GONE);
+        errorView.setVisibility(View.VISIBLE);
+
+        TextView tvError = errorView.findViewById(R.id.tv_error);
+        if (tvError != null) {
+            tvError.setText(message);
+        }
+    }
+
+    private void showEmptyState() {
+        rvProducts.setVisibility(View.GONE);
+        tvEmpty.setVisibility(View.VISIBLE);
+
+        String emptyMessage = currentTab.equals("ACTIVE") ?
+                "No active listings" : "No sold items";
+        tvEmpty.setText(emptyMessage);
+    }
+
+    private void hideEmptyState() {
+        rvProducts.setVisibility(View.VISIBLE);
+        tvEmpty.setVisibility(View.GONE);
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        if (!isOwnProfile) {
-            getMenuInflater().inflate(R.menu.user_profile_menu, menu);
-        }
+        getMenuInflater().inflate(R.menu.menu_user_profile, menu);
         return true;
     }
 
@@ -387,39 +512,36 @@ public class UserProfileActivity extends AppCompatActivity implements ProductGri
         int itemId = item.getItemId();
 
         if (itemId == android.R.id.home) {
-            finish();
+            onBackPressed();
             return true;
         } else if (itemId == R.id.action_share) {
-            shareUserProfile();
+            shareProfile();
             return true;
         } else if (itemId == R.id.action_report) {
             reportUser();
-            return true;
-        } else if (itemId == R.id.action_block) {
-            blockUser();
             return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    private void shareUserProfile() {
+    private void shareProfile() {
         if (user == null) return;
+
+        String shareText = user.getDisplayOrFullName() + "'s profile on TradeUp";
 
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_TEXT,
-                "Check out " + user.getDisplayNameOrFullName() + "'s profile on NewTrade!");
-        startActivity(Intent.createChooser(shareIntent, "Share Profile"));
+        shareIntent.putExtra(Intent.EXTRA_TEXT, shareText);
+
+        Intent chooser = Intent.createChooser(shareIntent, "Share Profile");
+        if (shareIntent.resolveActivity(getPackageManager()) != null) {
+            startActivity(chooser);
+        }
     }
 
     private void reportUser() {
         // TODO: Implement report user functionality
-        Toast.makeText(this, "Report functionality coming soon", Toast.LENGTH_SHORT).show();
-    }
-
-    private void blockUser() {
-        // TODO: Implement block user functionality
-        Toast.makeText(this, "Block functionality coming soon", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Report user - Coming soon", Toast.LENGTH_SHORT).show();
     }
 }
