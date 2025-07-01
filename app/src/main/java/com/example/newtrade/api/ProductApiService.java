@@ -1,7 +1,8 @@
 // app/src/main/java/com/example/newtrade/api/ProductApiService.java
 package com.example.newtrade.api;
 
-import com.example.newtrade.models.Product;
+import com.example.newtrade.models.ProductRequest;
+import com.example.newtrade.models.ProductResponse;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.models.PagedResponse;
 
@@ -21,10 +22,31 @@ import retrofit2.http.Query;
 public interface ProductApiService {
 
     /**
+     * Create new product
+     */
+    @POST("products")
+    Call<StandardResponse<ProductResponse>> createProduct(@Body ProductRequest request);
+
+    /**
+     * Update product
+     */
+    @PUT("products/{id}")
+    Call<StandardResponse<ProductResponse>> updateProduct(
+            @Path("id") Long id,
+            @Body ProductRequest request
+    );
+
+    /**
+     * Get product by ID
+     */
+    @GET("products/{id}")
+    Call<StandardResponse<ProductResponse>> getProductById(@Path("id") Long id);
+
+    /**
      * Get all products with filters
      */
     @GET("products")
-    Call<StandardResponse<PagedResponse<Product>>> getAllProducts(
+    Call<StandardResponse<PagedResponse<ProductResponse>>> getAllProducts(
             @Query("page") int page,
             @Query("size") int size,
             @Query("sortBy") String sortBy,
@@ -39,7 +61,7 @@ public interface ProductApiService {
      * Search products
      */
     @GET("products/search")
-    Call<StandardResponse<PagedResponse<Product>>> searchProducts(
+    Call<StandardResponse<PagedResponse<ProductResponse>>> searchProducts(
             @Query("query") String query,
             @Query("page") int page,
             @Query("size") int size,
@@ -53,24 +75,33 @@ public interface ProductApiService {
     );
 
     /**
-     * Get product by ID
+     * Get my products
      */
-    @GET("products/{id}")
-    Call<StandardResponse<Product>> getProductById(@Path("id") Long id);
+    @GET("products/my-products")
+    Call<StandardResponse<PagedResponse<ProductResponse>>> getMyProducts(
+            @Query("page") int page,
+            @Query("size") int size,
+            @Query("status") String status
+    );
 
     /**
-     * Create new product
+     * Get products by user ID
      */
-    @POST("products")
-    Call<StandardResponse<Product>> createProduct(@Body ProductCreateRequest request);
+    @GET("products/user/{userId}")
+    Call<StandardResponse<PagedResponse<ProductResponse>>> getUserProducts(
+            @Path("userId") Long userId,
+            @Query("page") int page,
+            @Query("size") int size
+    );
 
     /**
-     * Update product
+     * Get products by category
      */
-    @PUT("products/{id}")
-    Call<StandardResponse<Product>> updateProduct(
-            @Path("id") Long id,
-            @Body ProductUpdateRequest request
+    @GET("products/category/{categoryId}")
+    Call<StandardResponse<PagedResponse<ProductResponse>>> getProductsByCategory(
+            @Path("categoryId") Long categoryId,
+            @Query("page") int page,
+            @Query("size") int size
     );
 
     /**
@@ -80,40 +111,10 @@ public interface ProductApiService {
     Call<StandardResponse<Void>> deleteProduct(@Path("id") Long id);
 
     /**
-     * Get products by user ID
-     */
-    @GET("products/user/{userId}")
-    Call<StandardResponse<PagedResponse<Product>>> getUserProducts(
-            @Path("userId") Long userId,
-            @Query("page") int page,
-            @Query("size") int size
-    );
-
-    /**
-     * Get my products
-     */
-    @GET("products/my-products")
-    Call<StandardResponse<PagedResponse<Product>>> getMyProducts(
-            @Query("page") int page,
-            @Query("size") int size,
-            @Query("status") String status
-    );
-
-    /**
-     * Get products by category
-     */
-    @GET("products/category/{categoryId}")
-    Call<StandardResponse<PagedResponse<Product>>> getProductsByCategory(
-            @Path("categoryId") Long categoryId,
-            @Query("page") int page,
-            @Query("size") int size
-    );
-
-    /**
      * Mark product as sold
      */
     @PUT("products/{id}/mark-sold")
-    Call<StandardResponse<Product>> markAsSold(@Path("id") Long id);
+    Call<StandardResponse<ProductResponse>> markAsSold(@Path("id") Long id);
 
     /**
      * Archive product
@@ -122,22 +123,22 @@ public interface ProductApiService {
     Call<StandardResponse<Void>> archiveProduct(@Path("id") Long id);
 
     /**
-     * Get product analytics
-     */
-    @GET("products/{id}/analytics")
-    Call<StandardResponse<Map<String, Object>>> getProductAnalytics(@Path("id") Long id);
-
-    /**
      * Increment view count
      */
     @POST("products/{id}/view")
     Call<StandardResponse<Void>> incrementViewCount(@Path("id") Long id);
 
     /**
+     * Get product analytics
+     */
+    @GET("products/{id}/analytics")
+    Call<StandardResponse<Map<String, Object>>> getProductAnalytics(@Path("id") Long id);
+
+    /**
      * Get recommended products
      */
     @GET("products/recommendations")
-    Call<StandardResponse<List<Product>>> getRecommendations(
+    Call<StandardResponse<List<ProductResponse>>> getRecommendations(
             @Query("latitude") Double latitude,
             @Query("longitude") Double longitude,
             @Query("limit") int limit
@@ -147,101 +148,11 @@ public interface ProductApiService {
      * Get featured products
      */
     @GET("products/featured")
-    Call<StandardResponse<List<Product>>> getFeaturedProducts(@Query("limit") int limit);
+    Call<StandardResponse<List<ProductResponse>>> getFeaturedProducts(@Query("limit") int limit);
 
     /**
      * Get recent products
      */
     @GET("products/recent")
-    Call<StandardResponse<List<Product>>> getRecentProducts(@Query("limit") int limit);
-
-    // =============================================
-    // REQUEST CLASSES
-    // =============================================
-
-    class ProductCreateRequest {
-        private String title;
-        private String description;
-        private BigDecimal price;
-        private String conditionType;
-        private String location;
-        private Double latitude;
-        private Double longitude;
-        private Long categoryId;
-        private List<String> imageUrls;
-
-        // Constructor
-        public ProductCreateRequest(String title, String description, BigDecimal price,
-                                    String conditionType, String location, Long categoryId) {
-            this.title = title;
-            this.description = description;
-            this.price = price;
-            this.conditionType = conditionType;
-            this.location = location;
-            this.categoryId = categoryId;
-        }
-
-        // Getters and Setters
-        public String getTitle() { return title; }
-        public void setTitle(String title) { this.title = title; }
-
-        public String getDescription() { return description; }
-        public void setDescription(String description) { this.description = description; }
-
-        public BigDecimal getPrice() { return price; }
-        public void setPrice(BigDecimal price) { this.price = price; }
-
-        public String getConditionType() { return conditionType; }
-        public void setConditionType(String conditionType) { this.conditionType = conditionType; }
-
-        public String getLocation() { return location; }
-        public void setLocation(String location) { this.location = location; }
-
-        public Double getLatitude() { return latitude; }
-        public void setLatitude(Double latitude) { this.latitude = latitude; }
-
-        public Double getLongitude() { return longitude; }
-        public void setLongitude(Double longitude) { this.longitude = longitude; }
-
-        public Long getCategoryId() { return categoryId; }
-        public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
-
-        public List<String> getImageUrls() { return imageUrls; }
-        public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }
-    }
-
-    class ProductUpdateRequest {
-        private String title;
-        private String description;
-        private BigDecimal price;
-        private String conditionType;
-        private String location;
-        private Double latitude;
-        private Double longitude;
-        private Long categoryId;
-        private List<String> imageUrls;
-
-        // Same structure as ProductCreateRequest
-        // Getters and setters...
-        public String getTitle() { return title; }
-        public void setTitle(String title) { this.title = title; }
-
-        public String getDescription() { return description; }
-        public void setDescription(String description) { this.description = description; }
-
-        public BigDecimal getPrice() { return price; }
-        public void setPrice(BigDecimal price) { this.price = price; }
-
-        public String getConditionType() { return conditionType; }
-        public void setConditionType(String conditionType) { this.conditionType = conditionType; }
-
-        public String getLocation() { return location; }
-        public void setLocation(String location) { this.location = location; }
-
-        public Long getCategoryId() { return categoryId; }
-        public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
-
-        public List<String> getImageUrls() { return imageUrls; }
-        public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }
-    }
+    Call<StandardResponse<List<ProductResponse>>> getRecentProducts(@Query("limit") int limit);
 }

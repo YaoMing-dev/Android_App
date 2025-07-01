@@ -27,17 +27,10 @@ public class PagedResponse<T> {
     @SerializedName("last")
     private boolean last;
 
-    @SerializedName("numberOfElements")
-    private int numberOfElements;
-
-    @SerializedName("empty")
-    private boolean empty;
-
     // Constructors
     public PagedResponse() {}
 
-    public PagedResponse(List<T> content, int page, int size, long totalElements,
-                         int totalPages, boolean first, boolean last) {
+    public PagedResponse(List<T> content, int page, int size, long totalElements, int totalPages, boolean first, boolean last) {
         this.content = content;
         this.page = page;
         this.size = size;
@@ -48,97 +41,46 @@ public class PagedResponse<T> {
     }
 
     // Getters and Setters
-    public List<T> getContent() {
-        return content;
-    }
+    public List<T> getContent() { return content; }
+    public void setContent(List<T> content) { this.content = content; }
 
-    public void setContent(List<T> content) {
-        this.content = content;
-    }
+    public int getPage() { return page; }
+    public void setPage(int page) { this.page = page; }
 
-    public int getPage() {
-        return page;
-    }
+    public int getSize() { return size; }
+    public void setSize(int size) { this.size = size; }
 
-    public void setPage(int page) {
-        this.page = page;
-    }
+    public long getTotalElements() { return totalElements; }
+    public void setTotalElements(long totalElements) { this.totalElements = totalElements; }
 
-    public int getSize() {
-        return size;
-    }
+    public int getTotalPages() { return totalPages; }
+    public void setTotalPages(int totalPages) { this.totalPages = totalPages; }
 
-    public void setSize(int size) {
-        this.size = size;
-    }
+    public boolean isFirst() { return first; }
+    public void setFirst(boolean first) { this.first = first; }
 
-    public long getTotalElements() {
-        return totalElements;
-    }
-
-    public void setTotalElements(long totalElements) {
-        this.totalElements = totalElements;
-    }
-
-    public int getTotalPages() {
-        return totalPages;
-    }
-
-    public void setTotalPages(int totalPages) {
-        this.totalPages = totalPages;
-    }
-
-    public boolean isFirst() {
-        return first;
-    }
-
-    public void setFirst(boolean first) {
-        this.first = first;
-    }
-
-    public boolean isLast() {
-        return last;
-    }
-
-    public void setLast(boolean last) {
-        this.last = last;
-    }
-
-    public int getNumberOfElements() {
-        return numberOfElements;
-    }
-
-    public void setNumberOfElements(int numberOfElements) {
-        this.numberOfElements = numberOfElements;
-    }
-
-    public boolean isEmpty() {
-        return empty;
-    }
-
-    public void setEmpty(boolean empty) {
-        this.empty = empty;
-    }
+    public boolean isLast() { return last; }
+    public void setLast(boolean last) { this.last = last; }
 
     // Utility methods
     public boolean hasContent() {
         return content != null && !content.isEmpty();
     }
 
-    public boolean hasNextPage() {
+    public boolean hasNext() {
         return !last;
     }
 
-    public boolean hasPreviousPage() {
+    public boolean hasPrevious() {
         return !first;
     }
 
     public int getNextPage() {
-        return hasNextPage() ? page + 1 : page;
+        return hasNext() ? page + 1 : page;
     }
 
     public int getPreviousPage() {
-        return hasPreviousPage() ? page - 1 : page;
+        return hasPrevious() ? page - 1 : page;
     }
 
     @Override

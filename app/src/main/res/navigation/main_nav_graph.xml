@@ -46,7 +46,7 @@
     <!-- ===== ADD PRODUCT FRAGMENT ===== -->
     <fragment
         android:id="@+id/nav_add_product"
-        android:name="com.example.newtrade.ui.product.AddProductFragment"
+        android:name="com.example.newtrade.ui.product.product.AddProductFragment"
         android:label="@string/nav_sell"
         tools:layout="@layout/fragment_add_product">
 

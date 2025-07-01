@@ -78,6 +78,9 @@ public class ApiClient {
         return retrofit;
     }
 
+
+
+
     // =============================================
     // API SERVICE GETTERS
     // =============================================
@@ -230,6 +233,18 @@ public class ApiClient {
     /**
      * Clear all API service instances (for logout)
      */
+
+
+    private static CategoryApiService categoryApiService;
+
+    public static CategoryApiService getCategoryService() {
+        if (categoryApiService == null) {
+            categoryApiService = getRetrofit().create(CategoryApiService.class);
+        }
+        return categoryApiService;
+    }
+
+    // Cập nhật clearInstances method:
     public static void clearInstances() {
         authApiService = null;
         productApiService = null;
@@ -237,6 +252,8 @@ public class ApiClient {
         chatApiService = null;
         offerApiService = null;
         fileUploadApiService = null;
+        categoryApiService = null; // Add this line
         Log.d(TAG, "✅ API service instances cleared");
     }
+
 }

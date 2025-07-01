@@ -5,7 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import androidx.annotation.NonNull;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
@@ -13,7 +13,6 @@ import androidx.fragment.app.FragmentTransaction;
 import com.example.newtrade.ui.auth.LoginActivity;
 import com.example.newtrade.ui.home.HomeFragment;
 import com.example.newtrade.ui.search.SearchFragment;
-import com.example.newtrade.ui.product.AddProductFragment;
 import com.example.newtrade.ui.chat.ChatListFragment;
 import com.example.newtrade.ui.profile.ProfileFragment;
 import com.example.newtrade.utils.SharedPrefsManager;
