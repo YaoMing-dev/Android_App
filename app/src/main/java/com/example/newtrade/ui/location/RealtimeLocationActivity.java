@@ -1,16 +1,10 @@
 // app/src/main/java/com/example/newtrade/ui/location/RealtimeLocationActivity.java
-// ✅ GPS Realtime với WebSocket
 package com.example.newtrade.ui.location;
 
 import android.Manifest;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.util.Log;
 import android.view.MenuItem;
 import android.widget.TextView;
@@ -22,7 +16,7 @@ import androidx.core.app.ActivityCompat;
 
 import com.example.newtrade.R;
 import com.example.newtrade.utils.NavigationUtils;
-import com.example.newtrade.websocket.RealtimeWebSocketService;
+import com.example.newtrade.websocket.LocationWebSocketManager; // ✅ NEW: Use LocationWebSocketManager
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -34,7 +28,7 @@ import com.google.android.material.appbar.MaterialToolbar;
 import java.util.Map;
 
 public class RealtimeLocationActivity extends AppCompatActivity implements
-        RealtimeWebSocketService.LocationListener {
+        LocationWebSocketManager.LocationListener { // ✅ FIX: Use new interface
 
     private static final String TAG = "RealtimeLocationActivity";
     private static final int LOCATION_PERMISSION_REQUEST = 1001;
@@ -53,29 +47,8 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
     private LocationCallback locationCallback;
     private Location lastKnownLocation;
 
-    // WebSocket Service
-    private RealtimeWebSocketService webSocketService;
-    private boolean isServiceBound = false;
-
-    private ServiceConnection serviceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            RealtimeWebSocketService.LocalBinder binder = (RealtimeWebSocketService.LocalBinder) service;
-            webSocketService = binder.getService();
-            isServiceBound = true;
-
-            webSocketService.addLocationListener(RealtimeLocationActivity.this);
-
-            Log.d(TAG, "✅ WebSocket service connected for location");
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            webSocketService = null;
-            isServiceBound = false;
-            Log.d(TAG, "❌ WebSocket service disconnected");
-        }
-    };
+    // WebSocket Manager
+    private LocationWebSocketManager locationWebSocketManager; // ✅ FIX: Use new manager
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,7 +58,7 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
         initViews();
         setupToolbar();
         initLocationServices();
-        startAndBindWebSocketService();
+        initWebSocketManager(); // ✅ FIX: Use new method
 
         Log.d(TAG, "✅ RealtimeLocationActivity created");
     }
@@ -132,10 +105,11 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
         }
     }
 
-    private void startAndBindWebSocketService() {
-        Intent serviceIntent = new Intent(this, RealtimeWebSocketService.class);
-        startService(serviceIntent);
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE);
+    // ✅ FIX: New method to init WebSocket manager
+    private void initWebSocketManager() {
+        locationWebSocketManager = LocationWebSocketManager.getInstance();
+        locationWebSocketManager.addLocationListener(this);
+        Log.d(TAG, "✅ LocationWebSocketManager initialized");
     }
 
     private boolean hasLocationPermission() {
@@ -180,17 +154,17 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
         tvCurrentLocation.setText(locationText);
 
         // Send to WebSocket
-        if (webSocketService != null && webSocketService.isConnected()) {
-            webSocketService.sendLocationUpdate(location.getLatitude(), location.getLongitude());
+        if (locationWebSocketManager != null && locationWebSocketManager.isConnected()) {
+            locationWebSocketManager.sendLocationUpdate(location.getLatitude(), location.getLongitude());
 
             // Request nearby users
-            webSocketService.requestNearbyUsers(location.getLatitude(), location.getLongitude(), 5.0); // 5km radius
+            locationWebSocketManager.requestNearbyUsers(location.getLatitude(), location.getLongitude(), 5.0); // 5km radius
         }
 
         Log.d(TAG, "📍 Location updated: " + location.getLatitude() + ", " + location.getLongitude());
     }
 
-    // ===== Location Listener =====
+    // ===== LocationWebSocketManager.LocationListener Implementation =====
 
     @Override
     public void onUserLocationUpdate(Long userId, double latitude, double longitude) {
@@ -218,16 +192,16 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
                     nearbyText.append("• ")
                             .append(name != null ? name : "User " + userId)
                             .append(" (")
-                            .append(String.format("%.1f km", distance))
+                            .append(distance != null ? String.format("%.1fkm", distance) : "Unknown distance")
                             .append(")\n");
                 }
             }
 
             tvNearbyUsers.setText(nearbyText.toString());
-
-            Log.d(TAG, "👥 Updated nearby users: " + nearbyUsers.size());
         });
     }
+
+    // ===== PERMISSION HANDLING =====
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -236,40 +210,46 @@ public class RealtimeLocationActivity extends AppCompatActivity implements
         if (requestCode == LOCATION_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startLocationUpdates();
-                Toast.makeText(this, "✅ Location permission granted", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "❌ Location permission denied", Toast.LENGTH_LONG).show();
-                tvLocationStatus.setText("❌ Location permission required");
+                Toast.makeText(this, "Location permission required for this feature", Toast.LENGTH_LONG).show();
+                tvLocationStatus.setText("❌ Location permission denied");
             }
         }
     }
 
+    // ===== LIFECYCLE =====
+
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (NavigationUtils.handleBackButton(this, item)) {
-            return true;
+    protected void onResume() {
+        super.onResume();
+        if (hasLocationPermission()) {
+            startLocationUpdates();
         }
-        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopLocationUpdates();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
 
-        // Stop location updates
         stopLocationUpdates();
 
-        // Remove location listener
-        if (webSocketService != null) {
-            webSocketService.removeLocationListener(this);
+        if (locationWebSocketManager != null) {
+            locationWebSocketManager.removeLocationListener(this);
         }
+    }
 
-        // Unbind service
-        if (isServiceBound) {
-            unbindService(serviceConnection);
-            isServiceBound = false;
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
         }
-
-        Log.d(TAG, "🧹 RealtimeLocationActivity destroyed");
+        return super.onOptionsItemSelected(item);
     }
 }

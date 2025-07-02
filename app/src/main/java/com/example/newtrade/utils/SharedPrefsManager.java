@@ -1,126 +1,149 @@
 // app/src/main/java/com/example/newtrade/utils/SharedPrefsManager.java
-// ✅ FIXED - Add all missing methods
 package com.example.newtrade.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 public class SharedPrefsManager {
-    private static final String PREF_NAME = "TradeUpPrefs";
-    private static final String KEY_USER_ID = "user_id";
-    private static final String KEY_USER_NAME = "user_name";
-    private static final String KEY_USER_EMAIL = "user_email";
-    private static final String KEY_USER_PROFILE_PICTURE = "user_profile_picture";
-    private static final String KEY_ACCESS_TOKEN = "access_token";
-    private static final String KEY_FCM_TOKEN = "fcm_token"; // ✅ ADD
-    private static final String KEY_IS_LOGGED_IN = "is_logged_in";
 
+    private static final String TAG = "SharedPrefsManager";
     private static SharedPrefsManager instance;
-    private SharedPreferences sharedPreferences;
-    private SharedPreferences.Editor editor;
-
-    private SharedPrefsManager(Context context) {
-        sharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        editor = sharedPreferences.edit();
-    }
+    private SharedPreferences prefs;
 
     public static synchronized SharedPrefsManager getInstance(Context context) {
         if (instance == null) {
-            instance = new SharedPrefsManager(context.getApplicationContext());
+            instance = new SharedPrefsManager(context);
         }
         return instance;
     }
 
-    // ✅ FIX: Add all missing saveUserSession methods
-    public void saveUserSession(Long userId, String userName, String userEmail, boolean isEmailVerified) {
-        editor.putLong(KEY_USER_ID, userId != null ? userId : 0);
-        editor.putString(KEY_USER_NAME, userName);
-        editor.putString(KEY_USER_EMAIL, userEmail);
-        editor.putBoolean(KEY_IS_LOGGED_IN, true);
-        // isEmailVerified is stored but we don't have a key for it in this simple version
-        editor.apply();
+    private SharedPrefsManager(Context context) {
+        prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
     }
 
-    // Overloaded method
-    public void saveUserSession(Long userId, String userName, String userEmail) {
-        saveUserSession(userId, userName, userEmail, true);
-    }
+    // ===== USER DATA =====
 
-    // ✅ FIX: Add missing saveUserData method
     public void saveUserData(Long userId, String userName, String userEmail, String profilePicture) {
-        editor.putLong(KEY_USER_ID, userId != null ? userId : 0);
-        editor.putString(KEY_USER_NAME, userName);
-        editor.putString(KEY_USER_EMAIL, userEmail);
-        editor.putString(KEY_USER_PROFILE_PICTURE, profilePicture);
-        editor.putBoolean(KEY_IS_LOGGED_IN, true);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putLong(Constants.PREF_USER_ID, userId != null ? userId : 0L);
+        editor.putString(Constants.PREF_USER_NAME, userName);
+        editor.putString(Constants.PREF_USER_EMAIL, userEmail);
+        editor.putString(Constants.PREF_USER_PROFILE_PICTURE, profilePicture);
+        editor.putBoolean(Constants.PREF_IS_LOGGED_IN, true);
         editor.apply();
+
+        Log.d(TAG, "✅ User data saved: " + userName + " (ID: " + userId + ")");
     }
 
-    // Original saveUserData method (keep for compatibility)
-    public void saveUserData(Long userId, String userName, String userEmail) {
-        saveUserData(userId, userName, userEmail, null);
-    }
-
-    // ✅ FIX: Add missing saveFcmToken method
-    public void saveFcmToken(String fcmToken) {
-        editor.putString(KEY_FCM_TOKEN, fcmToken);
-        editor.apply();
-    }
-
-    public void saveAccessToken(String accessToken) {
-        editor.putString(KEY_ACCESS_TOKEN, accessToken);
-        editor.apply();
-    }
-
-    // Getters
     public Long getUserId() {
-        long id = sharedPreferences.getLong(KEY_USER_ID, 0);
+        long id = prefs.getLong(Constants.PREF_USER_ID, 0L);
         return id > 0 ? id : null;
     }
 
     public String getUserName() {
-        return sharedPreferences.getString(KEY_USER_NAME, "");
+        return prefs.getString(Constants.PREF_USER_NAME, "");
     }
 
     public String getUserEmail() {
-        return sharedPreferences.getString(KEY_USER_EMAIL, "");
+        return prefs.getString(Constants.PREF_USER_EMAIL, "");
     }
 
     public String getUserProfilePicture() {
-        return sharedPreferences.getString(KEY_USER_PROFILE_PICTURE, "");
-    }
-
-    public String getAccessToken() {
-        return sharedPreferences.getString(KEY_ACCESS_TOKEN, "");
-    }
-
-    // ✅ FIX: Add missing getFcmToken method
-    public String getFcmToken() {
-        return sharedPreferences.getString(KEY_FCM_TOKEN, "");
+        return prefs.getString(Constants.PREF_USER_PROFILE_PICTURE, "");
     }
 
     public boolean isLoggedIn() {
-        return sharedPreferences.getBoolean(KEY_IS_LOGGED_IN, false);
+        return prefs.getBoolean(Constants.PREF_IS_LOGGED_IN, false) && getUserId() != null;
     }
 
-    public void clearUserSession() {
-        editor.clear();
-        editor.apply();
+    public boolean isEmailVerified() {
+        return prefs.getBoolean(Constants.PREF_IS_EMAIL_VERIFIED, false);
     }
 
-    // Additional helper methods
-    public void updateUserName(String userName) {
-        editor.putString(KEY_USER_NAME, userName);
-        editor.apply();
+    public void setEmailVerified(boolean verified) {
+        prefs.edit().putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, verified).apply();
     }
 
-    public void updateUserEmail(String userEmail) {
-        editor.putString(KEY_USER_EMAIL, userEmail);
-        editor.apply();
+    // ===== FCM TOKEN =====
+
+    public void saveFcmToken(String token) {
+        prefs.edit().putString(Constants.PREF_FCM_TOKEN, token).apply();
+        Log.d(TAG, "✅ FCM token saved");
     }
 
-    public void updateUserProfilePicture(String profilePicture) {
-        editor.putString(KEY_USER_PROFILE_PICTURE, profilePicture);
+    public String getFcmToken() {
+        return prefs.getString(Constants.PREF_FCM_TOKEN, "");
+    }
+
+    // ===== CHAT SETTINGS =====
+
+    public void saveLastConversationId(Long conversationId) {
+        prefs.edit().putLong("last_conversation_id", conversationId != null ? conversationId : 0L).apply();
+    }
+
+    public Long getLastConversationId() {
+        long id = prefs.getLong("last_conversation_id", 0L);
+        return id > 0 ? id : null;
+    }
+
+    public void setChatNotificationsEnabled(boolean enabled) {
+        prefs.edit().putBoolean("chat_notifications_enabled", enabled).apply();
+    }
+
+    public boolean isChatNotificationsEnabled() {
+        return prefs.getBoolean("chat_notifications_enabled", true);
+    }
+
+    // ===== APP SETTINGS =====
+
+    public void setFirstLaunch(boolean isFirstLaunch) {
+        prefs.edit().putBoolean("is_first_launch", isFirstLaunch).apply();
+    }
+
+    public boolean isFirstLaunch() {
+        return prefs.getBoolean("is_first_launch", true);
+    }
+
+    public void saveAppVersion(String version) {
+        prefs.edit().putString("app_version", version).apply();
+    }
+
+    public String getAppVersion() {
+        return prefs.getString("app_version", "1.0.0");
+    }
+
+    // ===== CLEAR DATA =====
+
+    public void clearUserData() {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.remove(Constants.PREF_USER_ID);
+        editor.remove(Constants.PREF_USER_NAME);
+        editor.remove(Constants.PREF_USER_EMAIL);
+        editor.remove(Constants.PREF_USER_PROFILE_PICTURE);
+        editor.remove(Constants.PREF_IS_LOGGED_IN);
+        editor.remove(Constants.PREF_IS_EMAIL_VERIFIED);
+        editor.remove("last_conversation_id");
         editor.apply();
+
+        Log.d(TAG, "✅ User data cleared");
+    }
+
+    public void clearAllData() {
+        prefs.edit().clear().apply();
+        Log.d(TAG, "✅ All preferences cleared");
+    }
+
+    // ===== DEBUG =====
+
+    public void logAllPreferences() {
+        Log.d(TAG, "=== SHARED PREFERENCES DEBUG ===");
+        Log.d(TAG, "User ID: " + getUserId());
+        Log.d(TAG, "User Name: " + getUserName());
+        Log.d(TAG, "User Email: " + getUserEmail());
+        Log.d(TAG, "Is Logged In: " + isLoggedIn());
+        Log.d(TAG, "Is Email Verified: " + isEmailVerified());
+        Log.d(TAG, "FCM Token: " + (getFcmToken().isEmpty() ? "Not set" : "Set"));
+        Log.d(TAG, "===========================");
     }
 }

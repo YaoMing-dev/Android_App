@@ -1,10 +1,11 @@
 // app/src/main/java/com/example/newtrade/adapters/MessageAdapter.java
 package com.example.newtrade.adapters;
 
+import android.content.Context;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -17,13 +18,16 @@ import java.util.List;
 
 public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
-    private static final int TYPE_SENT = 1;
-    private static final int TYPE_RECEIVED = 2;
+    private static final String TAG = "MessageAdapter";
+    private static final int VIEW_TYPE_SENT = 1;
+    private static final int VIEW_TYPE_RECEIVED = 2;
 
-    private final List<Message> messages;
-    private final Long currentUserId;
+    private Context context;
+    private List<Message> messages;
+    private Long currentUserId;
 
-    public MessageAdapter(List<Message> messages, Long currentUserId) {
+    public MessageAdapter(Context context, List<Message> messages, Long currentUserId) {
+        this.context = context;
         this.messages = messages;
         this.currentUserId = currentUserId;
     }
@@ -31,23 +35,21 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     @Override
     public int getItemViewType(int position) {
         Message message = messages.get(position);
-        if (message.getSenderId() != null && message.getSenderId().equals(currentUserId)) {
-            return TYPE_SENT;
+        if (message.getSenderId().equals(currentUserId)) {
+            return VIEW_TYPE_SENT;
         } else {
-            return TYPE_RECEIVED;
+            return VIEW_TYPE_RECEIVED;
         }
     }
 
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        if (viewType == TYPE_SENT) {
-            View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_message_sent, parent, false);
+        if (viewType == VIEW_TYPE_SENT) {
+            View view = LayoutInflater.from(context).inflate(R.layout.item_message_sent, parent, false);
             return new SentMessageViewHolder(view);
         } else {
-            View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_message_received, parent, false);
+            View view = LayoutInflater.from(context).inflate(R.layout.item_message_received, parent, false);
             return new ReceivedMessageViewHolder(view);
         }
     }
@@ -70,46 +72,49 @@ public class MessageAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     // ViewHolder for sent messages
     static class SentMessageViewHolder extends RecyclerView.ViewHolder {
-        private final TextView tvMessageText;
-        private final TextView tvTimestamp;
+        TextView tvMessage, tvTime;
 
-        public SentMessageViewHolder(@NonNull View itemView) {
+        SentMessageViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvMessageText = itemView.findViewById(R.id.tv_message_text);
-            tvTimestamp = itemView.findViewById(R.id.tv_timestamp);
+            tvMessage = itemView.findViewById(R.id.tv_message);
+            tvTime = itemView.findViewById(R.id.tv_time);
+
+            Log.d("MessageAdapter", "SentMessageViewHolder - tvMessage: " + tvMessage + ", tvTime: " + tvTime);
         }
 
-        public void bind(Message message) {
-            tvMessageText.setText(message.getContent());
-            if (tvTimestamp != null) {
-                tvTimestamp.setText(message.getTimestamp() != null ? message.getTimestamp() : "");
+        void bind(Message message) {
+            if (tvMessage != null) {
+                tvMessage.setText(message.getContent() != null ? message.getContent() : "");
+            }
+            if (tvTime != null) {
+                tvTime.setText(message.getCreatedAt() != null ? message.getCreatedAt() : "");
             }
         }
     }
 
     // ViewHolder for received messages
     static class ReceivedMessageViewHolder extends RecyclerView.ViewHolder {
-        private final TextView tvMessageText;
-        private final TextView tvTimestamp;
-        private final ImageView ivSenderAvatar;
+        TextView tvMessage, tvTime;
 
-        public ReceivedMessageViewHolder(@NonNull View itemView) {
+        ReceivedMessageViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvMessageText = itemView.findViewById(R.id.tv_message_text);
-            tvTimestamp = itemView.findViewById(R.id.tv_timestamp);
-            ivSenderAvatar = itemView.findViewById(R.id.iv_sender_avatar);
+            tvMessage = itemView.findViewById(R.id.tv_message);
+            tvTime = itemView.findViewById(R.id.tv_time);
+
+            Log.d("MessageAdapter", "ReceivedMessageViewHolder - tvMessage: " + tvMessage + ", tvTime: " + tvTime);
         }
 
-        public void bind(Message message) {
-            tvMessageText.setText(message.getContent());
-            if (tvTimestamp != null) {
-                tvTimestamp.setText(message.getTimestamp() != null ? message.getTimestamp() : "");
+        void bind(Message message) {
+            if (tvMessage != null) {
+                tvMessage.setText(message.getContent() != null ? message.getContent() : "");
+            } else {
+                Log.e("MessageAdapter", "❌ tvMessage is null in ReceivedMessageViewHolder");
             }
 
-            // Set sender avatar if available
-            if (ivSenderAvatar != null) {
-                // Use placeholder for now
-                ivSenderAvatar.setImageResource(R.drawable.placeholder_avatar);
+            if (tvTime != null) {
+                tvTime.setText(message.getCreatedAt() != null ? message.getCreatedAt() : "");
+            } else {
+                Log.e("MessageAdapter", "❌ tvTime is null in ReceivedMessageViewHolder");
             }
         }
     }

@@ -1,5 +1,4 @@
 // app/src/main/java/com/example/newtrade/ui/profile/EditProfileActivity.java
-// ✅ COMPLETE REWRITE - No errors version
 package com.example.newtrade.ui.profile;
 
 import android.app.Activity;
@@ -9,7 +8,6 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
-import android.util.Patterns;
 import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.Toast;
@@ -20,16 +18,26 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
+import com.example.newtrade.api.ApiService;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.NavigationUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
+import com.example.newtrade.utils.ValidationUtils;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.textfield.TextInputEditText;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
 import de.hdodenhof.circleimageview.CircleImageView;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -95,57 +103,39 @@ public class EditProfileActivity extends AppCompatActivity {
         String profilePicture = prefsManager.getUserProfilePicture();
         if (!TextUtils.isEmpty(profilePicture)) {
             Glide.with(this)
-                    .load(profilePicture)
+                    .load(Constants.BASE_URL + profilePicture)
                     .placeholder(R.drawable.ic_person)
                     .error(R.drawable.ic_person)
                     .into(ivProfilePicture);
         }
 
-        // Load full profile from API
-        loadProfileFromAPI();
+        // Load additional profile data from server
+        loadProfileFromServer();
     }
 
-    private void loadProfileFromAPI() {
-        Long userId = prefsManager.getUserId();
-        if (userId == null || userId <= 0) {
-            Log.w(TAG, "Invalid user ID");
-            return;
-        }
+    private void loadProfileFromServer() {
+        ApiService apiService = ApiClient.getApiService();
+        Call<StandardResponse<Map<String, Object>>> call = apiService.getCurrentUserProfile(); // ✅ FIXED - No ID needed
 
-        Log.d(TAG, "📋 Loading profile from API for user: " + userId);
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                   Response<StandardResponse<Map<String, Object>>> response) {
 
-        // TODO: Implement when API is ready
-        // For now, just populate with mock data
-        populateMockProfile();
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Map<String, Object>> standardResponse = response.body();
 
-        /*
-        ApiClient.getApiService().getUserProfile(userId)
-                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                         Response<StandardResponse<Map<String, Object>>> response) {
-
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            Map<String, Object> profile = response.body().getData();
-                            populateProfile(profile);
-                            Log.d(TAG, "✅ Profile loaded from API");
-                        } else {
-                            Log.w(TAG, "⚠️ Failed to load profile from API");
-                        }
+                    if (standardResponse.isSuccess()) {
+                        populateProfile(standardResponse.getData());
                     }
+                }
+            }
 
-                    @Override
-                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        Log.e(TAG, "❌ Failed to load profile", t);
-                    }
-                });
-        */
-    }
-
-    private void populateMockProfile() {
-        // Mock data for testing
-        etBio.setText("I love buying and selling unique items!");
-        etContactInfo.setText("+84 901 234 567");
+            @Override
+            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                Log.e(TAG, "Failed to load profile from server", t);
+            }
+        });
     }
 
     private void populateProfile(Map<String, Object> profile) {
@@ -159,7 +149,7 @@ public class EditProfileActivity extends AppCompatActivity {
             String imageUrl = profile.get("profilePicture").toString();
             if (!TextUtils.isEmpty(imageUrl)) {
                 Glide.with(this)
-                        .load(imageUrl)
+                        .load(Constants.BASE_URL + imageUrl)
                         .placeholder(R.drawable.ic_person)
                         .error(R.drawable.ic_person)
                         .into(ivProfilePicture);
@@ -210,53 +200,151 @@ public class EditProfileActivity extends AppCompatActivity {
         isLoading = true;
         updateSaveButton(false, "Saving...");
 
-        // For now, just simulate success
-        simulateSuccessfulSave(displayName, email, bio, contactInfo);
-
-        // TODO: Implement real API call
-        // updateProfileData(displayName, email, bio, contactInfo, null);
-    }
-
-    private void simulateSuccessfulSave(String displayName, String email, String bio, String contactInfo) {
-        // Simulate network delay
-        new android.os.Handler().postDelayed(() -> {
-            // Update SharedPrefs
-            prefsManager.saveUserData(
-                    prefsManager.getUserId(),
-                    displayName,
-                    email,
-                    prefsManager.getUserProfilePicture()
-            );
-
-            resetSaveButton();
-            Toast.makeText(this, "✅ Profile updated successfully", Toast.LENGTH_SHORT).show();
-            setResult(RESULT_OK);
-            finish();
-
-            Log.d(TAG, "✅ Profile updated successfully (simulated)");
-        }, 2000);
+        // ✅ NEW: Use combined avatar upload + profile update
+        if (hasImageChanged && selectedImageUri != null) {
+            uploadAvatarAndUpdateProfile(displayName, email, bio, contactInfo);
+        } else {
+            // Update profile without image change
+            updateProfileData(displayName, email, bio, contactInfo);
+        }
     }
 
     private boolean validateInput(String displayName, String email) {
-        if (TextUtils.isEmpty(displayName)) {
-            etDisplayName.setError("Display name is required");
-            etDisplayName.requestFocus();
-            return false;
+        boolean isValid = true;
+
+        // Validate display name
+        String displayNameError = ValidationUtils.getDisplayNameError(displayName);
+        if (displayNameError != null) {
+            etDisplayName.setError(displayNameError);
+            isValid = false;
         }
 
-        if (displayName.length() < 2) {
-            etDisplayName.setError("Display name must be at least 2 characters");
-            etDisplayName.requestFocus();
-            return false;
+        // Validate email
+        String emailError = ValidationUtils.getEmailError(email);
+        if (emailError != null) {
+            etEmail.setError(emailError);
+            isValid = false;
         }
 
-        if (TextUtils.isEmpty(email) || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            etEmail.setError("Valid email is required");
-            etEmail.requestFocus();
-            return false;
+        return isValid;
+    }
+
+    // ✅ NEW: Combined avatar upload + profile update
+    private void uploadAvatarAndUpdateProfile(String displayName, String email, String bio, String contactInfo) {
+        try {
+            File imageFile = createTempFileFromUri(selectedImageUri);
+            RequestBody requestFile = RequestBody.create(MediaType.parse("image/*"), imageFile);
+            MultipartBody.Part imagePart = MultipartBody.Part.createFormData("file", imageFile.getName(), requestFile);
+
+            ApiService apiService = ApiClient.getApiService();
+            Call<StandardResponse<Map<String, String>>> call = apiService.uploadAndUpdateAvatar(imagePart); // ✅ NEW METHOD
+
+            call.enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+                @Override
+                public void onResponse(Call<StandardResponse<Map<String, String>>> call,
+                                       Response<StandardResponse<Map<String, String>>> response) {
+
+                    if (response.isSuccessful() && response.body() != null) {
+                        StandardResponse<Map<String, String>> standardResponse = response.body();
+
+                        if (standardResponse.isSuccess()) {
+                            Map<String, String> data = standardResponse.getData();
+                            String uploadedImageUrl = data.get("avatarUrl");
+
+                            Log.d(TAG, "✅ Avatar uploaded successfully: " + uploadedImageUrl);
+
+                            // Now update profile data
+                            updateProfileData(displayName, email, bio, contactInfo);
+
+                        } else {
+                            resetSaveButton();
+                            showError("Failed to upload avatar: " + standardResponse.getMessage());
+                        }
+                    } else {
+                        resetSaveButton();
+                        showError("Failed to upload avatar to server");
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
+                    resetSaveButton();
+                    Log.e(TAG, "❌ Avatar upload failed", t);
+                    showError("Network error while uploading avatar");
+                }
+            });
+
+        } catch (Exception e) {
+            resetSaveButton();
+            Log.e(TAG, "❌ Error preparing avatar for upload", e);
+            showError("Error preparing avatar: " + e.getMessage());
+        }
+    }
+
+    // ✅ FIXED: Use correct API endpoint
+    private void updateProfileData(String displayName, String email, String bio, String contactInfo) {
+        // Prepare update data
+        Map<String, Object> profileData = new HashMap<>();
+        profileData.put("displayName", displayName);
+        profileData.put("bio", bio);
+        profileData.put("contactInfo", contactInfo);
+
+        ApiService apiService = ApiClient.getApiService();
+        Call<StandardResponse<Map<String, Object>>> call = apiService.updateUserProfile(profileData); // ✅ FIXED - No userId needed
+
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                   Response<StandardResponse<Map<String, Object>>> response) {
+
+                resetSaveButton();
+
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Map<String, Object>> standardResponse = response.body();
+
+                    if (standardResponse.isSuccess()) {
+                        // Update SharedPrefs
+                        Long userId = prefsManager.getUserId();
+                        String currentProfilePicture = prefsManager.getUserProfilePicture();
+                        prefsManager.saveUserData(userId, displayName, email, currentProfilePicture);
+
+                        Toast.makeText(EditProfileActivity.this, "✅ Profile updated successfully!", Toast.LENGTH_SHORT).show();
+                        hasImageChanged = false; // Reset flag
+                        finish(); // Go back to profile
+
+                    } else {
+                        showError("Failed to update profile: " + standardResponse.getMessage());
+                    }
+                } else {
+                    showError("Failed to update profile");
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                resetSaveButton();
+                Log.e(TAG, "❌ Profile update failed", t);
+                showError(Constants.getNetworkErrorMessage(t));
+            }
+        });
+    }
+
+    private File createTempFileFromUri(Uri uri) throws IOException {
+        InputStream inputStream = getContentResolver().openInputStream(uri);
+        String fileName = "avatar_" + System.currentTimeMillis() + ".jpg";
+        File tempFile = new File(getCacheDir(), fileName);
+
+        FileOutputStream outputStream = new FileOutputStream(tempFile);
+        byte[] buffer = new byte[1024];
+        int length;
+        while ((length = inputStream.read(buffer)) > 0) {
+            outputStream.write(buffer, 0, length);
         }
 
-        return true;
+        outputStream.close();
+        inputStream.close();
+
+        return tempFile;
     }
 
     private void updateSaveButton(boolean enabled, String text) {
@@ -266,17 +354,17 @@ public class EditProfileActivity extends AppCompatActivity {
 
     private void resetSaveButton() {
         isLoading = false;
-        updateSaveButton(true, "💾 Save Changes");
+        updateSaveButton(true, "Save Changes");
     }
 
     private void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        Log.e(TAG, "Error: " + message);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (NavigationUtils.handleBackButton(this, item)) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
             return true;
         }
         return super.onOptionsItemSelected(item);

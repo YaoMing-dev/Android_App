@@ -1,71 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- app/src/main/res/layout/item_message_received.xml - FIXED -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="start"
     android:orientation="horizontal"
-    android:paddingHorizontal="@dimen/padding_lg"
-    android:paddingVertical="@dimen/chat_bubble_margin">
-
-    <!-- User Avatar -->
-    <de.hdodenhof.circleimageview.CircleImageView
-        android:id="@+id/iv_sender_avatar"
-        android:layout_width="@dimen/chat_avatar_size"
-        android:layout_height="@dimen/chat_avatar_size"
-        android:layout_marginEnd="@dimen/margin_sm"
-        android:src="@drawable/placeholder_avatar"
-        tools:src="@tools:sample/avatars" />
+    android:gravity="start"
+    android:padding="8dp">
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="60dp"
+        android:layout_marginEnd="64dp"
         android:orientation="vertical">
 
-        <!-- Message Bubble -->
-        <LinearLayout
+        <!-- ✅ FIX: Use same structure as sent message -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_message"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/chat_bubble_received"
-            android:orientation="vertical"
-            android:paddingHorizontal="@dimen/chat_bubble_padding_horizontal"
-            android:paddingVertical="@dimen/chat_bubble_padding_vertical">
+            android:background="@drawable/bg_message_received"
+            android:padding="12dp"
+            android:text="Hi there! I'm doing well, thanks!"
+            android:textColor="@android:color/black"
+            android:textSize="16sp" />
 
-            <!-- Message Text -->
-            <TextView
-                android:id="@+id/tv_message_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_size_md"
-                android:textIsSelectable="true"
-                tools:text="Yes, it's still available! Are you interested?" />
-
-            <!-- Message Image (if any) -->
-            <ImageView
-                android:id="@+id/iv_message_image"
-                android:layout_width="200dp"
-                android:layout_height="150dp"
-                android:layout_marginTop="@dimen/margin_sm"
-                android:background="@drawable/rounded_background_gray"
-                android:scaleType="centerCrop"
-                android:visibility="gone"
-                tools:src="@tools:sample/backgrounds/scenic"
-                tools:visibility="visible" />
-
-        </LinearLayout>
-
-        <!-- Timestamp -->
-        <TextView
-            android:id="@+id/tv_timestamp"
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/margin_xs"
-            android:textColor="@color/chat_timestamp"
-            android:textSize="@dimen/text_size_xs"
-            tools:text="14:32" />
+            android:layout_gravity="start"
+            android:layout_marginTop="4dp"
+            android:text="10:32 AM"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="12sp" />
 
     </LinearLayout>
 

@@ -1,49 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- app/src/main/res/layout/fragment_messages.xml -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/background_light">
+    android:background="@android:color/white">
 
-    <!-- Header -->
+    <!-- Toolbar/Header -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@color/white"
-        app:elevation="2dp">
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/primary_color"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="Messages"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary"
-            android:gravity="center" />
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <!-- New Message Button -->
+        <ImageButton
+            android:id="@+id/btn_new_message"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_add_message"
+            android:tint="@android:color/white"
+            android:contentDescription="New Message" />
 
     </LinearLayout>
 
-    <!-- Content -->
+    <!-- Content Container -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <RelativeLayout
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <!-- Conversations List -->
+            <!-- Conversations RecyclerView -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rv_conversations"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@color/white"
-                tools:listitem="@layout/item_conversation" />
+                android:padding="8dp"
+                android:clipToPadding="false" />
 
             <!-- Empty State -->
             <LinearLayout
@@ -58,42 +68,38 @@
                 <ImageView
                     android:layout_width="120dp"
                     android:layout_height="120dp"
-                    android:src="@drawable/ic_message"
-                    app:tint="@color/text_secondary"
+                    android:src="@drawable/ic_empty_messages"
+                    android:alpha="0.6"
                     android:layout_marginBottom="24dp" />
 
                 <TextView
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="No messages yet"
-                    android:textSize="20sp"
+                    android:textSize="18sp"
+                    android:textColor="@android:color/darker_gray"
                     android:textStyle="bold"
-                    android:textColor="@color/text_primary"
-                    android:gravity="center"
                     android:layout_marginBottom="8dp" />
 
                 <TextView
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Start shopping to connect with sellers"
-                    android:textSize="16sp"
-                    android:textColor="@color/text_secondary"
+                    android:text="Start browsing products to connect\nwith sellers and buyers"
+                    android:textSize="14sp"
+                    android:textColor="@android:color/darker_gray"
                     android:gravity="center"
                     android:layout_marginBottom="24dp" />
 
-                <!-- Start Shopping Button -->
-                <Button
-                    android:id="@+id/btn_start_shopping"
-                    style="@style/Widget.Material3.Button"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_browse_products"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🛍️ Start Shopping"
-                    android:textSize="16sp"
-                    android:paddingHorizontal="24dp" />
+                    android:text="Browse Products"
+                    app:cornerRadius="24dp" />
 
             </LinearLayout>
 
-        </RelativeLayout>
+        </FrameLayout>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 

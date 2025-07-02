@@ -1,80 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- app/src/main/res/layout/item_message_sent.xml - CONSISTENT -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="end"
     android:orientation="horizontal"
-    android:paddingHorizontal="@dimen/padding_lg"
-    android:paddingVertical="@dimen/chat_bubble_margin">
+    android:gravity="end"
+    android:padding="8dp">
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="60dp"
+        android:layout_marginStart="64dp"
         android:orientation="vertical">
 
-        <!-- Message Bubble -->
-        <LinearLayout
+        <!-- ✅ Use MaterialTextView consistently -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_message"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/chat_bubble_sent"
-            android:orientation="vertical"
-            android:paddingHorizontal="@dimen/chat_bubble_padding_horizontal"
-            android:paddingVertical="@dimen/chat_bubble_padding_vertical">
+            android:background="@drawable/bg_message_sent"
+            android:padding="12dp"
+            android:text="Hello! How are you?"
+            android:textColor="@android:color/white"
+            android:textSize="16sp" />
 
-            <!-- Message Text -->
-            <TextView
-                android:id="@+id/tv_message_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/white"
-                android:textSize="@dimen/text_size_md"
-                android:textIsSelectable="true"
-                tools:text="Hi! Is this iPhone still available?" />
-
-            <!-- Message Image (if any) -->
-            <ImageView
-                android:id="@+id/iv_message_image"
-                android:layout_width="200dp"
-                android:layout_height="150dp"
-                android:layout_marginTop="@dimen/margin_sm"
-                android:background="@drawable/rounded_background_gray"
-                android:scaleType="centerCrop"
-                android:visibility="gone"
-                tools:src="@tools:sample/backgrounds/scenic"
-                tools:visibility="visible" />
-
-        </LinearLayout>
-
-        <!-- Message Info -->
-        <LinearLayout
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tv_time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
-            android:layout_marginTop="@dimen/margin_xs"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/tv_timestamp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/chat_timestamp"
-                android:textSize="@dimen/text_size_xs"
-                tools:text="14:30" />
-
-            <ImageView
-                android:id="@+id/iv_message_status"
-                android:layout_width="@dimen/icon_size_sm"
-                android:layout_height="@dimen/icon_size_sm"
-                android:layout_marginStart="@dimen/margin_xs"
-                android:src="@drawable/ic_done"
-                app:tint="@color/text_secondary"
-                tools:src="@drawable/ic_done_all" />
-
-        </LinearLayout>
+            android:layout_marginTop="4dp"
+            android:text="10:30 AM"
+            android:textColor="@android:color/darker_gray"
+            android:textSize="12sp" />
 
     </LinearLayout>
 

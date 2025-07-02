@@ -7,7 +7,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
@@ -21,6 +20,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.ConversationAdapter;
 import com.example.newtrade.api.ApiClient;
+import com.example.newtrade.api.ApiService;
 import com.example.newtrade.models.Conversation;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.SharedPrefsManager;
@@ -38,19 +38,19 @@ public class MessagesFragment extends Fragment {
     private static final String TAG = "MessagesFragment";
 
     // UI Components
-    private SwipeRefreshLayout swipeRefresh;
     private RecyclerView rvConversations;
+    private SwipeRefreshLayout swipeRefresh;
     private LinearLayout llEmptyState;
-    private Button btnStartShopping;
 
     // Data
     private ConversationAdapter conversationAdapter;
-    private final List<Conversation> conversations = new ArrayList<>();
+    private List<Conversation> conversations;
     private SharedPrefsManager prefsManager;
-    private Long currentUserId;
+    private boolean isLoading = false;
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_messages, container, false);
     }
 
@@ -59,120 +59,160 @@ public class MessagesFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         initViews(view);
-        initData();
         setupRecyclerView();
-        setupListeners();
+        setupSwipeRefresh();
         loadConversations();
 
         Log.d(TAG, "✅ MessagesFragment created");
     }
 
     private void initViews(View view) {
-        swipeRefresh = view.findViewById(R.id.swipe_refresh);
         rvConversations = view.findViewById(R.id.rv_conversations);
+        swipeRefresh = view.findViewById(R.id.swipe_refresh);
         llEmptyState = view.findViewById(R.id.ll_empty_state);
-        btnStartShopping = view.findViewById(R.id.btn_start_shopping);
-    }
 
-    private void initData() {
         prefsManager = SharedPrefsManager.getInstance(requireContext());
-        currentUserId = getCurrentUserId();
-
-        Log.d(TAG, "Current user ID: " + currentUserId);
+        conversations = new ArrayList<>();
     }
 
     private void setupRecyclerView() {
-        conversationAdapter = new ConversationAdapter(conversations, this::openChatActivity);
+        conversationAdapter = new ConversationAdapter(requireContext(), conversations, this::openChatActivity);
         rvConversations.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvConversations.setAdapter(conversationAdapter);
     }
 
-    private void setupListeners() {
+    private void setupSwipeRefresh() {
         swipeRefresh.setOnRefreshListener(this::loadConversations);
-
-        if (btnStartShopping != null) {
-            btnStartShopping.setOnClickListener(v -> {
-                // Navigate to home or search
-                Toast.makeText(requireContext(), "Let's start shopping!", Toast.LENGTH_SHORT).show();
-            });
-        }
+        swipeRefresh.setColorSchemeResources(
+                R.color.primary_color,
+                R.color.primary_dark
+        );
     }
 
+    // ✅ NEW: Load conversations from API
     private void loadConversations() {
-        swipeRefresh.setRefreshing(true);
+        if (isLoading) return;
 
-        if (currentUserId == null) {
-            Log.w(TAG, "⚠️ No user ID, loading mock conversations");
-            loadMockConversations();
+        Long userId = getCurrentUserId();
+        if (userId == null) {
+            showError("Please login to view messages");
             return;
         }
 
-        Log.d(TAG, "📋 Loading conversations for user: " + currentUserId);
+        isLoading = true;
+        swipeRefresh.setRefreshing(true);
 
-        // ✅ FIX: Try to load real conversations first, fallback to mock
-        loadConversationsFromAPI();
-    }
+        ApiService apiService = ApiClient.getApiService();
+        Call<StandardResponse<Map<String, Object>>> call = apiService.getConversations(0, 20);
 
-    private void loadConversationsFromAPI() {
-        // TODO: Implement when conversation API is ready
-        // For now, test with health check then fallback to mock
-        testAPIThenLoadMock();
+        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                   Response<StandardResponse<Map<String, Object>>> response) {
 
-        /*
-        ApiClient.getApiService().getUserConversations(currentUserId)
-                .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
-                                         Response<StandardResponse<List<Map<String, Object>>>> response) {
+                isLoading = false;
+                swipeRefresh.setRefreshing(false);
 
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            List<Map<String, Object>> conversationData = response.body().getData();
-                            updateConversationsFromData(conversationData);
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Map<String, Object>> standardResponse = response.body();
+
+                    if (standardResponse.isSuccess()) {
+                        Map<String, Object> pageData = standardResponse.getData();
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> conversationList = (List<Map<String, Object>>) pageData.get("content");
+
+                        if (conversationList != null) {
+                            conversations.clear();
+                            for (Map<String, Object> conversationData : conversationList) {
+                                Conversation conversation = parseConversationFromApi(conversationData, userId);
+                                if (conversation != null) {
+                                    conversations.add(conversation);
+                                }
+                            }
+
+                            updateUI();
+                            Log.d(TAG, "✅ Loaded " + conversations.size() + " conversations");
+
                         } else {
-                            Log.w(TAG, "⚠️ API response unsuccessful, loading mock conversations");
-                            loadMockConversations();
+                            Log.e(TAG, "Conversation list is null");
+                            createMockConversations(); // Fallback
                         }
-                    }
 
-                    @Override
-                    public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
-                        Log.e(TAG, "❌ Failed to load conversations", t);
-                        loadMockConversations();
+                    } else {
+                        Log.e(TAG, "Failed to load conversations: " + standardResponse.getMessage());
+                        createMockConversations(); // Fallback
                     }
-                });
-        */
+                } else {
+                    Log.e(TAG, "Failed to load conversations: HTTP " + response.code());
+                    createMockConversations(); // Fallback
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                isLoading = false;
+                swipeRefresh.setRefreshing(false);
+                Log.e(TAG, "Error loading conversations", t);
+                createMockConversations(); // Fallback
+            }
+        });
     }
 
-    private void testAPIThenLoadMock() {
-        ApiClient.getAuthService().healthCheck()
-                .enqueue(new Callback<StandardResponse<String>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<String>> call,
-                                           Response<StandardResponse<String>> response) {
-                        if (response.isSuccessful()) {
-                            Log.d(TAG, "✅ Backend connected, but conversation API not implemented yet");
-                        } else {
-                            Log.w(TAG, "⚠️ Backend connection issues");
-                        }
-                        loadMockConversations();
-                    }
+    // ✅ NEW: Parse conversation from API response
+    private Conversation parseConversationFromApi(Map<String, Object> conversationData, Long currentUserId) {
+        try {
+            Conversation conversation = new Conversation();
 
-                    @Override
-                    public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
-                        Log.e(TAG, "❌ Backend connection failed: " + t.getMessage());
-                        loadMockConversations();
-                    }
-                });
+            if (conversationData.get("id") != null) {
+                conversation.setId(((Number) conversationData.get("id")).longValue());
+            }
+            if (conversationData.get("productId") != null) {
+                conversation.setProductId(((Number) conversationData.get("productId")).longValue());
+            }
+            if (conversationData.get("productTitle") != null) {
+                conversation.setProductTitle(conversationData.get("productTitle").toString());
+            }
+            if (conversationData.get("buyerId") != null) {
+                conversation.setBuyerId(((Number) conversationData.get("buyerId")).longValue());
+            }
+            if (conversationData.get("sellerId") != null) {
+                conversation.setSellerId(((Number) conversationData.get("sellerId")).longValue());
+            }
+            if (conversationData.get("buyerName") != null) {
+                conversation.setBuyerName(conversationData.get("buyerName").toString());
+            }
+            if (conversationData.get("sellerName") != null) {
+                conversation.setSellerName(conversationData.get("sellerName").toString());
+            }
+            if (conversationData.get("lastMessage") != null) {
+                conversation.setLastMessage(conversationData.get("lastMessage").toString());
+            }
+            if (conversationData.get("lastMessageTime") != null) {
+                conversation.setLastMessageTime(conversationData.get("lastMessageTime").toString());
+            }
+            if (conversationData.get("unreadCount") != null) {
+                conversation.setUnreadCount(((Number) conversationData.get("unreadCount")).intValue());
+            }
+
+            // Setup other user info
+            conversation.setupOtherUserInfo(currentUserId);
+
+            return conversation;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing conversation from API", e);
+            return null;
+        }
     }
 
-    private void loadMockConversations() {
+    private void createMockConversations() {
         conversations.clear();
 
-        // Mock conversation 1 - Based on sample data
+        // Mock conversation 1
         Conversation mockConversation1 = new Conversation();
-        mockConversation1.setId(1L);
-        mockConversation1.setOtherUserName("Nguyễn Văn Anh");
-        mockConversation1.setLastMessage("Máy còn nguyên seal không anh?");
+        mockConversation1.setId(3L);
+        mockConversation1.setOtherUserName("Nguyễn Văn An");
+        mockConversation1.setLastMessage("Chào bạn, sản phẩm còn không?");
         mockConversation1.setLastMessageTime("10 phút trước");
         mockConversation1.setProductTitle("iPhone 14 Pro 128GB Deep Purple");
         mockConversation1.setUnreadCount(1);
@@ -188,23 +228,11 @@ public class MessagesFragment extends Fragment {
         mockConversation2.setUnreadCount(0);
         conversations.add(mockConversation2);
 
-        // Mock conversation 3
-        Conversation mockConversation3 = new Conversation();
-        mockConversation3.setId(5L);
-        mockConversation3.setOtherUserName("Lê Hoàng Nam");
-        mockConversation3.setLastMessage("Được rồi chị, em lấy luôn!");
-        mockConversation3.setLastMessageTime("3 ngày trước");
-        mockConversation3.setProductTitle("Túi Chanel Classic Medium");
-        mockConversation3.setUnreadCount(0);
-        conversations.add(mockConversation3);
-
         updateUI();
         Log.d(TAG, "✅ Mock conversations created: " + conversations.size());
     }
 
     private void updateUI() {
-        swipeRefresh.setRefreshing(false);
-
         if (conversationAdapter != null) {
             conversationAdapter.notifyDataSetChanged();
         }
@@ -234,11 +262,12 @@ public class MessagesFragment extends Fragment {
             intent.putExtra("conversation_id", conversation.getId());
             intent.putExtra("other_user_name", conversation.getOtherUserName());
             intent.putExtra("product_title", conversation.getProductTitle());
+            intent.putExtra("product_id", conversation.getProductId());
             startActivity(intent);
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to open chat", e);
-            Toast.makeText(getContext(), "Failed to open chat", Toast.LENGTH_SHORT).show();
+            showError("Failed to open chat");
         }
     }
 
@@ -248,15 +277,19 @@ public class MessagesFragment extends Fragment {
             Long userId = prefsManager.getUserId();
             return (userId != null && userId > 0) ? userId : null;
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error getting user ID", e);
+            Log.e(TAG, "Error getting user ID", e);
             return null;
         }
+    }
+
+    private void showError(String message) {
+        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh conversations when fragment becomes visible
+        // Refresh conversations when returning to fragment
         loadConversations();
     }
 }
