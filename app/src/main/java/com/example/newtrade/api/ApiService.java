@@ -173,7 +173,7 @@ public interface ApiService {
     Call<StandardResponse<Map<String, Object>>> startConversation(@Body Map<String, Object> conversationData);
 
     @POST("api/conversations/find-or-create")
-    Call<StandardResponse<Map<String, Object>>> findOrCreateConversation(@Body Map<String, Object> conversationData);
+    Call<StandardResponse<Map<String, Object>>> findOrCreateConversation(@Query("productId") Long productId);
 
     @GET("api/conversations")
     Call<StandardResponse<Map<String, Object>>> getConversations(

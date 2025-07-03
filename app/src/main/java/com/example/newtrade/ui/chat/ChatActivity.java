@@ -191,19 +191,43 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
     // ✅ NEW: Create conversation via API
     private void createConversation() {
-        Map<String, Object> conversationData = new HashMap<>();
-        conversationData.put("productId", productId);
+        // Validate user login
+        if (currentUserId == null || currentUserId <= 0) {
+            Log.e(TAG, "❌ User not logged in, currentUserId: " + currentUserId);
+            Toast.makeText(this, "Bạn cần đăng nhập để chat", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        // Validate product ID
+        if (productId == null || productId <= 0) {
+            Log.e(TAG, "❌ Invalid product ID: " + productId);
+            addMockMessages();
+            return;
+        }
+
+        Log.d(TAG, "🔍 Creating conversation - UserID: " + currentUserId + ", ProductID: " + productId);
 
         ApiService apiService = ApiClient.getApiService();
-        Call<StandardResponse<Map<String, Object>>> call = apiService.findOrCreateConversation(conversationData);
+
+        // ❌ CŨ:
+        // Map<String, Object> conversationData = new HashMap<>();
+        // conversationData.put("productId", productId);
+        // Call<StandardResponse<Map<String, Object>>> call = apiService.findOrCreateConversation(conversationData);
+
+        // ✅ MỚI: Query Parameters
+        Call<StandardResponse<Map<String, Object>>> call = apiService.findOrCreateConversation(productId);
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                    Response<StandardResponse<Map<String, Object>>> response) {
 
+                Log.d(TAG, "🔍 Response code: " + response.code());
+
                 if (response.isSuccessful() && response.body() != null) {
                     StandardResponse<Map<String, Object>> standardResponse = response.body();
+                    Log.d(TAG, "🔍 Response success: " + standardResponse.isSuccess());
 
                     if (standardResponse.isSuccess()) {
                         Map<String, Object> conversationResponse = standardResponse.getData();
@@ -220,18 +244,26 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                         loadMessages();
 
                     } else {
-                        Log.e(TAG, "Failed to create conversation: " + standardResponse.getMessage());
+                        Log.e(TAG, "❌ Failed to create conversation: " + standardResponse.getMessage());
                         addMockMessages(); // Fallback
                     }
                 } else {
-                    Log.e(TAG, "Failed to create conversation: HTTP " + response.code());
+                    Log.e(TAG, "❌ HTTP Error " + response.code() + ": " + response.message());
+                    try {
+                        if (response.errorBody() != null) {
+                            String errorBody = response.errorBody().string();
+                            Log.e(TAG, "❌ Error body: " + errorBody);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error reading error body", e);
+                    }
                     addMockMessages(); // Fallback
                 }
             }
 
             @Override
             public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                Log.e(TAG, "Error creating conversation", t);
+                Log.e(TAG, "❌ Network error creating conversation", t);
                 addMockMessages(); // Fallback
             }
         });
@@ -381,7 +413,7 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         }
     }
 
-    // ✅ NEW: Send via API (persistence)
+    // ✅ FIXED: Send via API (persistence)
     private void sendMessageViaApi(String messageText) {
         if (conversationId == null || conversationId <= 0) {
             Log.w(TAG, "No conversation ID, cannot send via API");
@@ -390,7 +422,7 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("conversationId", conversationId);
-        messageData.put("content", messageText);
+        messageData.put("messageText", messageText); // ❌ Đổi từ "content" → "messageText"
         messageData.put("messageType", "TEXT");
 
         ApiService apiService = ApiClient.getApiService();
@@ -406,21 +438,21 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
                     if (standardResponse.isSuccess()) {
                         // Update last message status to "Sent"
-                        updateLastMessageStatus("Sent");
+                        updateLastMessageStatus("✅ Sent");
                         Log.d(TAG, "✅ Message sent via API");
                     } else {
-                        updateLastMessageStatus("Failed");
+                        updateLastMessageStatus("❌ Failed");
                         Log.e(TAG, "Failed to send message via API: " + standardResponse.getMessage());
                     }
                 } else {
-                    updateLastMessageStatus("Failed");
+                    updateLastMessageStatus("❌ Failed");
                     Log.e(TAG, "Failed to send message via API: HTTP " + response.code());
                 }
             }
 
             @Override
             public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                updateLastMessageStatus("Failed");
+                updateLastMessageStatus("❌ Network Error");
                 Log.e(TAG, "Error sending message via API", t);
             }
         });
