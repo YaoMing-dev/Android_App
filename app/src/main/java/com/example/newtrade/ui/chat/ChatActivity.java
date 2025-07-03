@@ -330,26 +330,49 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         try {
             Message message = new Message();
 
+            Log.d(TAG, "🔍 Raw message data: " + messageData.toString());
+
+            // Parse ID
             if (messageData.get("id") != null) {
                 message.setId(((Number) messageData.get("id")).longValue());
             }
-            if (messageData.get("senderId") != null) {
-                message.setSenderId(((Number) messageData.get("senderId")).longValue());
-            }
-            if (messageData.get("content") != null) {
-                message.setContent(messageData.get("content").toString());
-            }
-            if (messageData.get("messageType") != null) {
-                message.setMessageType(messageData.get("messageType").toString());
-            }
-            if (messageData.get("createdAt") != null) {
-                message.setCreatedAt(formatTimestamp(messageData.get("createdAt").toString()));
+
+            // ✅ FIX: Parse sender từ nested sender object
+            if (messageData.get("sender") != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> sender = (Map<String, Object>) messageData.get("sender");
+                if (sender.get("id") != null) {
+                    message.setSenderId(((Number) sender.get("id")).longValue());
+                }
+                Log.d(TAG, "✅ Sender ID: " + message.getSenderId());
             }
 
+            // ✅ FIX: messageText thay vì content
+            if (messageData.get("messageText") != null) {
+                message.setContent(messageData.get("messageText").toString());
+                Log.d(TAG, "✅ Message text: " + message.getContent());
+            }
+
+            // Parse message type
+            if (messageData.get("messageType") != null) {
+                message.setMessageType(messageData.get("messageType").toString());
+            } else {
+                message.setMessageType("TEXT"); // Default
+            }
+
+            // Parse timestamp
+            if (messageData.get("createdAt") != null) {
+                String timestamp = messageData.get("createdAt").toString();
+                message.setCreatedAt(formatTimestampString(timestamp));
+                Log.d(TAG, "✅ Message time: " + message.getCreatedAt());
+            }
+
+            Log.d(TAG, "✅ Successfully parsed message from user " + message.getSenderId() + ": " + message.getContent());
             return message;
 
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing message from API", e);
+            Log.e(TAG, "❌ Error parsing message from API", e);
+            Log.e(TAG, "❌ Message data was: " + messageData.toString());
             return null;
         }
     }
@@ -517,16 +540,26 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
     public void onMessageReceived(JsonObject messageJson) {
         runOnUiThread(() -> {
             try {
-                Log.d(TAG, "📨 New message received: " + messageJson.toString());
-
-                // Parse message from JSON
                 Message newMessage = new Message();
-                newMessage.setId(messageJson.has("id") ? messageJson.get("id").getAsLong() : System.currentTimeMillis());
+
+                newMessage.setId(messageJson.has("id") ?
+                        messageJson.get("id").getAsLong() : System.currentTimeMillis());
                 newMessage.setSenderId(messageJson.get("senderId").getAsLong());
                 newMessage.setContent(messageJson.get("content").getAsString());
-                newMessage.setMessageType(messageJson.has("messageType") ? messageJson.get("messageType").getAsString() : "TEXT");
-                newMessage.setCreatedAt(messageJson.has("timestamp") ?
-                        formatTimestamp(messageJson.get("timestamp").getAsLong()) : "Now");
+                newMessage.setMessageType(messageJson.has("messageType") ?
+                        messageJson.get("messageType").getAsString() : "TEXT");
+
+                // ❌ CŨ:
+                // newMessage.setCreatedAt(messageJson.has("timestamp") ?
+                //         formatTimestamp(messageJson.get("timestamp").getAsLong()) : "Now");
+
+                // ✅ MỚI: Parse string timestamp
+                if (messageJson.has("timestamp")) {
+                    String timestampStr = messageJson.get("timestamp").getAsString();
+                    newMessage.setCreatedAt(formatTimestampString(timestampStr));
+                } else {
+                    newMessage.setCreatedAt("Now");
+                }
 
                 // Only add if it's from someone else (avoid duplicates)
                 if (!newMessage.getSenderId().equals(currentUserId)) {
@@ -539,6 +572,27 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                 Log.e(TAG, "Error parsing received message", e);
             }
         });
+    }
+    private String formatTimestampString(String timestampStr) {
+        try {
+            // Parse ISO timestamp: "2025-07-03T14:19:39.6632698"
+            SimpleDateFormat inputFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+
+            // Remove microseconds if present (.6632698)
+            String cleanTimestamp = timestampStr.split("\\.")[0];
+
+            Date dateTime = inputFormatter.parse(cleanTimestamp);
+
+            if (dateTime != null) {
+                SimpleDateFormat outputFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                return outputFormatter.format(dateTime);
+            }
+
+            return "Now";
+        } catch (Exception e) {
+            Log.w(TAG, "Could not parse timestamp: " + timestampStr, e);
+            return "Now";
+        }
     }
 
     @Override
