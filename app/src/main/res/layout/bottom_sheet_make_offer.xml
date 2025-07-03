@@ -35,13 +35,32 @@
         app:suffixText="VNĐ"
         app:boxStrokeColor="@color/primary_color"
         app:hintTextColor="@color/primary_color"
-        android:layout_marginBottom="24dp">
+        android:layout_marginBottom="16dp">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/et_offer_amount"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="number" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- ✅ THÊM MESSAGE INPUT -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Message (Optional)"
+        app:startIconDrawable="@drawable/ic_message"
+        app:boxStrokeColor="@color/primary_color"
+        app:hintTextColor="@color/primary_color"
+        android:layout_marginBottom="24dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/et_offer_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="textMultiLine"
+            android:maxLines="3" />
 
     </com.google.android.material.textfield.TextInputLayout>
 

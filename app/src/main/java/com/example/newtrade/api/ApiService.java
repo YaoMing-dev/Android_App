@@ -25,10 +25,10 @@ public interface ApiService {
     @POST("api/auth/google-signin")
     Call<StandardResponse<Map<String, Object>>> googleSignIn(@Body Map<String, String> request);
 
-    @POST("api/auth/register") // ✅ NEW - Email/Password Registration
+    @POST("api/auth/register")
     Call<StandardResponse<Map<String, Object>>> register(@Body Map<String, String> request);
 
-    @POST("api/auth/login") // ✅ NEW - Email/Password Login
+    @POST("api/auth/login")
     Call<StandardResponse<Map<String, Object>>> login(@Body Map<String, String> request);
 
     @POST("api/auth/send-otp")
@@ -45,13 +45,13 @@ public interface ApiService {
 
     // ===== USER MANAGEMENT - UPDATED =====
 
-    @GET("api/users/profile") // ✅ FIXED - No {id} needed
+    @GET("api/users/profile")
     Call<StandardResponse<Map<String, Object>>> getCurrentUserProfile();
 
     @GET("api/users/{id}/profile")
     Call<StandardResponse<Map<String, Object>>> getUserProfile(@Path("id") Long userId);
 
-    @PUT("api/users/profile") // ✅ FIXED - No {id} needed
+    @PUT("api/users/profile")
     Call<StandardResponse<Map<String, Object>>> updateUserProfile(@Body Map<String, Object> profileData);
 
     @GET("api/users/{id}/stats")
@@ -64,7 +64,7 @@ public interface ApiService {
     Call<StandardResponse<Map<String, String>>> uploadAvatar(@Part MultipartBody.Part image);
 
     @Multipart
-    @POST("api/users/profile/avatar/upload") // ✅ NEW - Upload + Update in one step
+    @POST("api/users/profile/avatar/upload")
     Call<StandardResponse<Map<String, String>>> uploadAndUpdateAvatar(@Part MultipartBody.Part image);
 
     @PUT("api/users/profile/avatar")
@@ -86,6 +86,24 @@ public interface ApiService {
             @Query("maxPrice") Double maxPrice,
             @Query("sortBy") String sortBy,
             @Query("sortDir") String sortDir
+    );
+
+    // ✅ THÊM OVERLOADED METHODS
+    @GET("api/products")
+    Call<StandardResponse<Map<String, Object>>> getProducts(
+            @Query("page") int page,
+            @Query("size") int size,
+            @Query("search") String search,
+            @Query("category") String category
+    );
+
+    @GET("api/products")
+    Call<StandardResponse<Map<String, Object>>> getProducts();
+
+    @GET("api/products")
+    Call<StandardResponse<Map<String, Object>>> getProducts(
+            @Query("page") int page,
+            @Query("size") int size
     );
 
     @GET("api/products/search")
@@ -183,7 +201,7 @@ public interface ApiService {
     @PUT("api/notifications/mark-all-read")
     Call<StandardResponse<String>> markAllNotificationsAsRead();
 
-    // ===== FILE UPLOAD =====
+    // ===== FILES =====
 
     @Multipart
     @POST("api/files/upload/product")
@@ -191,55 +209,4 @@ public interface ApiService {
 
     @GET("api/files/info")
     Call<StandardResponse<Map<String, Object>>> getFileUploadInfo();
-
-    // ===== OFFERS - NEW =====
-
-    @POST("api/offers")
-    Call<StandardResponse<Map<String, Object>>> makeOffer(@Body Map<String, Object> offerData);
-
-    @PUT("api/offers/{id}/respond")
-    Call<StandardResponse<Map<String, Object>>> respondToOffer(
-            @Path("id") Long offerId,
-            @Body Map<String, Object> responseData
-    );
-
-    @GET("api/offers/buyer")
-    Call<StandardResponse<Map<String, Object>>> getBuyerOffers(
-            @Query("page") int page,
-            @Query("size") int size
-    );
-
-    @GET("api/offers/seller")
-    Call<StandardResponse<Map<String, Object>>> getSellerOffers(
-            @Query("page") int page,
-            @Query("size") int size
-    );
-
-    @PUT("api/offers/{id}/cancel")
-    Call<StandardResponse<String>> cancelOffer(@Path("id") Long offerId);
-
-    // ===== SAVED ITEMS - NEW =====
-
-    @POST("api/saved-items/{productId}")
-    Call<StandardResponse<String>> saveItem(@Path("productId") Long productId);
-
-    @DELETE("api/saved-items/{productId}")
-    Call<StandardResponse<String>> unsaveItem(@Path("productId") Long productId);
-
-    @GET("api/saved-items")
-    Call<StandardResponse<Map<String, Object>>> getSavedItems(
-            @Query("page") int page,
-            @Query("size") int size
-    );
-
-    @GET("api/saved-items/{productId}/is-saved")
-    Call<StandardResponse<Map<String, Object>>> isItemSaved(@Path("productId") Long productId);
-
-    // ===== ANALYTICS =====
-
-    @GET("api/analytics/dashboard")
-    Call<StandardResponse<Map<String, Object>>> getDashboardAnalytics();
-
-    @GET("api/analytics/product/{productId}/stats")
-    Call<StandardResponse<Map<String, Object>>> getProductAnalytics(@Path("productId") Long productId);
 }

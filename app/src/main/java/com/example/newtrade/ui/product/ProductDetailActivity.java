@@ -1,5 +1,4 @@
 // app/src/main/java/com/example/newtrade/ui/product/ProductDetailActivity.java
-// ✅ FIXED: Sửa lỗi showContactOptions và makeOffer
 package com.example.newtrade.ui.product;
 
 import android.app.AlertDialog;
@@ -17,11 +16,11 @@ import com.example.newtrade.ui.profile.UserProfileActivity;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.chat.ChatActivity;
+import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -30,8 +29,10 @@ import com.example.newtrade.utils.NavigationUtils;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import retrofit2.Call;
@@ -79,7 +80,7 @@ public class ProductDetailActivity extends AppCompatActivity {
 
     private void getIntentData() {
         Intent intent = getIntent();
-        productId = intent.getLongExtra("product_id", -1L);
+        productId = intent.getLongExtra("product_id", 0L);
         productTitle = intent.getStringExtra("product_title");
         productPrice = intent.getStringExtra("product_price");
 
@@ -108,13 +109,12 @@ public class ProductDetailActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle(productTitle != null ? productTitle : "Product Details");
+            getSupportActionBar().setTitle(productTitle != null ? productTitle : "Product Detail");
         }
     }
 
     private void setupListeners() {
-        // ✅ FIX: Sửa lỗi contact seller
-        btnContact.setOnClickListener(v -> contactSeller());
+        btnContact.setOnClickListener(v -> showContactOptions());
         btnMakeOffer.setOnClickListener(v -> makeOffer());
         btnViewProfile.setOnClickListener(v -> viewSellerProfile());
         fabShare.setOnClickListener(v -> shareProduct());
@@ -122,259 +122,292 @@ public class ProductDetailActivity extends AppCompatActivity {
     }
 
     private void loadProductDetails() {
-        if (productId <= 0) {
+        if (productId == null || productId <= 0) {
             Toast.makeText(this, "Invalid product ID", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        // Mock data for testing if API not available
-        displayProductData();
-    }
+        Log.d(TAG, "Loading product details for ID: " + productId);
 
-    private void displayProductData() {
-        // Mock seller data for testing
-        Map<String, Object> mockSeller = new HashMap<>();
-        mockSeller.put("id", 2L);
-        mockSeller.put("displayName", "John Seller");
-        mockSeller.put("rating", 4.5);
+        ApiClient.getApiService().getProductDetail(productId)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
 
-        Map<String, Object> mockProduct = new HashMap<>();
-        mockProduct.put("id", productId);
-        mockProduct.put("title", productTitle != null ? productTitle : "Sample Product");
-        mockProduct.put("price", productPrice != null ? productPrice : "100000");
-        mockProduct.put("description", "This is a sample product description.");
-        mockProduct.put("location", "Ho Chi Minh City");
-        mockProduct.put("condition", "GOOD");
-        mockProduct.put("seller", mockSeller);
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> standardResponse = response.body();
 
-        productData = mockProduct;
-
-        // Update UI
-        updateUI();
-    }
-
-    private void updateUI() {
-        if (productData != null) {
-            tvTitle.setText((String) productData.get("title"));
-            tvPrice.setText(productData.get("price") + " VNĐ");
-            tvDescription.setText((String) productData.get("description"));
-            tvLocation.setText((String) productData.get("location"));
-            tvCondition.setText((String) productData.get("condition"));
-
-            // Seller info
-            @SuppressWarnings("unchecked")
-            Map<String, Object> seller = (Map<String, Object>) productData.get("seller");
-            if (seller != null) {
-                tvSellerName.setText((String) seller.get("displayName"));
-                tvSellerRating.setText("★ " + seller.get("rating"));
-                tvMemberSince.setText("Member since 2023");
-            }
-        }
-    }
-
-    // ✅ FIX: Sửa lỗi contactSeller method
-    private void contactSeller() {
-        try {
-            Long currentUserId = prefsManager.getUserId();
-            if (currentUserId == null || currentUserId <= 0) {
-                Toast.makeText(this, "Vui lòng đăng nhập để liên hệ người bán", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            Long sellerId = getSellerId();
-            if (sellerId == null) {
-                Toast.makeText(this, "Không thể xác định người bán", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            if (sellerId.equals(currentUserId)) {
-                Toast.makeText(this, "Đây là sản phẩm của bạn", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // ✅ FIX: Gọi showContactOptions với proper error handling
-            showContactOptions(sellerId);
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error in contactSeller", e);
-            Toast.makeText(this, "Có lỗi xảy ra: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    // ✅ FIX: Sửa lỗi showContactOptions
-    private void showContactOptions(Long sellerId) {
-        try {
-            AlertDialog.Builder builder = new AlertDialog.Builder(this);
-            builder.setTitle("Liên hệ người bán");
-
-            String[] options = {"Gửi tin nhắn", "Gọi điện", "Xem hồ sơ"};
-
-            builder.setItems(options, (dialog, which) -> {
-                try {
-                    switch (which) {
-                        case 0:
-                            // ✅ FIX: Proper chat opening
-                            openChat(sellerId);
-                            break;
-                        case 1:
-                            Toast.makeText(this, "Chức năng gọi điện sẽ có sớm!", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 2:
-                            viewSellerProfile();
-                            break;
+                            if (standardResponse.isSuccess()) {
+                                productData = standardResponse.getData();
+                                displayProductData(productData);
+                            } else {
+                                showError("Failed to load product: " + standardResponse.getMessage());
+                            }
+                        } else {
+                            showError("Failed to load product details");
+                        }
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error in contact option", e);
-                    Toast.makeText(this, "Có lỗi xảy ra", Toast.LENGTH_SHORT).show();
-                }
-            });
 
-            builder.setNegativeButton("Hủy", null);
-            builder.show();
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error showing contact options", e);
-            Toast.makeText(this, "Không thể hiển thị tùy chọn liên hệ", Toast.LENGTH_SHORT).show();
-        }
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        showError("Network error: " + t.getMessage());
+                        Log.e(TAG, "Failed to load product details", t);
+                    }
+                });
     }
 
-    // ✅ FIX: Proper chat opening method
-    private void openChat(Long sellerId) {
+    private void displayProductData(Map<String, Object> data) {
         try {
-            Intent intent = new Intent(this, ChatActivity.class);
-            intent.putExtra("conversation_id", -1L); // Will create new conversation
-            intent.putExtra("product_id", productId);
-            intent.putExtra("product_title", productTitle);
-            intent.putExtra("seller_id", sellerId);
-            intent.putExtra("other_user_name", getSellerName());
-            startActivity(intent);
-
-            Log.d(TAG, "✅ Opening chat with seller: " + sellerId);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error opening chat", e);
-            Toast.makeText(this, "Không thể mở chat: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    // ✅ FIX: Safe method to get seller ID
-    private Long getSellerId() {
-        try {
-            if (productData != null) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> seller = (Map<String, Object>) productData.get("seller");
-                if (seller != null && seller.get("id") instanceof Number) {
-                    return ((Number) seller.get("id")).longValue();
+            // Basic product info
+            if (data.get("title") != null) {
+                tvTitle.setText(data.get("title").toString());
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().setTitle(data.get("title").toString());
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error getting seller ID", e);
-        }
-        return null;
-    }
 
-    // ✅ FIX: Safe method to get seller name
-    private String getSellerName() {
-        try {
-            if (productData != null) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> seller = (Map<String, Object>) productData.get("seller");
-                if (seller != null) {
-                    return (String) seller.get("displayName");
+            if (data.get("description") != null) {
+                tvDescription.setText(data.get("description").toString());
+            }
+
+            if (data.get("location") != null) {
+                tvLocation.setText(data.get("location").toString());
+            }
+
+            if (data.get("condition") != null) {
+                tvCondition.setText(data.get("condition").toString());
+            }
+
+            // Price formatting
+            if (data.get("price") != null) {
+                Object priceObj = data.get("price");
+                if (priceObj instanceof Number) {
+                    BigDecimal price = new BigDecimal(priceObj.toString());
+                    tvPrice.setText(formatPrice(price));
                 }
             }
+
+            // ✅ SETUP PRODUCT IMAGE USING ImageUtils
+            setupProductImage(data);
+
+            // Seller information
+            if (data.get("seller") != null || data.get("user") != null) {
+                Map<String, Object> seller = (Map<String, Object>)
+                        (data.get("seller") != null ? data.get("seller") : data.get("user"));
+
+                if (seller.get("displayName") != null) {
+                    tvSellerName.setText(seller.get("displayName").toString());
+                }
+
+                if (seller.get("rating") != null) {
+                    tvSellerRating.setText("★ " + seller.get("rating").toString());
+                }
+
+                if (seller.get("createdAt") != null) {
+                    tvMemberSince.setText("Member since " +
+                            seller.get("createdAt").toString().substring(0, 4));
+                }
+            }
+
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error getting seller name", e);
+            Log.e(TAG, "Error displaying product data", e);
         }
-        return "Unknown Seller";
     }
 
-    // ✅ FIX: Sửa makeOffer method
+    // ✅ THÊM METHOD setupProductImage
+    private void setupProductImage(Map<String, Object> productData) {
+        if (ivProductImage == null || productData == null) return;
+
+        try {
+            String imageUrl = null;
+
+            // Try different ways to get image URL from backend response
+            if (productData.get("primaryImageUrl") != null) {
+                imageUrl = productData.get("primaryImageUrl").toString();
+            } else if (productData.get("imageUrl") != null) {
+                imageUrl = productData.get("imageUrl").toString();
+            } else if (productData.get("imageUrls") != null) {
+                Object imageUrlsObj = productData.get("imageUrls");
+                if (imageUrlsObj instanceof List) {
+                    List<String> imageUrls = (List<String>) imageUrlsObj;
+                    if (!imageUrls.isEmpty()) {
+                        imageUrl = imageUrls.get(0);
+                    }
+                }
+            }
+
+            // Use ImageUtils to load the image
+            ImageUtils.loadProductImage(this, imageUrl, ivProductImage);
+
+            Log.d(TAG, "Product image setup complete. URL: " + imageUrl);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting up product image", e);
+            ivProductImage.setImageResource(R.drawable.ic_image_placeholder);
+        }
+    }
+
+    private String formatPrice(BigDecimal price) {
+        if (price == null) return "Free";
+        NumberFormat formatter = NumberFormat.getNumberInstance(new Locale("vi", "VN"));
+        return formatter.format(price) + " VNĐ";
+    }
+
+    // ✅ FIXED: showContactOptions với safe ID parsing
+    private void showContactOptions() {
+        if (productData == null) return;
+
+        try {
+            // Get seller info
+            Map<String, Object> seller = (Map<String, Object>)
+                    (productData.get("seller") != null ? productData.get("seller") : productData.get("user"));
+
+            if (seller == null) {
+                Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // ✅ FIX: Parse ID an toàn cho cả Integer và Double
+            Long sellerId = parseToLong(seller.get("id"));
+            String sellerName = seller.get("displayName") != null ? seller.get("displayName").toString() : "Seller";
+
+            if (sellerId == null || sellerId <= 0) {
+                Toast.makeText(this, "Invalid seller ID", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Log.d(TAG, "Starting chat with seller ID: " + sellerId + ", name: " + sellerName);
+
+            // Start chat
+            Intent chatIntent = new Intent(this, ChatActivity.class);
+            chatIntent.putExtra("product_id", productId);
+            chatIntent.putExtra("seller_id", sellerId);
+            chatIntent.putExtra("seller_name", sellerName);
+            startActivity(chatIntent);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting chat", e);
+            Toast.makeText(this, "Unable to start conversation", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ✅ THÊM HELPER METHOD để parse ID an toàn
+    private Long parseToLong(Object value) {
+        if (value == null) return null;
+
+        try {
+            String valueStr = value.toString();
+
+            // Nếu là số thập phân, chuyển thành số nguyên
+            if (valueStr.contains(".")) {
+                return Math.round(Double.parseDouble(valueStr));
+            }
+
+            // Nếu là số nguyên
+            return Long.parseLong(valueStr);
+
+        } catch (NumberFormatException e) {
+            Log.e(TAG, "Error parsing ID: " + value, e);
+            return null;
+        }
+    }
+
+    // ✅ FIXED: makeOffer với đơn giản hóa
     private void makeOffer() {
-        try {
-            Long currentUserId = prefsManager.getUserId();
-            if (currentUserId == null || currentUserId <= 0) {
-                Toast.makeText(this, "Vui lòng đăng nhập để đưa ra offer", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            Long sellerId = getSellerId();
-            if (sellerId == null) {
-                Toast.makeText(this, "Không thể xác định người bán", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            if (sellerId.equals(currentUserId)) {
-                Toast.makeText(this, "Đây là sản phẩm của bạn", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // Show make offer dialog
-            showMakeOfferDialog();
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error in makeOffer", e);
-            Toast.makeText(this, "Có lỗi xảy ra: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void showMakeOfferDialog() {
-        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
         View view = getLayoutInflater().inflate(R.layout.bottom_sheet_make_offer, null);
+        bottomSheet.setContentView(view);
 
-        TextInputEditText etOffer = view.findViewById(R.id.et_offer_amount);
+        // ✅ CHỈ CẦN et_offer_amount (không có et_offer_message)
+        TextInputEditText etOfferAmount = view.findViewById(R.id.et_offer_amount);
         Button btnSubmitOffer = view.findViewById(R.id.btn_submit_offer);
 
         btnSubmitOffer.setOnClickListener(v -> {
-            String offerAmount = etOffer.getText().toString().trim();
-            if (!offerAmount.isEmpty()) {
-                Toast.makeText(this, "Offer submitted: " + offerAmount + " VNĐ", Toast.LENGTH_SHORT).show();
-                dialog.dismiss();
-            } else {
-                etOffer.setError("Vui lòng nhập số tiền");
+            String offerAmount = etOfferAmount.getText().toString().trim();
+
+            if (offerAmount.isEmpty()) {
+                etOfferAmount.setError("Please enter offer amount");
+                return;
             }
+
+            // ✅ GỌI submitOffer VỚI MESSAGE RỖNG
+            submitOffer(offerAmount, ""); // Không có message
+            bottomSheet.dismiss();
         });
 
-        dialog.setContentView(view);
-        dialog.show();
+        bottomSheet.show();
     }
 
-    private void viewSellerProfile() {
-        try {
-            Long sellerId = getSellerIdFromProduct();
-            if (sellerId != null && sellerId > 0) {
-                Intent intent = new Intent(this, UserProfileActivity.class);
-                intent.putExtra("user_id", sellerId);
-                startActivity(intent);
+    private void submitOffer(String amount, String message) {
+        Map<String, Object> offerData = new HashMap<>();
+        offerData.put("productId", productId);
+        offerData.put("amount", Double.parseDouble(amount));
+        offerData.put("message", message);
 
-                Log.d(TAG, "✅ Opening seller profile: " + sellerId);
+        // TODO: Implement offer submission API call
+        Toast.makeText(this, "Offer submitted: " + amount + " VNĐ", Toast.LENGTH_SHORT).show();
+    }
+
+    // ✅ FIXED: viewSellerProfile với safe ID parsing
+    private void viewSellerProfile() {
+        if (productData == null) return;
+
+        try {
+            Map<String, Object> seller = (Map<String, Object>)
+                    (productData.get("seller") != null ? productData.get("seller") : productData.get("user"));
+
+            if (seller != null && seller.get("id") != null) {
+                // ✅ FIX: Parse ID an toàn
+                Long sellerId = parseToLong(seller.get("id"));
+
+                if (sellerId != null && sellerId > 0) {
+                    Intent intent = new Intent(this, UserProfileActivity.class);
+                    intent.putExtra("user_id", sellerId);
+                    startActivity(intent);
+
+                    Log.d(TAG, "Opening seller profile for ID: " + sellerId);
+                } else {
+                    Toast.makeText(this, "Invalid seller ID", Toast.LENGTH_SHORT).show();
+                }
             } else {
                 Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show();
             }
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error opening seller profile", e);
-            Toast.makeText(this, "Cannot view seller profile", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error viewing seller profile", e);
+            Toast.makeText(this, "Unable to view seller profile", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private Long getSellerIdFromProduct() {
-        // TODO: Get from actual product data
-        return 1L; // Mock seller ID for now
-    }
     private void shareProduct() {
+        if (productData == null) return;
+
+        String shareText = "Check out this item: " +
+                (productData.get("title") != null ? productData.get("title").toString() : "Product") +
+                " - " +
+                (productData.get("price") != null ? productData.get("price").toString() + " VNĐ" : "");
+
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_TEXT, "Xem sản phẩm này trên TradeUp: " + productTitle);
-        startActivity(Intent.createChooser(shareIntent, "Chia sẻ sản phẩm"));
+        shareIntent.putExtra(Intent.EXTRA_TEXT, shareText);
+        startActivity(Intent.createChooser(shareIntent, "Share Product"));
     }
 
     private void saveProduct() {
-        Toast.makeText(this, "Đã lưu sản phẩm", Toast.LENGTH_SHORT).show();
+        // TODO: Implement save product functionality
+        Toast.makeText(this, "Product saved to favorites", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Log.e(TAG, message);
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (NavigationUtils.handleBackButton(this, item)) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
             return true;
         }
         return super.onOptionsItemSelected(item);

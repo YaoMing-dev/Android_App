@@ -36,6 +36,31 @@ public class SharedPrefsManager {
         Log.d(TAG, "✅ User data saved: " + userName + " (ID: " + userId + ")");
     }
 
+    // ✅ THÊM METHOD saveUserSession
+    public void saveUserSession(Long userId, String email, String displayName, boolean isEmailVerified) {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putLong(Constants.PREF_USER_ID, userId != null ? userId : 0L);
+        editor.putString(Constants.PREF_USER_NAME, displayName);
+        editor.putString(Constants.PREF_USER_EMAIL, email);
+        editor.putBoolean(Constants.PREF_IS_LOGGED_IN, true);
+        editor.putBoolean(Constants.PREF_IS_EMAIL_VERIFIED, isEmailVerified);
+        editor.apply();
+
+        Log.d(TAG, "✅ User session saved: " + displayName + " (ID: " + userId + ")");
+    }
+
+    // ✅ THÊM METHOD clearUserSession
+    public void clearUserSession() {
+        clearUserData();
+        Log.d(TAG, "✅ User session cleared");
+    }
+
+    // ✅ THÊM METHOD updateProfilePicture
+    public void updateProfilePicture(String profilePictureUrl) {
+        prefs.edit().putString(Constants.PREF_USER_PROFILE_PICTURE, profilePictureUrl).apply();
+        Log.d(TAG, "✅ Profile picture updated: " + profilePictureUrl);
+    }
+
     public Long getUserId() {
         long id = prefs.getLong(Constants.PREF_USER_ID, 0L);
         return id > 0 ? id : null;

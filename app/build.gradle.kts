@@ -76,11 +76,10 @@ dependencies {
     implementation(libs.play.services.location)
     implementation(libs.play.services.maps)
 
-    // Camera & Image Handling (thay cho ImagePicker)
+    // Camera & Image Handling
     implementation("androidx.camera:camera-camera2:1.3.1")
     implementation("androidx.camera:camera-lifecycle:1.3.1")
     implementation("androidx.camera:camera-view:1.3.1")
-
 
     // Additional UI components
     implementation("de.hdodenhof:circleimageview:3.1.0")
@@ -89,8 +88,16 @@ dependencies {
     // Permissions
     implementation("com.karumi:dexter:6.2.3")
 
-    // WebSocket for chat
+    // ✅ UPDATED: WebSocket với STOMP support
     implementation("org.java-websocket:Java-WebSocket:1.5.3")
+    implementation("com.github.NaikSoftware:StompProtocolAndroid:1.6.6")
+
+    // ✅ ADDED: RxJava cho STOMP
+    implementation("io.reactivex.rxjava2:rxjava:2.2.21")
+    implementation("io.reactivex.rxjava2:rxandroid:2.1.1")
+
+    // ✅ ADDED: OkHttp cho STOMP connection
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
 
     // Testing
     testImplementation(libs.junit)

@@ -5,12 +5,11 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
-import android.text.InputType;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -22,14 +21,15 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.auth.LoginActivity;
+import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import de.hdodenhof.circleimageview.CircleImageView;
@@ -116,210 +116,236 @@ public class ProfileFragment extends Fragment {
         if (fabEditProfile != null) {
             fabEditProfile.setOnClickListener(v -> {
                 try {
-                    Log.d(TAG, "🔍 Edit profile button clicked");
                     Intent intent = new Intent(requireContext(), EditProfileActivity.class);
                     editProfileLauncher.launch(intent);
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ Error opening EditProfileActivity: " + e.getMessage());
-                    Toast.makeText(requireContext(), "Error opening edit profile: " + e.getMessage(),
-                            Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Error launching edit profile", e);
+                    Toast.makeText(requireContext(), "Unable to open edit profile", Toast.LENGTH_SHORT).show();
                 }
             });
         }
 
-        // My Listings
+        // Menu item listeners
         if (llMyListings != null) {
-            llMyListings.setOnClickListener(v -> {
-                try {
-                    Intent intent = new Intent(requireContext(), MyListingsActivity.class);
-                    startActivity(intent);
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error opening MyListingsActivity: " + e.getMessage());
-                    Toast.makeText(requireContext(), "Feature coming soon!", Toast.LENGTH_SHORT).show();
-                }
-            });
+            llMyListings.setOnClickListener(v -> openMyListings());
         }
 
-        // Saved Items
         if (llSavedItems != null) {
-            llSavedItems.setOnClickListener(v -> {
-                try {
-                    Intent intent = new Intent(requireContext(), SavedItemsActivity.class);
-                    startActivity(intent);
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error opening SavedItemsActivity: " + e.getMessage());
-                    Toast.makeText(requireContext(), "Feature coming soon!", Toast.LENGTH_SHORT).show();
-                }
-            });
+            llSavedItems.setOnClickListener(v -> openSavedItems());
         }
 
-        // Account Settings
-        if (llAccountSettings != null) {
-            llAccountSettings.setOnClickListener(v -> {
-                try {
-                    Intent intent = new Intent(requireContext(), SettingsActivity.class);
-                    startActivity(intent);
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error opening SettingsActivity: " + e.getMessage());
-                    Toast.makeText(requireContext(), "Feature coming soon!", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-
-        // Logout
-        if (llLogout != null) {
-            llLogout.setOnClickListener(v -> showLogoutDialog());
-        }
-
-        // Other menu items with placeholder actions
-        setupPlaceholderListeners();
-    }
-
-    private void setupPlaceholderListeners() {
         if (llPurchaseHistory != null) {
-            llPurchaseHistory.setOnClickListener(v ->
-                    Toast.makeText(requireContext(), "Purchase History - Coming soon!", Toast.LENGTH_SHORT).show());
+            llPurchaseHistory.setOnClickListener(v -> openPurchaseHistory());
+        }
+
+        if (llAccountSettings != null) {
+            llAccountSettings.setOnClickListener(v -> openAccountSettings());
         }
 
         if (llHelpSupport != null) {
-            llHelpSupport.setOnClickListener(v ->
-                    Toast.makeText(requireContext(), "Help & Support - Coming soon!", Toast.LENGTH_SHORT).show());
+            llHelpSupport.setOnClickListener(v -> openHelpSupport());
         }
 
         if (llAbout != null) {
-            llAbout.setOnClickListener(v ->
-                    Toast.makeText(requireContext(), "About TradeUp v1.0", Toast.LENGTH_SHORT).show());
+            llAbout.setOnClickListener(v -> openAbout());
+        }
+
+        if (llLogout != null) {
+            llLogout.setOnClickListener(v -> showLogoutDialog());
         }
     }
 
     private void loadUserProfile() {
-        Log.d(TAG, "📋 Loading user profile...");
+        try {
+            // Load basic info from SharedPrefs
+            displayBasicProfile();
 
-        // First load from SharedPrefs
-        loadProfileFromPrefs();
+            // Load detailed profile from server
+            loadProfileFromServer();
 
-        // Then try to load from API
-        loadProfileFromAPI();
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading user profile", e);
+        }
     }
 
-    private void loadProfileFromPrefs() {
-        String userName = prefsManager.getUserName();
-        String userEmail = prefsManager.getUserEmail();
-        String profilePicture = prefsManager.getUserProfilePicture();
+    // ✅ FIXED: displayBasicProfile với Glide cache bypass + DEBUG
+    private void displayBasicProfile() {
+        try {
+            String displayName = prefsManager.getUserName();
+            String email = prefsManager.getUserEmail();
+            String profilePicture = prefsManager.getUserProfilePicture();
 
-        // Set basic info
-        if (tvDisplayName != null) {
-            tvDisplayName.setText(userName != null ? userName : "User");
-        }
+            Log.d(TAG, "🔍 displayBasicProfile called");
+            Log.d(TAG, "  - Display name: " + displayName);
+            Log.d(TAG, "  - Email: " + email);
+            Log.d(TAG, "  - Profile picture URL: " + profilePicture);
 
-        if (tvEmail != null) {
-            tvEmail.setText(userEmail != null ? userEmail : "user@example.com");
-        }
-
-        if (tvMemberSince != null) {
-            tvMemberSince.setText("Member since 2024");
-        }
-
-        // Set profile picture
-        if (ivProfilePicture != null) {
-            if (profilePicture != null && !profilePicture.isEmpty()) {
-                Glide.with(this)
-                        .load(profilePicture)
-                        .placeholder(R.drawable.ic_person)
-                        .error(R.drawable.ic_person)
-                        .into(ivProfilePicture);
-            } else {
-                ivProfilePicture.setImageResource(R.drawable.ic_person);
+            // Display name and email
+            if (tvDisplayName != null) {
+                tvDisplayName.setText(displayName != null && !displayName.isEmpty() ? displayName : "User");
             }
+
+            if (tvEmail != null) {
+                tvEmail.setText(email != null && !email.isEmpty() ? email : "No email");
+            }
+
+            // ✅ FIX: Load profile picture với ImageUtils + debug
+            if (ivProfilePicture != null) {
+                Log.d(TAG, "🔍 About to call ImageUtils.loadAvatarImage()");
+                ImageUtils.loadAvatarImage(requireContext(), profilePicture, ivProfilePicture);
+            } else {
+                Log.e(TAG, "❌ ivProfilePicture is null!");
+            }
+
+            Log.d(TAG, "✅ displayBasicProfile completed");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error in displayBasicProfile", e);
         }
-
-        // Set mock stats for now
-        updateStatsUI(5, 3, 2); // 5 listings, 3 sold, 2 bought
-
-        Log.d(TAG, "✅ Profile loaded from SharedPrefs");
     }
 
-    private void loadProfileFromAPI() {
-        Long userId = prefsManager.getUserId();
-        if (userId == null || userId <= 0) {
-            Log.w(TAG, "Invalid user ID, skipping API call");
-            return;
-        }
-
-        Log.d(TAG, "📋 Loading profile from API for user: " + userId);
-
-        // TODO: Implement when API is ready
-        // For now, just populate with mock data
-        populateMockProfile();
-
-        /*
-        ApiClient.getUserService().getCurrentUserProfile()
+    private void loadProfileFromServer() {
+        ApiClient.getApiService().getCurrentUserProfile()
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                         Response<StandardResponse<Map<String, Object>>> response) {
+                                           Response<StandardResponse<Map<String, Object>>> response) {
 
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            Map<String, Object> profile = response.body().getData();
-                            populateProfile(profile);
-                            Log.d(TAG, "✅ Profile loaded from API");
-                        } else {
-                            Log.w(TAG, "⚠️ Failed to load profile from API");
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> standardResponse = response.body();
+
+                            if (standardResponse.isSuccess()) {
+                                updateProfileFromServer(standardResponse.getData());
+                            }
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        Log.e(TAG, "❌ Failed to load profile", t);
+                        Log.e(TAG, "Failed to load profile from server", t);
                     }
                 });
-        */
     }
 
-    private void populateMockProfile() {
-        // Mock data for testing
-        updateStatsUI(8, 5, 3); // 8 listings, 5 sold, 3 bought
+    private void updateProfileFromServer(Map<String, Object> profile) {
+        try {
+            // Update stats
+            if (tvListingsCount != null && profile.get("totalListings") != null) {
+                tvListingsCount.setText(profile.get("totalListings").toString());
+            }
+
+            if (tvSoldCount != null && profile.get("totalSold") != null) {
+                tvSoldCount.setText(profile.get("totalSold").toString());
+            }
+
+            if (tvBoughtCount != null && profile.get("totalBought") != null) {
+                tvBoughtCount.setText(profile.get("totalBought").toString());
+            }
+
+            // Update member since
+            if (tvMemberSince != null && profile.get("createdAt") != null) {
+                String createdAt = profile.get("createdAt").toString();
+                tvMemberSince.setText("Member since " + createdAt.substring(0, 4));
+            }
+
+            // ✅ FIX: Update profile picture if different from SharedPrefs
+            if (profile.get("profilePicture") != null) {
+                String serverProfilePicture = profile.get("profilePicture").toString();
+                String localProfilePicture = prefsManager.getUserProfilePicture();
+
+                Log.d(TAG, "🔍 Profile picture update check:");
+                Log.d(TAG, "  - Server URL: " + serverProfilePicture);
+                Log.d(TAG, "  - Local URL: " + localProfilePicture);
+
+                // If server has different URL, update local and reload image
+                if (!serverProfilePicture.equals(localProfilePicture)) {
+                    Log.d(TAG, "🔄 Avatar URLs different, updating...");
+                    prefsManager.updateProfilePicture(serverProfilePicture);
+
+                    if (ivProfilePicture != null) {
+                        Log.d(TAG, "🔍 Calling ImageUtils.loadAvatarImage() with fresh server URL");
+                        ImageUtils.loadAvatarImage(requireContext(), serverProfilePicture, ivProfilePicture);
+                    }
+
+                    Log.d(TAG, "✅ Updated avatar from server: " + serverProfilePicture);
+                } else {
+                    Log.d(TAG, "✅ Avatar URLs same, no update needed");
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating profile from server", e);
+        }
     }
 
-    private void updateStatsUI(int listings, int sold, int bought) {
-        if (tvListingsCount != null) tvListingsCount.setText(String.valueOf(listings));
-        if (tvSoldCount != null) tvSoldCount.setText(String.valueOf(sold));
-        if (tvBoughtCount != null) tvBoughtCount.setText(String.valueOf(bought));
+    // ✅ THÊM onResume() để reload khi quay lại
+    @Override
+    public void onResume() {
+        super.onResume();
+        Log.d(TAG, "🔄 onResume() called, refreshing profile");
+        // Reload profile để cập nhật những thay đổi từ EditProfileActivity
+        displayBasicProfile();
+    }
+
+    // Menu navigation methods
+    private void openMyListings() {
+        Toast.makeText(requireContext(), "My Listings - Coming soon", Toast.LENGTH_SHORT).show();
+    }
+
+    private void openSavedItems() {
+        Toast.makeText(requireContext(), "Saved Items - Coming soon", Toast.LENGTH_SHORT).show();
+    }
+
+    private void openPurchaseHistory() {
+        Toast.makeText(requireContext(), "Purchase History - Coming soon", Toast.LENGTH_SHORT).show();
+    }
+
+    private void openAccountSettings() {
+        Toast.makeText(requireContext(), "Account Settings - Coming soon", Toast.LENGTH_SHORT).show();
+    }
+
+    private void openHelpSupport() {
+        showSimpleDialog("Help & Support", "For support, please contact us at support@tradeup.com");
+    }
+
+    private void openAbout() {
+        showSimpleDialog("About TradeUp", "TradeUp v1.0\nA marketplace for buying and selling used items locally.");
     }
 
     private void showLogoutDialog() {
         new AlertDialog.Builder(requireContext())
                 .setTitle("Logout")
                 .setMessage("Are you sure you want to logout?")
-                .setPositiveButton("Logout", (dialog, which) -> {
-                    performLogout();
-                })
+                .setPositiveButton("Logout", (dialog, which) -> performLogout())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
     private void performLogout() {
-        Log.d(TAG, "🚪 Performing logout...");
+        try {
+            // Clear user data
+            prefsManager.clearUserSession();
 
-        // Clear user data
-        prefsManager.clearUserSession();
+            // Navigate to login
+            Intent intent = new Intent(requireContext(), LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
 
-        // Navigate to login
-        Intent intent = new Intent(requireContext(), LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
+            requireActivity().finish();
 
-        if (getActivity() != null) {
-            getActivity().finish();
+            Log.d(TAG, "✅ User logged out successfully");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error during logout", e);
+            Toast.makeText(requireContext(), "Error during logout", Toast.LENGTH_SHORT).show();
         }
-
-        Log.d(TAG, "✅ Logout completed");
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        // Refresh profile when fragment becomes visible
-        loadProfileFromPrefs();
+    private void showSimpleDialog(String title, String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
     }
 }

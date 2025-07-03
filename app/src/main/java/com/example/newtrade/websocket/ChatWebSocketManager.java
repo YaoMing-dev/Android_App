@@ -3,30 +3,38 @@ package com.example.newtrade.websocket;
 
 import android.util.Log;
 
-import com.example.newtrade.utils.Constants;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.drafts.Draft_6455;
-import org.java_websocket.handshake.ServerHandshake;
-
-import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.schedulers.Schedulers;
+import ua.naiksoftware.stomp.Stomp;
+import ua.naiksoftware.stomp.StompClient;
+import ua.naiksoftware.stomp.dto.LifecycleEvent;
+import ua.naiksoftware.stomp.dto.StompHeader;
+import ua.naiksoftware.stomp.dto.StompMessage;
 
 public class ChatWebSocketManager {
     private static final String TAG = "ChatWebSocketManager";
     private static ChatWebSocketManager instance;
 
-    private WebSocketClient webSocketClient;
+    // ✅ REPLACED: WebSocketClient with StompClient
+    private StompClient stompClient;
+    private CompositeDisposable compositeDisposable;
     private boolean isConnected = false;
     private boolean isConnecting = false;
     private Long currentUserId;
     private Long currentConversationId;
     private Gson gson = new Gson();
 
-    // Listeners
+    // Listeners - keep same interface
     private Set<ChatListener> chatListeners = new HashSet<>();
 
     public interface ChatListener {
@@ -44,11 +52,13 @@ public class ChatWebSocketManager {
         return instance;
     }
 
-    private ChatWebSocketManager() {}
+    private ChatWebSocketManager() {
+        compositeDisposable = new CompositeDisposable();
+    }
 
     public void connect(Long userId) {
         if (isConnected || isConnecting || userId == null || userId <= 0) {
-            Log.d(TAG, "Already connected/connecting or invalid userId");
+            Log.d(TAG, "Already connected/connecting or invalid userId: " + userId);
             return;
         }
 
@@ -56,60 +66,105 @@ public class ChatWebSocketManager {
         isConnecting = true;
 
         try {
-            // ✅ FIXED: Use correct WebSocket URL from backend
-            String wsUrl = Constants.WS_BASE_URL + "/ws"; // ws://10.0.2.2:8080/ws
-            URI serverUri = URI.create(wsUrl);
+            // ✅ UPDATED: Use STOMP instead of raw WebSocket
+            String wsUrl = "ws://10.0.2.2:8080/ws";
+            Log.d(TAG, "🔄 Connecting STOMP to: " + wsUrl + " for user: " + userId);
 
-            Log.d(TAG, "🔄 Connecting to: " + wsUrl + " for user: " + userId);
+            // Disconnect existing connection if any
+            disconnect();
 
-            webSocketClient = new WebSocketClient(serverUri, new Draft_6455()) {
-                @Override
-                public void onOpen(ServerHandshake handshake) {
-                    Log.d(TAG, "✅ WebSocket connected");
-                    isConnected = true;
-                    isConnecting = false;
-                    notifyConnected();
+            // ✅ Create STOMP client
+            stompClient = Stomp.over(Stomp.ConnectionProvider.OKHTTP, wsUrl);
 
-                    // ✅ Join conversation if available
-                    if (currentConversationId != null) {
-                        joinConversation(currentConversationId);
-                    }
-                }
+            // ✅ Setup headers
+            List<StompHeader> headers = new ArrayList<>();
+            headers.add(new StompHeader("User-ID", String.valueOf(userId)));
 
-                @Override
-                public void onMessage(String message) {
-                    Log.d(TAG, "📨 Received: " + message);
-                    handleIncomingMessage(message);
-                }
+            // ✅ Subscribe to lifecycle events
+            compositeDisposable.add(
+                    stompClient.lifecycle()
+                            .subscribeOn(Schedulers.io())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe(this::handleLifecycleEvent, this::handleError)
+            );
 
-                @Override
-                public void onClose(int code, String reason, boolean remote) {
-                    Log.d(TAG, "❌ WebSocket closed: " + code + " - " + reason);
-                    isConnected = false;
-                    isConnecting = false;
-                    notifyDisconnected();
-
-                    // Auto reconnect if not manually closed
-                    if (code != 1000 && currentUserId != null) {
-                        scheduleReconnect();
-                    }
-                }
-
-                @Override
-                public void onError(Exception ex) {
-                    Log.e(TAG, "❌ WebSocket error", ex);
-                    isConnected = false;
-                    isConnecting = false;
-                    notifyError("Connection error: " + ex.getMessage());
-                }
-            };
-
-            webSocketClient.connect();
+            // ✅ Connect with headers
+            stompClient.connect(headers);
 
         } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to create WebSocket connection", e);
+            Log.e(TAG, "❌ Failed to create STOMP connection", e);
             isConnecting = false;
             notifyError("Failed to connect: " + e.getMessage());
+        }
+    }
+
+    // ✅ NEW: Handle STOMP lifecycle events
+    private void handleLifecycleEvent(LifecycleEvent lifecycleEvent) {
+        switch (lifecycleEvent.getType()) {
+            case OPENED:
+                Log.d(TAG, "✅ STOMP connected");
+                isConnected = true;
+                isConnecting = false;
+                notifyConnected();
+                subscribeToTopics();
+
+                // Join conversation if available
+                if (currentConversationId != null) {
+                    joinConversation(currentConversationId);
+                }
+                break;
+
+            case CLOSED:
+                Log.d(TAG, "❌ STOMP disconnected");
+                isConnected = false;
+                isConnecting = false;
+                notifyDisconnected();
+
+                // Auto reconnect
+                if (currentUserId != null) {
+                    scheduleReconnect();
+                }
+                break;
+
+            case ERROR:
+                Log.e(TAG, "❌ STOMP error", lifecycleEvent.getException());
+                isConnected = false;
+                isConnecting = false;
+                String errorMsg = lifecycleEvent.getException() != null ?
+                        lifecycleEvent.getException().getMessage() : "Unknown error";
+                notifyError("Connection error: " + errorMsg);
+                break;
+        }
+    }
+
+    // ✅ NEW: Handle subscription errors
+    private void handleError(Throwable throwable) {
+        Log.e(TAG, "❌ STOMP subscription error", throwable);
+        isConnected = false;
+        isConnecting = false;
+        notifyError("Subscription error: " + throwable.getMessage());
+    }
+
+    // ✅ NEW: Subscribe to STOMP topics
+    private void subscribeToTopics() {
+        if (!isConnected || stompClient == null) {
+            Log.w(TAG, "Cannot subscribe - not connected");
+            return;
+        }
+
+        try {
+            // Subscribe to personal notifications
+            compositeDisposable.add(
+                    stompClient.topic("/user/queue/notifications")
+                            .subscribeOn(Schedulers.io())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe(this::handleNotificationMessage, this::handleError)
+            );
+
+            Log.d(TAG, "✅ Subscribed to STOMP topics");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error subscribing to topics", e);
         }
     }
 
@@ -131,118 +186,173 @@ public class ChatWebSocketManager {
     public void joinConversation(Long conversationId) {
         this.currentConversationId = conversationId;
 
-        if (!isConnected) {
+        if (!isConnected || stompClient == null) {
             Log.w(TAG, "Not connected, will join when connected");
             return;
         }
 
-        // ✅ NEW: Use STOMP format for joining conversation
-        JsonObject joinMessage = new JsonObject();
-        joinMessage.addProperty("type", "JOIN_CONVERSATION");
-        joinMessage.addProperty("conversationId", conversationId);
-        joinMessage.addProperty("userId", currentUserId);
+        try {
+            // ✅ Subscribe to conversation messages
+            compositeDisposable.add(
+                    stompClient.topic("/topic/conversation/" + conversationId)
+                            .subscribeOn(Schedulers.io())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe(this::handleChatMessage, this::handleError)
+            );
 
-        sendStompMessage(Constants.JOIN_CONVERSATION + conversationId, joinMessage.toString());
-        Log.d(TAG, "📡 Joined conversation: " + conversationId);
+            // ✅ Send join message
+            JsonObject joinMessage = new JsonObject();
+            joinMessage.addProperty("conversationId", conversationId);
+            joinMessage.addProperty("userId", currentUserId);
+
+            sendToDestination("/app/join/conversation/" + conversationId, joinMessage.toString());
+
+            Log.d(TAG, "📡 Joined conversation: " + conversationId);
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error joining conversation", e);
+        }
     }
 
     public void leaveConversation() {
-        if (!isConnected || currentConversationId == null) return;
+        if (!isConnected || currentConversationId == null || stompClient == null) return;
 
-        JsonObject leaveMessage = new JsonObject();
-        leaveMessage.addProperty("type", "LEAVE_CONVERSATION");
-        leaveMessage.addProperty("conversationId", currentConversationId);
-        leaveMessage.addProperty("userId", currentUserId);
+        try {
+            JsonObject leaveMessage = new JsonObject();
+            leaveMessage.addProperty("conversationId", currentConversationId);
+            leaveMessage.addProperty("userId", currentUserId);
 
-        sendStompMessage(Constants.LEAVE_CONVERSATION + currentConversationId, leaveMessage.toString());
-        Log.d(TAG, "📡 Left conversation: " + currentConversationId);
+            sendToDestination("/app/leave/conversation/" + currentConversationId, leaveMessage.toString());
+            Log.d(TAG, "📡 Left conversation: " + currentConversationId);
 
-        currentConversationId = null;
+            currentConversationId = null;
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error leaving conversation", e);
+        }
     }
 
     public void sendChatMessage(String messageText) {
-        if (!isConnected || currentConversationId == null || messageText.trim().isEmpty()) {
-            Log.w(TAG, "Cannot send - not connected, no conversation, or empty message");
+        if (!isConnected || currentConversationId == null || stompClient == null) {
+            Log.w(TAG, "Cannot send message - not connected or no conversation");
+            notifyError("Cannot send message - not connected");
             return;
         }
 
-        // ✅ NEW: Use backend message format
-        JsonObject message = new JsonObject();
-        message.addProperty("type", "MESSAGE");
-        message.addProperty("senderId", currentUserId);
-        message.addProperty("conversationId", currentConversationId);
-        message.addProperty("content", messageText.trim());
-        message.addProperty("messageType", "TEXT");
-        message.addProperty("timestamp", System.currentTimeMillis());
-
-        sendStompMessage(Constants.SEND_MESSAGE, message.toString());
-        Log.d(TAG, "📤 Sent message to conversation: " + currentConversationId);
-    }
-
-    private void sendStompMessage(String destination, String body) {
-        if (webSocketClient != null && isConnected) {
-            try {
-                // ✅ STOMP message format
-                String stompMessage = "SEND\n" +
-                        "destination:" + destination + "\n" +
-                        "content-type:application/json\n" +
-                        "\n" +
-                        body + "\0";
-
-                webSocketClient.send(stompMessage);
-            } catch (Exception e) {
-                Log.e(TAG, "Error sending STOMP message", e);
-                notifyError("Failed to send message");
-            }
-        }
-    }
-
-    private void handleIncomingMessage(String rawMessage) {
         try {
-            // ✅ Handle STOMP message format
-            if (rawMessage.startsWith("MESSAGE")) {
-                String[] parts = rawMessage.split("\n\n", 2);
-                if (parts.length > 1) {
-                    String body = parts[1].replace("\0", "");
-                    JsonObject json = gson.fromJson(body, JsonObject.class);
+            JsonObject message = new JsonObject();
+            message.addProperty("conversationId", currentConversationId);
+            message.addProperty("senderId", currentUserId);
+            message.addProperty("messageText", messageText);
+            message.addProperty("messageType", "TEXT");
 
-                    String type = json.has("type") ? json.get("type").getAsString() : "";
-
-                    switch (type) {
-                        case "MESSAGE":
-                            notifyMessageReceived(json);
-                            break;
-                        case "TYPING":
-                            if (json.has("senderId") && json.has("isTyping")) {
-                                Long userId = json.get("senderId").getAsLong();
-                                boolean isTyping = json.get("isTyping").getAsBoolean();
-                                notifyTypingIndicator(userId, isTyping);
-                            }
-                            break;
-                        case "USER_JOINED":
-                            Log.d(TAG, "✅ User joined conversation");
-                            break;
-                        default:
-                            Log.d(TAG, "Unknown message type: " + type);
-                            break;
-                    }
-                }
-            } else if (rawMessage.startsWith("CONNECTED")) {
-                Log.d(TAG, "✅ STOMP connected");
-            } else if (rawMessage.startsWith("ERROR")) {
-                Log.e(TAG, "❌ STOMP error: " + rawMessage);
-                notifyError("STOMP error");
-            }
+            sendToDestination("/app/send/message", message.toString());
+            Log.d(TAG, "📤 Sent message to conversation: " + currentConversationId);
 
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing message: " + rawMessage, e);
+            Log.e(TAG, "❌ Error sending message", e);
+            notifyError("Failed to send message");
         }
     }
 
-    // ===== LISTENER MANAGEMENT =====
+    public void sendTypingIndicator(boolean isTyping) {
+        if (!isConnected || currentConversationId == null || stompClient == null) return;
+
+        try {
+            JsonObject typing = new JsonObject();
+            typing.addProperty("conversationId", currentConversationId);
+            typing.addProperty("userId", currentUserId);
+            typing.addProperty("isTyping", isTyping);
+
+            sendToDestination("/app/send/typing", typing.toString());
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error sending typing indicator", e);
+        }
+    }
+
+    // ✅ NEW: Send message to STOMP destination
+    private void sendToDestination(String destination, String message) {
+        if (stompClient != null && isConnected) {
+            compositeDisposable.add(
+                    stompClient.send(destination, message)
+                            .subscribeOn(Schedulers.io())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe(
+                                    () -> Log.d(TAG, "✅ Message sent to: " + destination),
+                                    throwable -> {
+                                        Log.e(TAG, "❌ Failed to send message to: " + destination, throwable);
+                                        notifyError("Failed to send message");
+                                    }
+                            )
+            );
+        }
+    }
+
+    // ✅ NEW: Handle incoming chat messages
+    private void handleChatMessage(StompMessage stompMessage) {
+        try {
+            String payload = stompMessage.getPayload();
+            Log.d(TAG, "📨 Received chat message: " + payload);
+
+            JsonObject messageJson = gson.fromJson(payload, JsonObject.class);
+            notifyMessageReceived(messageJson);
+
+        } catch (JsonSyntaxException e) {
+            Log.e(TAG, "❌ Error parsing chat message JSON", e);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error handling chat message", e);
+        }
+    }
+
+    // ✅ NEW: Handle notifications
+    private void handleNotificationMessage(StompMessage stompMessage) {
+        try {
+            String payload = stompMessage.getPayload();
+            Log.d(TAG, "🔔 Received notification: " + payload);
+
+            // Handle notifications here if needed
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error handling notification", e);
+        }
+    }
+
+    public void disconnect() {
+        try {
+            Log.d(TAG, "🔌 Disconnecting...");
+
+            // ✅ Clear all subscriptions
+            if (compositeDisposable != null && !compositeDisposable.isDisposed()) {
+                compositeDisposable.clear();
+            }
+
+            // ✅ Disconnect STOMP client
+            if (stompClient != null) {
+                if (stompClient.isConnected()) {
+                    stompClient.disconnect();
+                }
+                stompClient = null;
+            }
+
+            // Reset state
+            isConnected = false;
+            isConnecting = false;
+            currentConversationId = null;
+
+            Log.d(TAG, "✅ Disconnected");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error disconnecting", e);
+        }
+    }
+
+    // ===== LISTENER MANAGEMENT (unchanged) =====
 
     public void addChatListener(ChatListener listener) {
-        chatListeners.add(listener);
+        if (listener != null) {
+            chatListeners.add(listener);
+        }
     }
 
     public void removeChatListener(ChatListener listener) {
@@ -250,75 +360,53 @@ public class ChatWebSocketManager {
     }
 
     private void notifyConnected() {
-        for (ChatListener listener : new HashSet<>(chatListeners)) {
+        for (ChatListener listener : chatListeners) {
             try {
                 listener.onConnected();
             } catch (Exception e) {
-                Log.e(TAG, "Error notifying listener", e);
+                Log.e(TAG, "Error notifying listener onConnected", e);
             }
         }
     }
 
     private void notifyDisconnected() {
-        for (ChatListener listener : new HashSet<>(chatListeners)) {
+        for (ChatListener listener : chatListeners) {
             try {
                 listener.onDisconnected();
             } catch (Exception e) {
-                Log.e(TAG, "Error notifying listener", e);
+                Log.e(TAG, "Error notifying listener onDisconnected", e);
             }
         }
     }
 
     private void notifyMessageReceived(JsonObject message) {
-        for (ChatListener listener : new HashSet<>(chatListeners)) {
+        for (ChatListener listener : chatListeners) {
             try {
                 listener.onMessageReceived(message);
             } catch (Exception e) {
-                Log.e(TAG, "Error notifying listener", e);
-            }
-        }
-    }
-
-    private void notifyTypingIndicator(Long userId, boolean isTyping) {
-        for (ChatListener listener : new HashSet<>(chatListeners)) {
-            try {
-                listener.onTypingIndicator(userId, isTyping);
-            } catch (Exception e) {
-                Log.e(TAG, "Error notifying listener", e);
+                Log.e(TAG, "Error notifying listener onMessageReceived", e);
             }
         }
     }
 
     private void notifyError(String error) {
-        for (ChatListener listener : new HashSet<>(chatListeners)) {
+        for (ChatListener listener : chatListeners) {
             try {
                 listener.onError(error);
             } catch (Exception e) {
-                Log.e(TAG, "Error notifying listener", e);
+                Log.e(TAG, "Error notifying listener onError", e);
             }
         }
     }
 
-    // ===== PUBLIC METHODS =====
-
-    public void disconnect() {
-        if (webSocketClient != null) {
-            try {
-                leaveConversation(); // Leave current conversation first
-                webSocketClient.close();
-            } catch (Exception e) {
-                Log.e(TAG, "Error closing WebSocket", e);
-            }
-            webSocketClient = null;
-        }
-        isConnected = false;
-        isConnecting = false;
-        currentConversationId = null;
-        Log.d(TAG, "🔌 Disconnected");
-    }
+    // ===== GETTERS (unchanged) =====
 
     public boolean isConnected() {
         return isConnected;
+    }
+
+    public boolean isConnecting() {
+        return isConnecting;
     }
 
     public Long getCurrentConversationId() {
