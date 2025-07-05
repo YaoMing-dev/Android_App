@@ -16,6 +16,7 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.os.Build;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -235,7 +236,11 @@ public class ChatActivity extends AppCompatActivity {
         };
 
         IntentFilter filter = new IntentFilter("NEW_MESSAGE_RECEIVED");
-        registerReceiver(messageReceiver, filter);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(messageReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(messageReceiver, filter);
+        }
     }
 
     private void loadMessages() {

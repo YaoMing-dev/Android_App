@@ -3,39 +3,62 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@color/background_primary">
 
     <!-- Toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/white"
-        app:navigationIcon="@drawable/ic_arrow_back" />
+        android:background="@color/primary_color"
+        app:titleTextColor="@color/white"
+        app:subtitleTextColor="@color/white"
+        app:navigationIconTint="@color/white"
+        app:menu="@menu/chat_menu" />
 
-    <!-- Connection Status (Optional) -->
+    <!-- Connection Status -->
     <TextView
         android:id="@+id/tv_connection_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/warning_color"
+        android:textColor="@color/white"
+        android:text="@string/connecting"
+        android:textSize="12sp"
         android:gravity="center"
         android:padding="4dp"
-        android:text="⚠️ Connecting..."
-        android:textColor="@color/white"
-        android:textSize="12sp"
         android:visibility="gone" />
 
-    <!-- Product Info (Optional) -->
-    <TextView
-        android:id="@+id/tv_product_info"
+    <!-- Product Info -->
+    <LinearLayout
+        android:id="@+id/ll_product_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/background_gray"
+        android:orientation="horizontal"
         android:padding="12dp"
-        android:text="📱 iPhone 13 Pro Max"
-        android:textSize="14sp"
-        android:visibility="gone" />
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/iv_product_thumb"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@color/gray_200"
+            android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/tv_product_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:textSize="14sp"
+            android:textColor="@color/text_primary"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+    </LinearLayout>
 
     <!-- Messages RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
@@ -43,27 +66,37 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="8dp" />
+        android:background="@color/background_light_gray"
+        android:padding="8dp"
+        android:clipToPadding="false" />
 
-    <!-- Typing Indicator (Optional) -->
-    <TextView
-        android:id="@+id/tv_typing_indicator"
+    <!-- Typing Indicator -->
+    <LinearLayout
+        android:id="@+id/ll_typing_indicator"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="8dp"
-        android:text="John is typing..."
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp"
-        android:textStyle="italic"
-        android:visibility="gone" />
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="@color/background_primary"
+        android:visibility="gone">
 
-    <!-- Message Input Section -->
+        <TextView
+            android:id="@+id/tv_typing_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/typing"
+            android:textStyle="italic"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+    </LinearLayout>
+
+    <!-- Message Input -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="8dp"
-        android:background="@color/white"
+        android:background="@color/background_primary"
+        android:padding="12dp"
         android:elevation="4dp">
 
         <EditText
@@ -71,9 +104,10 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:background="@drawable/rounded_background_gray"
-            android:hint="Type a message..."
+            android:hint="@string/type_message"
             android:maxLines="3"
+            android:inputType="textMultiLine|textCapSentences"
+            android:background="@drawable/rounded_background_gray"
             android:padding="12dp"
             android:textSize="16sp" />
 
@@ -82,11 +116,11 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginStart="8dp"
-            android:background="@drawable/rounded_background_primary"
             android:src="@drawable/ic_send"
-            android:tint="@color/white"
+            android:background="@drawable/rounded_background_primary"
+            android:contentDescription="@string/send_message"
+            android:scaleType="centerInside"
             android:enabled="false" />
-
     </LinearLayout>
 
 </LinearLayout>

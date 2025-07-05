@@ -61,6 +61,7 @@ public class SharedPrefsManager {
         return userId != -1L ? userId : null;
     }
 
+
     public String getUserName() {
         return sharedPreferences.getString(Constants.PREF_USER_NAME, "");
     }

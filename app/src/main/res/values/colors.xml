@@ -7,6 +7,46 @@
     <color name="primary_variant">#1565C0</color>
 
 
+    <!-- app/src/main/res/values/colors.xml -->
+
+        <!-- Primary Colors -->
+
+        <!-- Gray Scale -->
+        <color name="gray_100">#F5F5F5</color>
+        <color name="gray_200">#EEEEEE</color>
+        <color name="gray_300">#E0E0E0</color>
+        <color name="gray_400">#BDBDBD</color>
+        <color name="gray_500">#9E9E9E</color>
+        <color name="gray_600">#757575</color>
+        <color name="gray_700">#616161</color>
+        <color name="gray_800">#424242</color>
+        <color name="gray_900">#212121</color>
+
+        <!-- Text Colors -->
+
+        <!-- Status Colors -->
+        <color name="green_500">#4CAF50</color>
+        <color name="red_500">#F44336</color>
+        <color name="orange_500">#FF9800</color>
+        <color name="blue_500">#2196F3</color>
+
+        <!-- Background Colors -->
+        <color name="background_primary">#FFFFFF</color>
+        <color name="background_secondary">#F8F9FA</color>
+
+        <!-- Button Colors -->
+        <color name="button_primary">#2196F3</color>
+        <color name="button_secondary">#6C757D</color>
+
+
+        <!-- Message Colors -->
+        <color name="message_sent">#DCF8C6</color>
+        <color name="message_received">#FFFFFF</color>
+
+        <!-- Divider -->
+        <color name="divider">#E0E0E0</color>
+
+
     <!-- Secondary Colors -->
     <color name="secondary_color">#FF9800</color>
     <color name="secondary_dark">#F57C00</color>
@@ -27,11 +67,32 @@
     <color name="text_white">#FFFFFF</color>
     <color name="text_link">#2196F3</color>
 
+    <!-- Primary Colors -->
+
+    <!-- Secondary Colors -->
+
     <!-- Status Colors -->
     <color name="success_color">#4CAF50</color>
-    <color name="error_color">#F44336</color>
     <color name="warning_color">#FF9800</color>
+    <color name="error_color">#F44336</color>
     <color name="info_color">#2196F3</color>
+
+    <!-- Background Colors -->
+
+
+
+
+    <!-- Gray Scale -->
+
+
+    <!-- Fix: Thêm màu orange -->
+    <color name="orange">#FF9800</color>
+
+    <color name="orange_light">#FFE0B2</color>
+    <color name="orange_dark">#F57C00</color>
+
+    <!-- Divider -->
+
     <color name="pending_color">#FFC107</color>
 
     <!-- UI Colors -->
@@ -105,4 +166,23 @@
     <color name="category_automotive">#F44336</color>
     <color name="category_toys">#FF5722</color>
     <color name="category_beauty">#E91E63</color>
+
+
+
+
+
+    <!-- Basic Colors -->
+   +
+
+    <!-- Background Colors -->
+   +
+    <color name="background_light_gray">#FAFAFA</color>
+    <color name="background_dark_gray">#EEEEEE</color>
+
+    <!-- Text Colors -->
+  +
+    <color name="text_black">#000000</color>
+
+    <!-- Chat Colors -->
+   +
 </resources>

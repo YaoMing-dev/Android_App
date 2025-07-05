@@ -61,4 +61,25 @@ public interface ChatService {
     @GET("/api/messages/unread-count")
     Call<StandardResponse<Map<String, Object>>> getUnreadMessageCount(
             @Header("User-ID") Long userId);
+
+
+
+
+    @GET("/api/chat/conversations/{conversationId}/messages")
+    Call<StandardResponse<Map<String, Object>>> getMessages(
+            @Path("conversationId") Long conversationId,
+            @Query("page") int page,
+            @Query("size") int size
+    );
+
+    @POST("/api/chat/messages")
+    Call<StandardResponse<Map<String, Object>>> sendMessage(
+            @Body Map<String, Object> messageData
+    );
+
+    @POST("/api/chat/conversations/{conversationId}/mark-read")
+    Call<StandardResponse<Map<String, Object>>> markConversationAsRead(
+            @Path("conversationId") Long conversationId
+    );
 }
+
