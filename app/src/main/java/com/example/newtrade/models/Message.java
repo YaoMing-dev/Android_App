@@ -1,35 +1,79 @@
 // app/src/main/java/com/example/newtrade/models/Message.java
 package com.example.newtrade.models;
 
-import java.time.LocalDateTime;
+import com.google.gson.JsonObject;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.Map;
 
 public class Message {
     private Long id;
     private Long conversationId;
     private Long senderId;
-    private String content;
+    private String messageText;
     private String messageType;
+    private String messageStatus;
     private String createdAt;
-    private String timestamp;
     private boolean isRead;
-    private String imageUrl; // ✅ NEW - For image messages
-    private String senderName; // ✅ NEW - For display
 
-    // Constructors
+    // Constructor
     public Message() {}
 
-    public Message(Long id, Long conversationId, Long senderId, String content, String messageType, String createdAt) {
+    public Message(Long id, Long conversationId, Long senderId, String messageText,
+                   String messageType, String messageStatus, String createdAt, boolean isRead) {
         this.id = id;
         this.conversationId = conversationId;
         this.senderId = senderId;
-        this.content = content;
+        this.messageText = messageText;
         this.messageType = messageType;
+        this.messageStatus = messageStatus;
         this.createdAt = createdAt;
-        this.isRead = false;
+        this.isRead = isRead;
     }
 
-    // ===== GETTERS AND SETTERS =====
+    // Factory method from Map
+    public static Message fromMap(Map<String, Object> messageData) {
+        Message message = new Message();
 
+        try {
+            message.id = ((Number) messageData.get("id")).longValue();
+            message.conversationId = ((Number) messageData.get("conversationId")).longValue();
+            message.senderId = ((Number) messageData.get("senderId")).longValue();
+            message.messageText = (String) messageData.get("messageText");
+            message.messageType = (String) messageData.get("messageType");
+            message.messageStatus = (String) messageData.get("messageStatus");
+            message.createdAt = (String) messageData.get("createdAt");
+            message.isRead = Boolean.TRUE.equals(messageData.get("isRead"));
+        } catch (Exception e) {
+            // Handle parsing errors
+        }
+
+        return message;
+    }
+
+    // Factory method from JsonObject
+    public static Message fromJsonObject(JsonObject data) {
+        Message message = new Message();
+
+        try {
+            if (data.has("id")) message.id = data.get("id").getAsLong();
+            if (data.has("conversationId")) message.conversationId = data.get("conversationId").getAsLong();
+            if (data.has("senderId")) message.senderId = data.get("senderId").getAsLong();
+            if (data.has("messageText")) message.messageText = data.get("messageText").getAsString();
+            if (data.has("messageType")) message.messageType = data.get("messageType").getAsString();
+            if (data.has("messageStatus")) message.messageStatus = data.get("messageStatus").getAsString();
+            if (data.has("createdAt")) message.createdAt = data.get("createdAt").getAsString();
+            if (data.has("isRead")) message.isRead = data.get("isRead").getAsBoolean();
+        } catch (Exception e) {
+            // Handle parsing errors
+        }
+
+        return message;
+    }
+
+    // Getters and Setters
     public Long getId() {
         return id;
     }
@@ -54,12 +98,12 @@ public class Message {
         this.senderId = senderId;
     }
 
-    public String getContent() {
-        return content;
+    public String getMessageText() {
+        return messageText;
     }
 
-    public void setContent(String content) {
-        this.content = content;
+    public void setMessageText(String messageText) {
+        this.messageText = messageText;
     }
 
     public String getMessageType() {
@@ -70,20 +114,20 @@ public class Message {
         this.messageType = messageType;
     }
 
+    public String getMessageStatus() {
+        return messageStatus;
+    }
+
+    public void setMessageStatus(String messageStatus) {
+        this.messageStatus = messageStatus;
+    }
+
     public String getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public String getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(String timestamp) {
-        this.timestamp = timestamp;
     }
 
     public boolean isRead() {
@@ -94,68 +138,41 @@ public class Message {
         isRead = read;
     }
 
-    public void setIsRead(boolean isRead) {
-        this.isRead = isRead;
-    }
+    // Utility methods
+    public String getFormattedTime() {
+        if (createdAt == null) return "";
 
-    public boolean getIsRead() {
-        return isRead;
-    }
-
-    // ✅ NEW: Image message support
-    public String getImageUrl() {
-        return imageUrl;
-    }
-
-    public void setImageUrl(String imageUrl) {
-        this.imageUrl = imageUrl;
-    }
-
-    // ✅ NEW: Sender name for display
-    public String getSenderName() {
-        return senderName;
-    }
-
-    public void setSenderName(String senderName) {
-        this.senderName = senderName;
-    }
-
-    // ===== UTILITY METHODS =====
-
-    public boolean isImageMessage() {
-        return "IMAGE".equals(messageType) && imageUrl != null && !imageUrl.isEmpty();
+        try {
+            SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+            SimpleDateFormat outputFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            Date date = inputFormat.parse(createdAt);
+            return date != null ? outputFormat.format(date) : "";
+        } catch (Exception e) {
+            return createdAt;
+        }
     }
 
     public boolean isTextMessage() {
         return "TEXT".equals(messageType);
     }
 
-    @Override
-    public String toString() {
-        return "Message{" +
-                "id=" + id +
-                ", conversationId=" + conversationId +
-                ", senderId=" + senderId +
-                ", content='" + content + '\'' +
-                ", messageType='" + messageType + '\'' +
-                ", createdAt='" + createdAt + '\'' +
-                ", timestamp='" + timestamp + '\'' +
-                ", isRead=" + isRead +
-                ", imageUrl='" + imageUrl + '\'' +
-                ", senderName='" + senderName + '\'' +
-                '}';
+    public boolean isImageMessage() {
+        return "IMAGE".equals(messageType);
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Message message = (Message) o;
-        return id != null && id.equals(message.id);
+    public boolean isOfferMessage() {
+        return "OFFER".equals(messageType);
     }
 
-    @Override
-    public int hashCode() {
-        return id != null ? id.hashCode() : 0;
+    public boolean isSent() {
+        return "SENT".equals(messageStatus);
+    }
+
+    public boolean isDelivered() {
+        return "DELIVERED".equals(messageStatus);
+    }
+
+    public boolean isMessageRead() {
+        return "READ".equals(messageStatus);
     }
 }

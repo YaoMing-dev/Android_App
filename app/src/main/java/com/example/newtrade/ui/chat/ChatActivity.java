@@ -1,8 +1,11 @@
 // app/src/main/java/com/example/newtrade/ui/chat/ChatActivity.java
 package com.example.newtrade.ui.chat;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
-import android.os.Handler;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -10,6 +13,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -18,74 +22,89 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.newtrade.R;
-import com.example.newtrade.models.Message;
 import com.example.newtrade.adapters.MessageAdapter;
-import com.example.newtrade.utils.NavigationUtils;
-import com.example.newtrade.utils.SharedPrefsManager;
-import com.example.newtrade.websocket.ChatWebSocketManager;
 import com.example.newtrade.api.ApiClient;
-import com.example.newtrade.api.ApiService;
+import com.example.newtrade.models.Message;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.SharedPrefsManager;
+import com.example.newtrade.websocket.RealtimeWebSocketService;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class ChatActivity extends AppCompatActivity implements ChatWebSocketManager.ChatListener {
+public class ChatActivity extends AppCompatActivity {
 
     private static final String TAG = "ChatActivity";
+    private static final int MESSAGES_PAGE_SIZE = 50;
 
     // UI Components
     private MaterialToolbar toolbar;
     private RecyclerView rvMessages;
     private EditText etMessage;
     private ImageButton btnSend;
+    private LinearLayout llTypingIndicator;
     private TextView tvTypingIndicator;
+    private TextView tvConnectionStatus;
 
     // Data
-    private SharedPrefsManager prefsManager;
-    private ChatWebSocketManager chatWebSocketManager;
-    private MessageAdapter messageAdapter;
-    private List<Message> messages;
-
-    // Chat data
     private Long conversationId;
-    private String otherUserName;
-    private String productTitle;
-    private Long currentUserId;
     private Long productId;
+    private SharedPrefsManager prefsManager;
+    private MessageAdapter messageAdapter;
+    private List<Message> messages = new ArrayList<>();
+    private boolean isLoading = false;
+    private int currentPage = 0;
+    private boolean hasMoreMessages = true;
 
-    // Typing indicator
-    private Handler typingHandler = new Handler();
-    private Runnable stopTypingRunnable;
-    private boolean isTyping = false;
+    // WebSocket
+    private RealtimeWebSocketService webSocketService;
+    private BroadcastReceiver messageReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        initViews();
+        // Initialize
+        prefsManager = SharedPrefsManager.getInstance(this);
+
+        // Get data from intent
         getIntentData();
+
+        // Initialize views
+        initViews();
         setupToolbar();
         setupRecyclerView();
         setupListeners();
-        initWebSocket();
-        loadOrCreateConversation();
+        setupWebSocket();
+        setupBroadcastReceiver();
+
+        // Load messages
+        loadMessages();
 
         Log.d(TAG, "✅ ChatActivity created for conversation: " + conversationId);
+    }
+
+    private void getIntentData() {
+        Intent intent = getIntent();
+        conversationId = intent.getLongExtra(Constants.EXTRA_CONVERSATION_ID, -1L);
+        productId = intent.getLongExtra(Constants.EXTRA_PRODUCT_ID, -1L);
+
+        if (conversationId == -1L) {
+            Log.e(TAG, "❌ Conversation ID not provided");
+            finish();
+            return;
+        }
     }
 
     private void initViews() {
@@ -93,590 +112,422 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         rvMessages = findViewById(R.id.rv_messages);
         etMessage = findViewById(R.id.et_message);
         btnSend = findViewById(R.id.btn_send);
+        llTypingIndicator = findViewById(R.id.ll_typing_indicator);
         tvTypingIndicator = findViewById(R.id.tv_typing_indicator);
+        tvConnectionStatus = findViewById(R.id.tv_connection_status);
 
-        prefsManager = SharedPrefsManager.getInstance(this);
-        currentUserId = prefsManager.getUserId();
-        messages = new ArrayList<>();
-    }
+        // Initially disable send button
+        btnSend.setEnabled(false);
 
-    private void getIntentData() {
-        conversationId = getIntent().getLongExtra("conversation_id", -1);
-        otherUserName = getIntent().getStringExtra("other_user_name");
-        productTitle = getIntent().getStringExtra("product_title");
-        productId = getIntent().getLongExtra("product_id", -1);
+        // Hide typing indicator
+        llTypingIndicator.setVisibility(View.GONE);
 
-        // ✅ NEW: If no conversationId but has productId, we'll create conversation
-        if (conversationId == -1 && productId != -1) {
-            Log.d(TAG, "No conversation ID, will create for product: " + productId);
-        }
-
-        Log.d(TAG, "Chat data - ConversationID: " + conversationId + ", ProductID: " + productId + ", Other user: " + otherUserName);
+        Log.d(TAG, "✅ Views initialized");
     }
 
     private void setupToolbar() {
-        String title = otherUserName != null ? otherUserName : "Chat";
-        String subtitle = productTitle != null ? productTitle : "";
-
-        NavigationUtils.setupToolbarWithBackButton(this, toolbar, title);
-        toolbar.setSubtitle(subtitle);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("Chat");
+        }
     }
 
     private void setupRecyclerView() {
-        messageAdapter = new MessageAdapter(this, messages, currentUserId);
-        rvMessages.setLayoutManager(new LinearLayoutManager(this));
+        Long currentUserId = prefsManager.getUserId();
+        messageAdapter = new MessageAdapter(messages, currentUserId);
+
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        layoutManager.setStackFromEnd(true); // Start from bottom
+        rvMessages.setLayoutManager(layoutManager);
         rvMessages.setAdapter(messageAdapter);
+
+        // Add scroll listener for pagination
+        rvMessages.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+
+                LinearLayoutManager manager = (LinearLayoutManager) recyclerView.getLayoutManager();
+                if (manager != null && !isLoading && hasMoreMessages) {
+                    int firstVisibleItem = manager.findFirstVisibleItemPosition();
+                    if (firstVisibleItem <= 2) { // Load more when near top
+                        loadMoreMessages();
+                    }
+                }
+            }
+        });
     }
 
     private void setupListeners() {
-        btnSend.setOnClickListener(v -> sendMessage());
-
-        // Typing indicator
+        // Message input text watcher
         etMessage.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                handleTyping();
-            }
+                boolean hasText = s.toString().trim().length() > 0;
+                btnSend.setEnabled(hasText);
 
-            @Override
-            public void afterTextChanged(Editable s) {
-                btnSend.setEnabled(!s.toString().trim().isEmpty());
-            }
-        });
-    }
-
-    private void initWebSocket() {
-        // ✅ ENABLE WebSocket with fixed backend
-        chatWebSocketManager = ChatWebSocketManager.getInstance();
-        chatWebSocketManager.addChatListener(this);
-
-        // Connect if not already connected
-        if (currentUserId != null && currentUserId > 0) {
-            if (!chatWebSocketManager.isConnected()) {
-                chatWebSocketManager.connect(currentUserId);
-            } else {
-                // Already connected, join conversation immediately if we have one
-                if (conversationId != null && conversationId > 0) {
-                    joinConversation();
-                }
-            }
-        } else {
-            Toast.makeText(this, "Please login to chat", Toast.LENGTH_SHORT).show();
-            finish();
-        }
-    }
-
-    private void joinConversation() {
-        if (conversationId != null && conversationId > 0) {
-            chatWebSocketManager.joinConversation(conversationId);
-        }
-    }
-
-    // ✅ NEW: Load existing conversation or create new one
-    private void loadOrCreateConversation() {
-        if (conversationId != null && conversationId > 0) {
-            // Load existing conversation
-            loadMessages();
-        } else if (productId != null && productId > 0) {
-            // Create new conversation for product
-            createConversation();
-        } else {
-            // Fallback to mock messages
-            addMockMessages();
-        }
-    }
-
-    // ✅ NEW: Create conversation via API
-    private void createConversation() {
-        // Validate user login
-        if (currentUserId == null || currentUserId <= 0) {
-            Log.e(TAG, "❌ User not logged in, currentUserId: " + currentUserId);
-            Toast.makeText(this, "Bạn cần đăng nhập để chat", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        // Validate product ID
-        if (productId == null || productId <= 0) {
-            Log.e(TAG, "❌ Invalid product ID: " + productId);
-            addMockMessages();
-            return;
-        }
-
-        Log.d(TAG, "🔍 Creating conversation - UserID: " + currentUserId + ", ProductID: " + productId);
-
-        ApiService apiService = ApiClient.getApiService();
-
-        // ❌ CŨ:
-        // Map<String, Object> conversationData = new HashMap<>();
-        // conversationData.put("productId", productId);
-        // Call<StandardResponse<Map<String, Object>>> call = apiService.findOrCreateConversation(conversationData);
-
-        // ✅ MỚI: Query Parameters
-        Call<StandardResponse<Map<String, Object>>> call = apiService.findOrCreateConversation(productId);
-
-        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-
-                Log.d(TAG, "🔍 Response code: " + response.code());
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> standardResponse = response.body();
-                    Log.d(TAG, "🔍 Response success: " + standardResponse.isSuccess());
-
-                    if (standardResponse.isSuccess()) {
-                        Map<String, Object> conversationResponse = standardResponse.getData();
-                        conversationId = ((Number) conversationResponse.get("id")).longValue();
-
-                        Log.d(TAG, "✅ Conversation created/found: " + conversationId);
-
-                        // Join WebSocket conversation
-                        if (chatWebSocketManager.isConnected()) {
-                            joinConversation();
-                        }
-
-                        // Load messages
-                        loadMessages();
-
-                    } else {
-                        Log.e(TAG, "❌ Failed to create conversation: " + standardResponse.getMessage());
-                        addMockMessages(); // Fallback
-                    }
-                } else {
-                    Log.e(TAG, "❌ HTTP Error " + response.code() + ": " + response.message());
-                    try {
-                        if (response.errorBody() != null) {
-                            String errorBody = response.errorBody().string();
-                            Log.e(TAG, "❌ Error body: " + errorBody);
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error reading error body", e);
-                    }
-                    addMockMessages(); // Fallback
+                // Send typing indicator
+                if (hasText && webSocketService != null) {
+                    sendTypingIndicator(true);
                 }
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                Log.e(TAG, "❌ Network error creating conversation", t);
-                addMockMessages(); // Fallback
-            }
+            public void afterTextChanged(Editable s) {}
         });
+
+        // Send button click
+        btnSend.setOnClickListener(v -> sendMessage());
     }
 
-    // ✅ NEW: Load messages from API
+    private void setupWebSocket() {
+        // Start WebSocket service
+        Intent serviceIntent = new Intent(this, RealtimeWebSocketService.class);
+        startService(serviceIntent);
+
+        // Bind to service
+        bindService(serviceIntent, new android.content.ServiceConnection() {
+            @Override
+            public void onServiceConnected(android.content.ComponentName name, android.os.IBinder service) {
+                RealtimeWebSocketService.LocalBinder binder = (RealtimeWebSocketService.LocalBinder) service;
+                webSocketService = binder.getService();
+
+                // Add listener for this activity
+                webSocketService.addListener(TAG, new RealtimeWebSocketService.WebSocketListener() {
+                    @Override
+                    public void onMessageReceived(String type, JsonObject data) {
+                        runOnUiThread(() -> handleWebSocketMessage(type, data));
+                    }
+
+                    @Override
+                    public void onConnectionStatusChanged(boolean connected) {
+                        runOnUiThread(() -> updateConnectionStatus(connected));
+                    }
+                });
+
+                // Join conversation
+                webSocketService.joinConversation(conversationId);
+
+                Log.d(TAG, "✅ WebSocket service connected");
+            }
+
+            @Override
+            public void onServiceDisconnected(android.content.ComponentName name) {
+                webSocketService = null;
+                Log.d(TAG, "WebSocket service disconnected");
+            }
+        }, Context.BIND_AUTO_CREATE);
+    }
+
+    private void setupBroadcastReceiver() {
+        messageReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if ("NEW_MESSAGE_RECEIVED".equals(intent.getAction())) {
+                    String messageData = intent.getStringExtra("message_data");
+                    handleNewMessageBroadcast(messageData);
+                }
+            }
+        };
+
+        IntentFilter filter = new IntentFilter("NEW_MESSAGE_RECEIVED");
+        registerReceiver(messageReceiver, filter);
+    }
+
     private void loadMessages() {
-        if (conversationId == null || conversationId <= 0) {
-            addMockMessages();
+        if (isLoading) return;
+
+        isLoading = true;
+        currentPage = 0;
+
+        Long userId = prefsManager.getUserId();
+        if (userId == null) {
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show();
+            finish();
             return;
         }
 
-        ApiService apiService = ApiClient.getApiService();
-        Call<StandardResponse<Map<String, Object>>> call = apiService.getConversationMessages(conversationId, 0, 50);
+        Log.d(TAG, "🔍 Loading messages for conversation: " + conversationId);
 
-        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
+        ApiClient.getChatService().getMessages(userId, conversationId, currentPage, MESSAGES_PAGE_SIZE)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        isLoading = false;
 
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> standardResponse = response.body();
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
+                            if (apiResponse.isSuccess()) {
+                                handleMessagesResponse(apiResponse.getData(), false);
 
-                    if (standardResponse.isSuccess()) {
-                        Map<String, Object> pageData = standardResponse.getData();
-                        @SuppressWarnings("unchecked")
-                        List<Map<String, Object>> messageList = (List<Map<String, Object>>) pageData.get("content");
+                                // Mark messages as read
+                                markMessagesAsRead();
 
-                        if (messageList != null) {
-                            messages.clear();
-                            for (Map<String, Object> messageData : messageList) {
-                                Message message = parseMessageFromApi(messageData);
-                                if (message != null) {
-                                    messages.add(message);
-                                }
+                                Log.d(TAG, "✅ Messages loaded successfully");
+                            } else {
+                                showError(apiResponse.getMessage());
                             }
-
-                            messageAdapter.notifyDataSetChanged();
-                            scrollToBottom();
-
-                            Log.d(TAG, "✅ Loaded " + messages.size() + " messages");
+                        } else {
+                            showError("Failed to load messages");
                         }
-
-                    } else {
-                        Log.e(TAG, "Failed to load messages: " + standardResponse.getMessage());
-                        addMockMessages(); // Fallback
                     }
-                } else {
-                    Log.e(TAG, "Failed to load messages: HTTP " + response.code());
-                    addMockMessages(); // Fallback
-                }
-            }
 
-            @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                Log.e(TAG, "Error loading messages", t);
-                addMockMessages(); // Fallback
-            }
-        });
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        isLoading = false;
+                        Log.e(TAG, "❌ Failed to load messages", t);
+                        showError("Network error. Please try again.");
+                    }
+                });
     }
 
-    // ✅ NEW: Parse message from API response
-    private Message parseMessageFromApi(Map<String, Object> messageData) {
+    private void loadMoreMessages() {
+        if (isLoading || !hasMoreMessages) return;
+
+        isLoading = true;
+        currentPage++;
+
+        Long userId = prefsManager.getUserId();
+        if (userId == null) return;
+
+        ApiClient.getChatService().getMessages(userId, conversationId, currentPage, MESSAGES_PAGE_SIZE)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        isLoading = false;
+
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
+                            if (apiResponse.isSuccess()) {
+                                handleMessagesResponse(apiResponse.getData(), true);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        isLoading = false;
+                        Log.e(TAG, "❌ Failed to load more messages", t);
+                    }
+                });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void handleMessagesResponse(Map<String, Object> data, boolean isLoadMore) {
         try {
-            Message message = new Message();
+            List<Map<String, Object>> messageList = (List<Map<String, Object>>) data.get("content");
+            Boolean hasMore = (Boolean) data.get("hasNext");
 
-            Log.d(TAG, "🔍 Raw message data: " + messageData.toString());
+            if (messageList != null) {
+                List<Message> newMessages = new ArrayList<>();
 
-            // Parse ID
-            if (messageData.get("id") != null) {
-                message.setId(((Number) messageData.get("id")).longValue());
-            }
-
-            // ✅ FIX: Parse sender từ nested sender object
-            if (messageData.get("sender") != null) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> sender = (Map<String, Object>) messageData.get("sender");
-                if (sender.get("id") != null) {
-                    message.setSenderId(((Number) sender.get("id")).longValue());
+                for (Map<String, Object> messageData : messageList) {
+                    Message message = Message.fromMap(messageData);
+                    newMessages.add(message);
                 }
-                Log.d(TAG, "✅ Sender ID: " + message.getSenderId());
+
+                if (isLoadMore) {
+                    // Add to beginning for older messages
+                    messages.addAll(0, newMessages);
+                    messageAdapter.notifyItemRangeInserted(0, newMessages.size());
+                } else {
+                    // Replace all messages
+                    messages.clear();
+                    messages.addAll(newMessages);
+                    messageAdapter.notifyDataSetChanged();
+
+                    // Scroll to bottom
+                    if (!messages.isEmpty()) {
+                        rvMessages.scrollToPosition(messages.size() - 1);
+                    }
+                }
+
+                hasMoreMessages = hasMore != null && hasMore;
             }
-
-            // ✅ FIX: messageText thay vì content
-            if (messageData.get("messageText") != null) {
-                message.setContent(messageData.get("messageText").toString());
-                Log.d(TAG, "✅ Message text: " + message.getContent());
-            }
-
-            // Parse message type
-            if (messageData.get("messageType") != null) {
-                message.setMessageType(messageData.get("messageType").toString());
-            } else {
-                message.setMessageType("TEXT"); // Default
-            }
-
-            // Parse timestamp
-            if (messageData.get("createdAt") != null) {
-                String timestamp = messageData.get("createdAt").toString();
-                message.setCreatedAt(formatTimestampString(timestamp));
-                Log.d(TAG, "✅ Message time: " + message.getCreatedAt());
-            }
-
-            Log.d(TAG, "✅ Successfully parsed message from user " + message.getSenderId() + ": " + message.getContent());
-            return message;
-
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing message from API", e);
-            Log.e(TAG, "❌ Message data was: " + messageData.toString());
-            return null;
+            Log.e(TAG, "❌ Error processing messages", e);
         }
-    }
-
-    private void addMockMessages() {
-        // Mock messages for testing
-        messages.clear();
-
-        Message msg1 = new Message();
-        msg1.setId(1L);
-        msg1.setSenderId(2L); // Other user
-        msg1.setContent("Hello! Is this item still available?");
-        msg1.setCreatedAt("10:30 AM");
-        msg1.setMessageType("TEXT");
-        messages.add(msg1);
-
-        Message msg2 = new Message();
-        msg2.setId(2L);
-        msg2.setSenderId(currentUserId); // Current user
-        msg2.setContent("Yes, it's still available! Would you like to know more details?");
-        msg2.setCreatedAt("10:32 AM");
-        msg2.setMessageType("TEXT");
-        messages.add(msg2);
-
-        messageAdapter.notifyDataSetChanged();
-        scrollToBottom();
-
-        Log.d(TAG, "✅ Mock messages loaded");
     }
 
     private void sendMessage() {
         String messageText = etMessage.getText().toString().trim();
         if (messageText.isEmpty()) return;
 
-        // Add message to UI immediately for better UX
-        Message newMessage = new Message();
-        newMessage.setId(System.currentTimeMillis()); // Temporary ID
-        newMessage.setSenderId(currentUserId);
-        newMessage.setContent(messageText);
-        newMessage.setCreatedAt("Sending...");
-        newMessage.setMessageType("TEXT");
+        Long userId = prefsManager.getUserId();
+        if (userId == null) return;
 
-        messages.add(newMessage);
-        messageAdapter.notifyItemInserted(messages.size() - 1);
-        scrollToBottom();
-
-        // Clear input
+        // Clear input immediately
         etMessage.setText("");
+        btnSend.setEnabled(false);
 
-        // ✅ Send via WebSocket AND API
-        sendMessageViaWebSocket(messageText);
-        sendMessageViaApi(messageText);
+        // Send typing indicator stop
+        sendTypingIndicator(false);
 
-        Log.d(TAG, "📤 Sent message: " + messageText);
-    }
+        Log.d(TAG, "📤 Sending message: " + messageText);
 
-    // ✅ NEW: Send via WebSocket (real-time)
-    private void sendMessageViaWebSocket(String messageText) {
-        if (chatWebSocketManager != null && chatWebSocketManager.isConnected()) {
-            chatWebSocketManager.sendChatMessage(messageText);
+        // Send via WebSocket if connected
+        if (webSocketService != null && webSocketService.isConnected()) {
+            webSocketService.sendChatMessage(conversationId, messageText);
+        } else {
+            // Fallback to API call
+            sendMessageViaAPI(messageText);
         }
     }
 
-    // ✅ FIXED: Send via API (persistence)
-    private void sendMessageViaApi(String messageText) {
-        if (conversationId == null || conversationId <= 0) {
-            Log.w(TAG, "No conversation ID, cannot send via API");
-            return;
-        }
+    private void sendMessageViaAPI(String messageText) {
+        Long userId = prefsManager.getUserId();
+        if (userId == null) return;
 
-        Map<String, Object> messageData = new HashMap<>();
-        messageData.put("conversationId", conversationId);
-        messageData.put("messageText", messageText); // ❌ Đổi từ "content" → "messageText"
-        messageData.put("messageType", "TEXT");
+        Map<String, Object> messageRequest = new HashMap<>();
+        messageRequest.put("conversationId", conversationId);
+        messageRequest.put("messageText", messageText);
+        messageRequest.put("messageType", "TEXT");
 
-        ApiService apiService = ApiClient.getApiService();
-        Call<StandardResponse<Map<String, Object>>> call = apiService.sendMessage(messageData);
-
-        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> standardResponse = response.body();
-
-                    if (standardResponse.isSuccess()) {
-                        // Update last message status to "Sent"
-                        updateLastMessageStatus("✅ Sent");
-                        Log.d(TAG, "✅ Message sent via API");
-                    } else {
-                        updateLastMessageStatus("❌ Failed");
-                        Log.e(TAG, "Failed to send message via API: " + standardResponse.getMessage());
+        ApiClient.getChatService().sendMessage(userId, messageRequest)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
+                            if (apiResponse.isSuccess()) {
+                                // Message sent successfully
+                                Log.d(TAG, "✅ Message sent via API");
+                            } else {
+                                showError(apiResponse.getMessage());
+                            }
+                        } else {
+                            showError("Failed to send message");
+                        }
                     }
-                } else {
-                    updateLastMessageStatus("❌ Failed");
-                    Log.e(TAG, "Failed to send message via API: HTTP " + response.code());
-                }
-            }
 
-            @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                updateLastMessageStatus("❌ Network Error");
-                Log.e(TAG, "Error sending message via API", t);
-            }
-        });
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.e(TAG, "❌ Failed to send message", t);
+                        showError("Network error. Please try again.");
+                    }
+                });
     }
 
-    private void updateLastMessageStatus(String status) {
-        if (!messages.isEmpty()) {
-            Message lastMessage = messages.get(messages.size() - 1);
-            lastMessage.setCreatedAt(status);
-            messageAdapter.notifyItemChanged(messages.size() - 1);
+    private void sendTypingIndicator(boolean isTyping) {
+        if (webSocketService != null && webSocketService.isConnected()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("conversationId", conversationId);
+            data.put("isTyping", isTyping);
+            webSocketService.sendMessage(isTyping ? "TYPING" : "STOP_TYPING", data);
         }
     }
 
-    private void handleTyping() {
-        if (!isTyping) {
-            isTyping = true;
-            // TODO: Send typing indicator via WebSocket
+    private void markMessagesAsRead() {
+        Long userId = prefsManager.getUserId();
+        if (userId == null) return;
+
+        ApiClient.getChatService().markMessagesAsRead(userId, conversationId)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            Log.d(TAG, "✅ Messages marked as read");
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.d(TAG, "Failed to mark messages as read");
+                    }
+                });
+    }
+
+    private void handleWebSocketMessage(String type, JsonObject data) {
+        switch (type) {
+            case Constants.WS_MESSAGE_TYPE_NEW_MESSAGE:
+                handleNewMessage(data);
+                break;
+            case Constants.WS_MESSAGE_TYPE_TYPING:
+                handleTypingIndicator(data, true);
+                break;
+            case "STOP_TYPING":
+                handleTypingIndicator(data, false);
+                break;
         }
-
-        // Cancel previous stop typing task
-        if (stopTypingRunnable != null) {
-            typingHandler.removeCallbacks(stopTypingRunnable);
-        }
-
-        // Schedule stop typing
-        stopTypingRunnable = () -> {
-            if (isTyping) {
-                isTyping = false;
-                // TODO: Send stop typing via WebSocket
-            }
-        };
-        typingHandler.postDelayed(stopTypingRunnable, 1000); // Stop typing after 1 second
     }
 
-    private void scrollToBottom() {
-        if (messages.size() > 0) {
-            rvMessages.smoothScrollToPosition(messages.size() - 1);
-        }
-    }
-
-    // ===== WEBSOCKET LISTENER IMPLEMENTATIONS =====
-
-    @Override
-    public void onConnected() {
-        runOnUiThread(() -> {
-            Log.d(TAG, "✅ Chat WebSocket connected");
-            if (conversationId != null && conversationId > 0) {
-                joinConversation();
-            }
-        });
-    }
-
-    @Override
-    public void onDisconnected() {
-        runOnUiThread(() -> {
-            Log.d(TAG, "❌ Chat WebSocket disconnected");
-            // Don't show toast, might reconnect automatically
-        });
-    }
-
-    @Override
-    public void onMessageReceived(JsonObject messageJson) {
-        runOnUiThread(() -> {
-            try {
-                Message newMessage = new Message();
-
-                newMessage.setId(messageJson.has("id") ?
-                        messageJson.get("id").getAsLong() : System.currentTimeMillis());
-                newMessage.setSenderId(messageJson.get("senderId").getAsLong());
-                newMessage.setContent(messageJson.get("content").getAsString());
-                newMessage.setMessageType(messageJson.has("messageType") ?
-                        messageJson.get("messageType").getAsString() : "TEXT");
-
-                // ❌ CŨ:
-                // newMessage.setCreatedAt(messageJson.has("timestamp") ?
-                //         formatTimestamp(messageJson.get("timestamp").getAsLong()) : "Now");
-
-                // ✅ MỚI: Parse string timestamp
-                if (messageJson.has("timestamp")) {
-                    String timestampStr = messageJson.get("timestamp").getAsString();
-                    newMessage.setCreatedAt(formatTimestampString(timestampStr));
-                } else {
-                    newMessage.setCreatedAt("Now");
-                }
-
-                // Only add if it's from someone else (avoid duplicates)
-                if (!newMessage.getSenderId().equals(currentUserId)) {
-                    messages.add(newMessage);
-                    messageAdapter.notifyItemInserted(messages.size() - 1);
-                    scrollToBottom();
-                }
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error parsing received message", e);
-            }
-        });
-    }
-    private String formatTimestampString(String timestampStr) {
+    private void handleNewMessage(JsonObject data) {
         try {
-            // Parse ISO timestamp: "2025-07-03T14:19:39.6632698"
-            SimpleDateFormat inputFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+            Long msgConversationId = data.get("conversationId").getAsLong();
 
-            // Remove microseconds if present (.6632698)
-            String cleanTimestamp = timestampStr.split("\\.")[0];
+            // Only handle messages for this conversation
+            if (msgConversationId.equals(conversationId)) {
+                // Convert JsonObject to Message
+                Message message = Message.fromJsonObject(data);
 
-            Date dateTime = inputFormatter.parse(cleanTimestamp);
+                // Add to messages list
+                messages.add(message);
+                messageAdapter.notifyItemInserted(messages.size() - 1);
 
-            if (dateTime != null) {
-                SimpleDateFormat outputFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                return outputFormatter.format(dateTime);
+                // Scroll to bottom
+                rvMessages.scrollToPosition(messages.size() - 1);
+
+                // Mark as read
+                markMessagesAsRead();
+
+                Log.d(TAG, "✅ New message received via WebSocket");
             }
-
-            return "Now";
         } catch (Exception e) {
-            Log.w(TAG, "Could not parse timestamp: " + timestampStr, e);
-            return "Now";
+            Log.e(TAG, "❌ Error handling new message", e);
         }
     }
 
-    @Override
-    public void onTypingIndicator(Long userId, boolean isTyping) {
-        runOnUiThread(() -> {
-            if (!userId.equals(currentUserId)) { // Not from current user
+    private void handleNewMessageBroadcast(String messageData) {
+        try {
+            Gson gson = new Gson();
+            JsonObject data = gson.fromJson(messageData, JsonObject.class);
+            handleNewMessage(data);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error handling message broadcast", e);
+        }
+    }
+
+    private void handleTypingIndicator(JsonObject data, boolean isTyping) {
+        try {
+            Long msgConversationId = data.get("conversationId").getAsLong();
+            Long senderId = data.get("senderId").getAsLong();
+            Long currentUserId = prefsManager.getUserId();
+
+            // Only show typing indicator for this conversation and from other users
+            if (msgConversationId.equals(conversationId) && !senderId.equals(currentUserId)) {
                 if (isTyping) {
-                    tvTypingIndicator.setText(otherUserName + " is typing...");
-                    tvTypingIndicator.setVisibility(View.VISIBLE);
+                    tvTypingIndicator.setText("Other user is typing...");
+                    llTypingIndicator.setVisibility(View.VISIBLE);
                 } else {
-                    tvTypingIndicator.setVisibility(View.GONE);
+                    llTypingIndicator.setVisibility(View.GONE);
                 }
             }
-        });
-    }
-
-    @Override
-    public void onError(String error) {
-        runOnUiThread(() -> {
-            Log.e(TAG, "❌ WebSocket error: " + error);
-            // Don't show toast for every error, might be temporary
-        });
-    }
-
-    // ===== UTILITY METHODS - FIXED API LEVEL =====
-
-    // ✅ FIXED: Use SimpleDateFormat instead of java.time
-    private String formatTimestamp(long timestamp) {
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        return sdf.format(new Date(timestamp));
-    }
-
-    // ✅ FIXED: Use SimpleDateFormat instead of java.time
-    private String formatTimestamp(String timestamp) {
-        try {
-            // Parse ISO timestamp and convert to HH:mm
-            SimpleDateFormat inputFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
-            Date dateTime = inputFormatter.parse(timestamp);
-
-            if (dateTime != null) {
-                SimpleDateFormat outputFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                return outputFormatter.format(dateTime);
-            }
-
-            return timestamp; // Return as-is if parsing fails
-        } catch (ParseException e) {
-            return timestamp; // Return as-is if parsing fails
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error handling typing indicator", e);
         }
     }
 
-    // ===== LIFECYCLE METHODS =====
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (chatWebSocketManager != null && chatWebSocketManager.isConnected() && conversationId != null) {
-            joinConversation();
+    private void updateConnectionStatus(boolean connected) {
+        if (connected) {
+            tvConnectionStatus.setText("Connected");
+            tvConnectionStatus.setTextColor(getResources().getColor(R.color.success_color));
+        } else {
+            tvConnectionStatus.setText("Reconnecting...");
+            tvConnectionStatus.setTextColor(getResources().getColor(R.color.warning_color));
         }
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (chatWebSocketManager != null) {
-            chatWebSocketManager.leaveConversation();
-        }
-
-        // Stop typing indicator
-        if (isTyping) {
-            isTyping = false;
-            // TODO: Send stop typing via WebSocket
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (chatWebSocketManager != null) {
-            chatWebSocketManager.removeChatListener(this);
-        }
-
-        if (typingHandler != null && stopTypingRunnable != null) {
-            typingHandler.removeCallbacks(stopTypingRunnable);
-        }
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        Log.w(TAG, "Error: " + message);
     }
 
     @Override
@@ -686,5 +537,27 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // Clean up WebSocket
+        if (webSocketService != null) {
+            webSocketService.removeListener(TAG);
+            webSocketService.leaveConversation(conversationId);
+        }
+
+        // Unregister broadcast receiver
+        if (messageReceiver != null) {
+            try {
+                unregisterReceiver(messageReceiver);
+            } catch (IllegalArgumentException e) {
+                // Receiver was not registered
+            }
+        }
+
+        Log.d(TAG, "ChatActivity destroyed");
     }
 }

@@ -1,17 +1,33 @@
+<!-- app/src/main/AndroidManifest.xml -->
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Essential Permissions Only -->
+    <!-- ===== ESSENTIAL PERMISSIONS ===== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- ✅ Camera Feature (optional) -->
+    <!-- ===== FEATURE DECLARATIONS ===== -->
     <uses-feature
         android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.location.network"
         android:required="false" />
 
     <application
@@ -24,42 +40,55 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Material3.DayNight"
         android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
 
-        <!-- ===== MAIN ACTIVITY ===== -->
+        <!-- ===== SPLASH ACTIVITY (MAIN LAUNCHER) ===== -->
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.auth.SplashActivity"
             android:exported="true"
-            android:theme="@style/Theme.Material3.DayNight">
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- ===== MAIN APPLICATION ACTIVITY ===== -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight"
+            android:screenOrientation="portrait" />
+
         <!-- ===== AUTHENTICATION ACTIVITIES ===== -->
         <activity
             android:name=".ui.auth.LoginActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:screenOrientation="portrait" />
 
         <activity
             android:name=".ui.auth.RegisterActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:parentActivityName=".ui.auth.LoginActivity"
+            android:screenOrientation="portrait" />
 
         <activity
             android:name=".ui.auth.ForgotPasswordActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:parentActivityName=".ui.auth.LoginActivity"
+            android:screenOrientation="portrait" />
 
         <activity
             android:name=".ui.auth.OtpVerificationActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:parentActivityName=".ui.auth.LoginActivity"
+            android:screenOrientation="portrait" />
 
         <!-- ===== PRODUCT ACTIVITIES ===== -->
         <activity
@@ -70,6 +99,12 @@
 
         <activity
             android:name=".ui.product.AddProductActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.product.EditProductActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
@@ -105,9 +140,22 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
+        <activity
+            android:name=".ui.profile.OfferHistoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
         <!-- ===== CHAT ACTIVITIES ===== -->
         <activity
             android:name=".ui.chat.ChatActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.chat.ConversationListActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
@@ -125,9 +173,60 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
+        <activity
+            android:name=".ui.search.SearchActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
         <!-- ===== LOCATION ACTIVITIES ===== -->
         <activity
+            android:name=".ui.location.LocationPickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
             android:name=".ui.location.RealtimeLocationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- ===== TRANSACTION ACTIVITIES ===== -->
+        <activity
+            android:name=".ui.transaction.TransactionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.transaction.PaymentActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- ===== OFFER ACTIVITIES ===== -->
+        <activity
+            android:name=".ui.offer.MakeOfferActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.offer.OfferDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- ===== REVIEW ACTIVITIES ===== -->
+        <activity
+            android:name=".ui.review.ReviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.review.ReviewListActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
@@ -137,6 +236,69 @@
             android:name=".websocket.RealtimeWebSocketService"
             android:enabled="true"
             android:exported="false" />
+
+        <service
+            android:name=".services.LocationUpdateService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <service
+            android:name=".services.NotificationService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- ===== FIREBASE MESSAGING SERVICE ===== -->
+        <service
+            android:name=".services.FirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- ===== BROADCAST RECEIVERS ===== -->
+        <receiver
+            android:name=".receivers.NetworkChangeReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ===== PROVIDERS ===== -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- ===== GOOGLE SERVICES METADATA ===== -->
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
+
+        <!-- ===== GOOGLE MAPS API KEY ===== -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_api_key" />
+
+        <!-- ===== FIREBASE METADATA ===== -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/primary_color" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/default_notification_channel_id" />
 
     </application>
 

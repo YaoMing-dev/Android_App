@@ -1,375 +1,171 @@
+<!-- app/src/main/res/values/strings.xml -->
 <resources>
     <!-- App Name -->
     <string name="app_name">TradeUp</string>
-    <string name="app_tagline">Buy &amp; Sell Used Items Locally</string>
+
+    <!-- Authentication -->
+    <string name="login_title">Welcome Back</string>
+    <string name="login_subtitle">Sign in to your account</string>
+    <string name="register_title">Create Account</string>
+    <string name="register_subtitle">Join TradeUp today</string>
+    <string name="forgot_password_title">Reset Password</string>
+    <string name="forgot_password_subtitle">Enter your email to reset password</string>
+    <string name="otp_verification_title">Verify Code</string>
+    <string name="otp_verification_subtitle">Enter the 6-digit code sent to your email</string>
+
+    <!-- Form Fields -->
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="display_name">Display Name</string>
+    <string name="full_name">Full Name</string>
+
+    <!-- Buttons -->
+    <string name="sign_in">Sign In</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="create_account">Create Account</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="send_reset_link">Send Reset Link</string>
+    <string name="verify_code">Verify Code</string>
+    <string name="resend_code">Resend Code</string>
+    <string name="back_to_login">Back to Login</string>
+    <string name="go_to_register">Don\'t have an account? Sign up</string>
+    <string name="go_to_login">Already have an account? Sign in</string>
+    <string name="forgot_password">Forgot Password?</string>
+
+    <!-- Terms and Conditions -->
+    <string name="terms_and_conditions">I agree to the Terms and Conditions</string>
+    <string name="privacy_policy">Privacy Policy</string>
+
+    <!-- Validation Messages -->
+    <string name="error_email_required">Email is required</string>
+    <string name="error_email_invalid">Please enter a valid email address</string>
+    <string name="error_password_required">Password is required</string>
+    <string name="error_password_weak">Password must be at least 8 characters with uppercase, lowercase, number, and special character</string>
+    <string name="error_passwords_not_match">Passwords do not match</string>
+    <string name="error_display_name_required">Display name is required</string>
+    <string name="error_display_name_short">Display name must be at least 2 characters</string>
+    <string name="error_terms_not_accepted">Please accept the terms and conditions</string>
+
+    <!-- Success Messages -->
+    <string name="success_registration">Registration successful! Please check your email for verification.</string>
+    <string name="success_login">Login successful!</string>
+    <string name="success_password_reset">Password reset instructions sent to your email</string>
+    <string name="success_email_verified">Email verified successfully!</string>
+    <string name="success_otp_sent">OTP sent successfully</string>
+
+    <!-- Error Messages -->
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="error_invalid_credentials">Invalid email or password</string>
+    <string name="error_user_not_found">User not found</string>
+    <string name="error_email_already_exists">Email already exists</string>
+    <string name="error_invalid_otp">Invalid OTP code</string>
+    <string name="error_otp_expired">OTP code has expired</string>
+    <string name="error_google_signin_failed">Google Sign-In failed</string>
+
+    <!-- Loading Messages -->
+    <string name="loading_signin">Signing in...</string>
+    <string name="loading_signup">Creating account...</string>
+    <string name="loading_google_signin">Signing in with Google...</string>
+    <string name="loading_sending_reset">Sending reset link...</string>
+    <string name="loading_verifying_otp">Verifying code...</string>
+    <string name="loading_resending_otp">Resending code...</string>
+
+    <!-- Timer Messages -->
+    <string name="resend_code_timer">Resend code in %d seconds</string>
+    <string name="didnt_receive_code">Didn\'t receive code?</string>
 
     <!-- Navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_search">Search</string>
-    <string name="nav_sell">Sell</string>
+    <string name="nav_add_product">Sell</string>
     <string name="nav_messages">Messages</string>
     <string name="nav_profile">Profile</string>
 
-    <!-- Authentication -->
-    <string name="login">Sign In</string>
-    <string name="register">Sign Up</string>
-    <string name="logout">Sign Out</string>
-    <string name="email">Email</string>
-    <string name="password">Password</string>
-    <string name="confirm_password">Confirm Password</string>
-    <string name="full_name">Full Name</string>
-    <string name="display_name">Display Name</string>
-    <string name="forgot_password">Forgot Password?</string>
-    <string name="reset_password">Reset Password</string>
-    <string name="google_signin">Continue with Google</string>
-    <string name="facebook_signin">Continue with Facebook</string>
-    <string name="verify_email">Verify Email</string>
-    <string name="otp_verification">OTP Verification</string>
-    <string name="resend_otp">Resend OTP</string>
-    <string name="otp_sent">We\'ve sent a verification code to your email</string>
-    <string name="otp_enter_code">Enter the 6-digit code</string>
-    <string name="welcome_back">Welcome Back!</string>
-    <string name="create_account">Create Account</string>
-    <string name="already_have_account">Already have an account?</string>
-    <string name="dont_have_account">Don\'t have an account?</string>
-    <string name="terms_and_conditions">I agree to the Terms of Service and Privacy Policy</string>
-
-    <!-- Home Screen -->
-    <string name="welcome_user">Welcome, %1$s!</string>
-    <string name="search_products">Search products, brands...</string>
-    <string name="search_hint">What are you looking for?</string>
-    <string name="categories">Categories</string>
-    <string name="view_all">View All</string>
-    <string name="near_you">Near You</string>
-    <string name="recommended">Recommended for You</string>
-    <string name="all_products">All Products</string>
-    <string name="featured_products">Featured Products</string>
-    <string name="recently_added">Recently Added</string>
-    <string name="popular_items">Popular Items</string>
-    <string name="detecting_location">Detecting your location...</string>
-    <string name="current_location">Current Location</string>
-    <string name="change_location">Change Location</string>
-
-    <!-- Products -->
-    <string name="add_product">Add Product</string>
-    <string name="edit_product">Edit Product</string>
-    <string name="product_title">Product Title</string>
-    <string name="product_description">Description</string>
-    <string name="product_price">Price (VND)</string>
-    <string name="product_condition">Condition</string>
-    <string name="product_category">Category</string>
-    <string name="product_location">Location</string>
-    <string name="product_photos">Photos</string>
-    <string name="upload_photos">Upload Photos</string>
-    <string name="take_photo">Take Photo</string>
-    <string name="choose_from_gallery">Choose from Gallery</string>
-    <string name="product_details">Product Details</string>
-    <string name="seller_info">Seller Information</string>
-    <string name="contact_seller">Contact Seller</string>
-    <string name="make_offer">Make Offer</string>
-    <string name="buy_now">Buy Now</string>
-    <string name="negotiate_price">Price is negotiable</string>
-    <string name="fixed_price">Fixed price</string>
-    <string name="product_views">%1$d views</string>
-    <string name="product_likes">%1$d likes</string>
-    <string name="product_offers">%1$d offers</string>
-    <string name="mark_as_sold">Mark as Sold</string>
-    <string name="mark_as_available">Mark as Available</string>
-    <string name="pause_listing">Pause Listing</string>
-    <string name="delete_listing">Delete Listing</string>
-    <string name="share_product">Share Product</string>
-    <string name="report_product">Report Product</string>
-    <string name="save_product">Save Product</string>
-    <string name="unsave_product">Remove from Saved</string>
-    <string name="product_saved">Product saved!</string>
-    <string name="product_unsaved">Product removed from saved items</string>
-
-    <!-- Product Conditions -->
-    <string name="condition_new">New</string>
-    <string name="condition_like_new">Like New</string>
-    <string name="condition_good">Good</string>
-    <string name="condition_fair">Fair</string>
-    <string name="condition_poor">Poor</string>
-
-    <!-- Product Status -->
-    <string name="status_available">Available</string>
-    <string name="status_sold">Sold</string>
-    <string name="status_pending">Pending</string>
-    <string name="status_paused">Paused</string>
-    <string name="status_expired">Expired</string>
-
-    <!-- Categories -->
-    <string name="category_electronics">Electronics</string>
-    <string name="category_fashion">Fashion</string>
-    <string name="category_home_garden">Home &amp; Garden</string>
-    <string name="category_sports">Sports &amp; Outdoors</string>
-    <string name="category_books">Books</string>
-    <string name="category_automotive">Automotive</string>
-    <string name="category_toys_games">Toys &amp; Games</string>
-    <string name="category_beauty">Beauty &amp; Health</string>
-    <string name="category_other">Other</string>
-
-    <!-- Search -->
-    <string name="search">Search</string>
-    <string name="filter">Filter</string>
-    <string name="sort_by">Sort by</string>
-    <string name="sort_relevance">Relevance</string>
-    <string name="sort_newest">Newest</string>
-    <string name="sort_oldest">Oldest</string>
-    <string name="sort_price_low">Price: Low to High</string>
-    <string name="sort_price_high">Price: High to Low</string>
-    <string name="sort_distance">Distance</string>
-    <string name="sort_popular">Most Popular</string>
-    <string name="search_results">Found %1$d products</string>
-    <string name="no_results">No products found</string>
-    <string name="try_different_keywords">Try different keywords or adjust filters</string>
-    <string name="clear_filters">Clear Filters</string>
-    <string name="apply_filters">Apply Filters</string>
-    <string name="recent_searches">Recent Searches</string>
-    <string name="popular_categories">Popular Categories</string>
-    <string name="price_range">Price Range</string>
-    <string name="min_price">Min Price</string>
-    <string name="max_price">Max Price</string>
-    <string name="distance_range">Distance</string>
-    <string name="any_distance">Any Distance</string>
-    <string name="within_1km">Within 1km</string>
-    <string name="within_5km">Within 5km</string>
-    <string name="within_10km">Within 10km</string>
-    <string name="within_25km">Within 25km</string>
-    <string name="within_50km">Within 50km</string>
-
-    <!-- Chat & Messages -->
-    <string name="messages">Messages</string>
-    <string name="new_message">New Message</string>
-    <string name="send_message">Send message...</string>
-    <string name="type_message">Type a message...</string>
-    <string name="send">Send</string>
-    <string name="online">Online</string>
-    <string name="offline">Offline</string>
-    <string name="last_seen">Last seen %1$s</string>
-    <string name="typing">Typing...</string>
-    <string name="delivered">Delivered</string>
-    <string name="read">Read</string>
-    <string name="message_sent">Message sent</string>
-    <string name="message_failed">Failed to send</string>
-    <string name="retry_send">Retry</string>
-    <string name="delete_conversation">Delete Conversation</string>
-    <string name="block_user">Block User</string>
-    <string name="report_conversation">Report Conversation</string>
-    <string name="no_messages">No messages yet</string>
-    <string name="start_conversation">Start a conversation</string>
-    <string name="conversation_with">Conversation with %1$s</string>
-
-    <!-- Offers -->
-    <string name="offers">Offers</string>
-    <string name="my_offers">My Offers</string>
-    <string name="received_offers">Received Offers</string>
-    <string name="offer_amount">Offer Amount</string>
-    <string name="offer_message">Message (Optional)</string>
-    <string name="send_offer">Send Offer</string>
-    <string name="accept_offer">Accept</string>
-    <string name="reject_offer">Reject</string>
-    <string name="counter_offer">Counter Offer</string>
-    <string name="cancel_offer">Cancel Offer</string>
-    <string name="offer_accepted">Offer Accepted</string>
-    <string name="offer_rejected">Offer Rejected</string>
-    <string name="offer_pending">Pending</string>
-    <string name="offer_countered">Countered</string>
-    <string name="offer_expired">Expired</string>
-    <string name="offer_cancelled">Cancelled</string>
-    <string name="new_offer_received">New offer received</string>
-    <string name="offer_status_changed">Offer status changed</string>
-
     <!-- Profile -->
-    <string name="profile">Profile</string>
+    <string name="profile_title">Profile</string>
     <string name="edit_profile">Edit Profile</string>
-    <string name="my_profile">My Profile</string>
-    <string name="user_profile">User Profile</string>
-    <string name="bio">Bio</string>
-    <string name="contact_info">Contact Info</string>
-    <string name="phone_number">Phone Number</string>
-    <string name="rating">Rating</string>
-    <string name="reviews">Reviews</string>
-    <string name="transactions">Transactions</string>
-    <string name="member_since">Member since %1$s</string>
-    <string name="verified_seller">Verified Seller</string>
-    <string name="change_photo">Change Photo</string>
-    <string name="remove_photo">Remove Photo</string>
     <string name="my_listings">My Listings</string>
     <string name="saved_items">Saved Items</string>
-    <string name="purchase_history">Purchase History</string>
-    <string name="sales_history">Sales History</string>
-    <string name="account_settings">Account Settings</string>
-    <string name="privacy_settings">Privacy Settings</string>
-    <string name="notification_settings">Notification Settings</string>
-    <string name="help_support">Help &amp; Support</string>
-    <string name="about">About</string>
-    <string name="version">Version %1$s</string>
-
-    <!-- Settings -->
+    <string name="offer_history">Offer History</string>
     <string name="settings">Settings</string>
-    <string name="general_settings">General</string>
-    <string name="notification_settings_title">Notifications</string>
-    <string name="privacy_settings_title">Privacy</string>
-    <string name="account_settings_title">Account</string>
-    <string name="push_notifications">Push Notifications</string>
-    <string name="email_notifications">Email Notifications</string>
-    <string name="message_notifications">Message Notifications</string>
-    <string name="offer_notifications">Offer Notifications</string>
-    <string name="listing_notifications">Listing Notifications</string>
-    <string name="promotion_notifications">Promotional Notifications</string>
-    <string name="show_online_status">Show Online Status</string>
-    <string name="show_location">Show Location</string>
-    <string name="allow_messages">Allow Messages from Anyone</string>
-    <string name="dark_mode">Dark Mode</string>
-    <string name="language">Language</string>
-    <string name="currency">Currency</string>
-    <string name="deactivate_account">Deactivate Account</string>
+    <string name="logout">Logout</string>
     <string name="delete_account">Delete Account</string>
 
-    <!-- Location -->
-    <string name="location">Location</string>
-    <string name="use_current_location">Use Current Location</string>
-    <string name="enter_location_manually">Enter Location Manually</string>
-    <string name="search_location">Search for a location...</string>
-    <string name="location_permission_required">Location permission is required</string>
-    <string name="enable_location_services">Enable Location Services</string>
-    <string name="location_not_available">Location not available</string>
-
-    <!-- Reviews & Ratings -->
-    <string name="leave_review">Leave Review</string>
-    <string name="write_review">Write Review</string>
-    <string name="rate_user">Rate this user</string>
-    <string name="rate_transaction">Rate this transaction</string>
-    <string name="review_message">Review (Optional)</string>
-    <string name="submit_review">Submit Review</string>
-    <string name="helpful_review">Was this review helpful?</string>
-    <string name="report_review">Report Review</string>
-    <string name="review_guidelines">Review Guidelines</string>
-    <string name="average_rating">Average Rating</string>
-    <string name="total_reviews">%1$d reviews</string>
-    <string name="no_reviews">No reviews yet</string>
-    <string name="be_first_to_review">Be the first to leave a review</string>
-
-    <!-- Transactions -->
-    <string name="transaction">Transaction</string>
-    <string name="transaction_history">Transaction History</string>
-    <string name="transaction_details">Transaction Details</string>
-    <string name="buyer">Buyer</string>
-    <string name="seller">Seller</string>
-    <string name="transaction_date">Date</string>
-    <string name="transaction_amount">Amount</string>
-    <string name="transaction_status">Status</string>
-    <string name="transaction_completed">Completed</string>
-    <string name="transaction_pending">Pending</string>
-    <string name="transaction_cancelled">Cancelled</string>
-    <string name="mark_transaction_complete">Mark as Complete</string>
-    <string name="payment_method">Payment Method</string>
-    <string name="cash_payment">Cash</string>
-    <string name="bank_transfer">Bank Transfer</string>
-    <string name="digital_wallet">Digital Wallet</string>
-
-    <!-- Common Actions -->
-    <string name="save">Save</string>
-    <string name="cancel">Cancel</string>
-    <string name="delete">Delete</string>
-    <string name="edit">Edit</string>
-    <string name="update">Update</string>
-    <string name="add">Add</string>
-    <string name="remove">Remove</string>
-    <string name="confirm">Confirm</string>
-    <string name="close">Close</string>
-    <string name="done">Done</string>
-    <string name="next">Next</string>
-    <string name="previous">Previous</string>
-    <string name="back">Back</string>
-    <string name="retry">Retry</string>
-    <string name="refresh">Refresh</string>
-    <string name="share">Share</string>
-    <string name="copy">Copy</string>
-    <string name="paste">Paste</string>
-    <string name="select_all">Select All</string>
-    <string name="clear_all">Clear All</string>
-
-    <!-- Status Messages -->
-    <string name="loading">Loading...</string>
-    <string name="please_wait">Please wait...</string>
-    <string name="success">Success!</string>
-    <string name="error">Error</string>
-    <string name="error_occurred">An error occurred</string>
-    <string name="try_again">Try Again</string>
-    <string name="no_data">No data available</string>
-    <string name="no_internet">No internet connection</string>
-    <string name="connection_timeout">Connection timeout</string>
-    <string name="server_error">Server error. Please try again later.</string>
-    <string name="invalid_input">Invalid input</string>
-    <string name="field_required">This field is required</string>
-    <string name="email_invalid">Please enter a valid email</string>
-    <string name="password_too_short">Password must be at least 8 characters</string>
-    <string name="passwords_dont_match">Passwords don\'t match</string>
-
-    <!-- Permissions -->
-    <string name="permission_camera">Camera permission is needed to take photos</string>
-    <string name="permission_storage">Storage permission is needed to select photos</string>
-    <string name="permission_location">Location permission is needed to show nearby products</string>
-    <string name="permission_notifications">Notification permission is needed for alerts</string>
-    <string name="permission_denied">Permission denied</string>
-    <string name="grant_permission">Grant Permission</string>
-    <string name="go_to_settings">Go to Settings</string>
+    <!-- Product -->
+    <string name="product_title">Product Title</string>
+    <string name="product_description">Product Description</string>
+    <string name="product_price">Price</string>
+    <string name="product_category">Category</string>
+    <string name="product_condition">Condition</string>
+    <string name="product_location">Location</string>
+    <string name="add_product">Add Product</string>
+    <string name="edit_product">Edit Product</string>
+    <string name="delete_product">Delete Product</string>
+    <string name="select_image">Select Image</string>
+    <string name="take_photo">Take Photo</string>
+    <string name="choose_from_gallery">Choose from Gallery</string>
 
     <!-- Notifications -->
-    <string name="notifications">Notifications</string>
-    <string name="notification_new_message">New message from %1$s</string>
-    <string name="notification_new_offer">New offer for %1$s</string>
+    <string name="notification_new_message">New message from %s</string>
+    <string name="notification_new_offer">New offer for %s</string>
     <string name="notification_offer_accepted">Your offer was accepted</string>
     <string name="notification_offer_rejected">Your offer was rejected</string>
-    <string name="notification_product_sold">Your product was sold</string>
-    <string name="notification_product_interest">Someone is interested in your product</string>
-    <string name="mark_all_read">Mark All as Read</string>
-    <string name="clear_notifications">Clear All</string>
-    <string name="no_notifications">No notifications</string>
+    <string name="notification_new_review">New review received</string>
 
-    <!-- Analytics -->
-    <string name="analytics">Analytics</string>
-    <string name="views">Views</string>
-    <string name="likes">Likes</string>
-    <string name="contacts">Contacts</string>
-    <string name="performance">Performance</string>
-    <string name="insights">Insights</string>
-    <string name="total_views">Total Views</string>
-    <string name="this_week">This Week</string>
-    <string name="this_month">This Month</string>
-    <string name="all_time">All Time</string>
+    <!-- Firebase -->
+    <string name="default_notification_channel_id">tradeup_notifications</string>
+    <string name="default_notification_channel_name">TradeUp Notifications</string>
 
-    <!-- Date & Time -->
-    <string name="today">Today</string>
-    <string name="yesterday">Yesterday</string>
-    <string name="just_now">Just now</string>
-    <string name="minutes_ago">%1$d minutes ago</string>
-    <string name="hours_ago">%1$d hours ago</string>
-    <string name="days_ago">%1$d days ago</string>
-    <string name="weeks_ago">%1$d weeks ago</string>
-    <string name="months_ago">%1$d months ago</string>
+    <!-- Google Maps -->
+    <string name="google_maps_api_key">YOUR_GOOGLE_MAPS_API_KEY</string>
 
-    <!-- Currency -->
-    <string name="currency_vnd">₫</string>
-    <string name="price_format">%1$s %2$s</string>
-    <string name="free">Free</string>
-    <string name="price_negotiable">Negotiable</string>
-    <string name="contact_for_price">Contact for price</string>
+    <!-- Empty States -->
+    <string name="empty_products">No products found</string>
+    <string name="empty_messages">No messages yet</string>
+    <string name="empty_notifications">No notifications</string>
+    <string name="empty_saved_items">No saved items</string>
+    <string name="empty_offers">No offers</string>
 
-    <!-- Validation Messages -->
-    <string name="validation_email_required">Email is required</string>
-    <string name="validation_email_invalid">Please enter a valid email address</string>
-    <string name="validation_password_required">Password is required</string>
-    <string name="validation_password_length">Password must be at least 8 characters</string>
-    <string name="validation_name_required">Name is required</string>
-    <string name="validation_title_required">Title is required</string>
-    <string name="validation_description_required">Description is required</string>
-    <string name="validation_price_required">Price is required</string>
-    <string name="validation_price_invalid">Please enter a valid price</string>
-    <string name="validation_category_required">Please select a category</string>
-    <string name="validation_condition_required">Please select a condition</string>
-    <string name="validation_location_required">Location is required</string>
-    <string name="validation_photos_required">At least one photo is required</string>
+    <!-- Search -->
+    <string name="search_hint">Search products...</string>
+    <string name="search_results">Search Results</string>
+    <string name="no_results_found">No results found</string>
+    <string name="recent_searches">Recent Searches</string>
+    <string name="clear_search_history">Clear Search History</string>
+
+    <!-- Common -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="share">Share</string>
+    <string name="view">View</string>
+    <string name="close">Close</string>
+    <string name="retry">Retry</string>
+    <string name="loading">Loading...</string>
+    <string name="error">Error</string>
+    <string name="success">Success</string>
+
+    <!-- Confirmation Dialogs -->
+    <string name="confirm_logout">Are you sure you want to logout?</string>
+    <string name="confirm_delete_account">Are you sure you want to delete your account? This action cannot be undone.</string>
+    <string name="confirm_delete_product">Are you sure you want to delete this product?</string>
+
+    <!-- Permissions -->
+    <string name="permission_location">Location permission is required to find nearby products</string>
+    <string name="permission_camera">Camera permission is required to take photos</string>
+    <string name="permission_storage">Storage permission is required to select photos</string>
+    <string name="permission_denied">Permission denied</string>
+
+    <!-- File Upload -->
+    <string name="uploading_image">Uploading image...</string>
+    <string name="upload_success">Image uploaded successfully</string>
+    <string name="upload_failed">Upload failed</string>
+    <string name="file_too_large">File size too large. Maximum size is 10MB.</string>
+    <string name="invalid_file_type">Invalid file type. Only images are allowed.</string>
 </resources>

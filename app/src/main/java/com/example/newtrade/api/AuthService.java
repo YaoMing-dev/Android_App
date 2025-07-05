@@ -1,10 +1,8 @@
+// app/src/main/java/com/example/newtrade/api/AuthService.java
 package com.example.newtrade.api;
 
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.models.User;
-
 import java.util.Map;
-
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
@@ -12,57 +10,33 @@ import retrofit2.http.POST;
 
 public interface AuthService {
 
-    // ===== AUTHENTICATION ENDPOINTS =====
+    @POST("/api/auth/login")
+    Call<StandardResponse<Map<String, Object>>> login(@Body Map<String, Object> loginRequest);
 
-    // Google Sign-In
-    @POST("api/auth/google-signin")
-    Call<StandardResponse<Map<String, Object>>> googleSignIn(@Body Map<String, String> request);
+    @POST("/api/auth/register")
+    Call<StandardResponse<Map<String, Object>>> register(@Body Map<String, Object> registerRequest);
 
-    // Regular email login (if backend has this endpoint)
-    @POST("api/auth/login")
-    Call<StandardResponse<Map<String, Object>>> login(@Body Map<String, String> request);
+    @POST("/api/auth/google-signin")
+    Call<StandardResponse<Map<String, Object>>> googleSignIn(@Body Map<String, Object> googleSignInRequest);
 
-    // Regular email registration (if backend has this endpoint)
-    @POST("api/auth/register")
-    Call<StandardResponse<User>> register(@Body Map<String, String> request);
+    @POST("/api/auth/verify-otp")
+    Call<StandardResponse<Map<String, Object>>> verifyOtp(@Body Map<String, Object> otpRequest);
 
-    // ===== OTP ENDPOINTS =====
+    @POST("/api/auth/send-otp")
+    Call<StandardResponse<Map<String, Object>>> sendOtp(@Body Map<String, Object> otpRequest);
 
-    // Send OTP for email verification
-    @POST("api/auth/send-otp")
-    Call<StandardResponse<Map<String, String>>> sendOtp(@Body Map<String, String> request);
+    @POST("/api/auth/resend-otp")
+    Call<StandardResponse<Map<String, Object>>> resendOtp(@Body Map<String, Object> resendOtpRequest);
 
-    // Verify OTP code
-    @POST("api/auth/verify-otp")
-    Call<StandardResponse<Map<String, Object>>> verifyOtp(@Body Map<String, String> request);
+    @POST("/api/auth/logout")
+    Call<StandardResponse<Map<String, Object>>> logout();
 
-    // Resend OTP verification
-    @POST("api/auth/resend-otp")
-    Call<StandardResponse<Map<String, String>>> resendOtp(@Body Map<String, String> request);
+    @GET("/api/auth/health")
+    Call<StandardResponse<Map<String, Object>>> healthCheck();
 
-    // ===== PASSWORD RECOVERY ENDPOINTS =====
+    @GET("/api/auth/validate-session")
+    Call<StandardResponse<Map<String, Object>>> validateSession();
 
-    // Send password reset email
-    @POST("api/auth/forgot-password")
-    Call<StandardResponse<Map<String, String>>> forgotPassword(@Body Map<String, String> request);
-
-    // Reset password with token
-    @POST("api/auth/reset-password")
-    Call<StandardResponse<Map<String, String>>> resetPassword(@Body Map<String, String> request);
-
-    // ===== SESSION MANAGEMENT =====
-
-    // Validate session (requires User-ID header)
-    @GET("api/auth/validate-session")
-    Call<StandardResponse<Map<String, Boolean>>> validateSession();
-
-    // Logout (requires User-ID header)
-    @POST("api/auth/logout")
-    Call<StandardResponse<Map<String, String>>> logout();
-
-    // ===== UTILITY ENDPOINTS =====
-
-    // Health check - ✅ Fixed to GET
-    @GET("api/auth/health")
-    Call<StandardResponse<String>> healthCheck();
+    @POST("/api/auth/change-password")
+    Call<StandardResponse<Map<String, Object>>> changePassword(@Body Map<String, Object> changePasswordRequest);
 }

@@ -15,7 +15,10 @@ public class StandardResponse<T> {
     private T data;
 
     @SerializedName("timestamp")
-    private String timestamp;
+    private long timestamp;
+
+    @SerializedName("error")
+    private String error;
 
     // Constructors
     public StandardResponse() {}
@@ -24,9 +27,10 @@ public class StandardResponse<T> {
         this.success = success;
         this.message = message;
         this.data = data;
+        this.timestamp = System.currentTimeMillis();
     }
 
-    // Getters and setters
+    // Getters and Setters
     public boolean isSuccess() {
         return success;
     }
@@ -51,20 +55,30 @@ public class StandardResponse<T> {
         this.data = data;
     }
 
-    public String getTimestamp() {
+    public long getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(String timestamp) {
+    public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
 
-    // Utility methods
-    public boolean hasData() {
-        return data != null;
+    public String getError() {
+        return error;
     }
 
-    public boolean isError() {
-        return !success;
+    public void setError(String error) {
+        this.error = error;
+    }
+
+    @Override
+    public String toString() {
+        return "StandardResponse{" +
+                "success=" + success +
+                ", message='" + message + '\'' +
+                ", data=" + data +
+                ", timestamp=" + timestamp +
+                ", error='" + error + '\'' +
+                '}';
     }
 }

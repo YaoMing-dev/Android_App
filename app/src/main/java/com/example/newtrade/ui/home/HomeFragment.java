@@ -1,4 +1,4 @@
-// File: app/src/main/java/com/example/newtrade/ui/home/HomeFragment.java
+// app/src/main/java/com/example/newtrade/ui/home/HomeFragment.java
 package com.example.newtrade.ui.home;
 
 import android.content.Intent;
@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -28,11 +29,12 @@ import com.example.newtrade.models.Category;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
-import com.example.newtrade.ui.search.CategoryProductsActivity;
 import com.example.newtrade.ui.search.AllProductsActivity;
+import com.example.newtrade.ui.search.CategoryProductsActivity;
+import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +54,7 @@ public class HomeFragment extends Fragment {
     private TextView tvViewAllCategories;
     private TextView tvViewAllProducts;
     private FloatingActionButton fabQuickAdd;
-    private View emptyView;
+    private LinearLayout emptyView;
 
     // Adapters
     private CategoryAdapter categoryAdapter;
@@ -61,6 +63,7 @@ public class HomeFragment extends Fragment {
     // Data
     private final List<Category> categories = new ArrayList<>();
     private final List<Product> products = new ArrayList<>();
+    private SharedPrefsManager prefsManager;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -72,333 +75,305 @@ public class HomeFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         initViews(view);
-        setupRecyclerViews();
+        initUtils();
+        setupAdapters();
         setupListeners();
         loadData();
 
-        Log.d(TAG, "HomeFragment created successfully");
+        Log.d(TAG, "✅ HomeFragment initialized");
     }
 
     private void initViews(View view) {
-        try {
-            swipeRefresh = view.findViewById(R.id.swipe_refresh);
-            rvCategories = view.findViewById(R.id.rv_categories);
-            rvRecentProducts = view.findViewById(R.id.rv_recent_products);
-            tvViewAllCategories = view.findViewById(R.id.tv_view_all_categories);
-            tvViewAllProducts = view.findViewById(R.id.tv_view_all_products);
-            fabQuickAdd = view.findViewById(R.id.fab_quick_add);
-            emptyView = view.findViewById(R.id.empty_view);
+        swipeRefresh = view.findViewById(R.id.swipe_refresh);
+        rvCategories = view.findViewById(R.id.rv_categories);
+        rvRecentProducts = view.findViewById(R.id.rv_recent_products);
+        tvViewAllCategories = view.findViewById(R.id.tv_view_all_categories);
+        tvViewAllProducts = view.findViewById(R.id.tv_view_all_products);
+        fabQuickAdd = view.findViewById(R.id.fab_quick_add);
+        emptyView = view.findViewById(R.id.empty_view);
 
-            Log.d(TAG, "✅ HomeFragment views initialized");
-        } catch (Exception e) {
-            Log.w(TAG, "Some HomeFragment views not found: " + e.getMessage());
-        }
+        Log.d(TAG, "✅ Views initialized");
     }
 
-    private void setupRecyclerViews() {
-        try {
-            // Categories RecyclerView (horizontal) với click listener hoạt động
-            if (rvCategories != null) {
-                categoryAdapter = new CategoryAdapter(categories, category -> {
-                    // 🔥 THÊM NAVIGATION ĐẾN CATEGORY PRODUCTS
-                    Log.d(TAG, "Category clicked: " + category.getName());
-                    navigateToCategoryProducts(category);
-                });
-                rvCategories.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false));
-                rvCategories.setAdapter(categoryAdapter);
+    private void initUtils() {
+        prefsManager = SharedPrefsManager.getInstance(requireContext());
+    }
+
+    private void setupAdapters() {
+        // Category adapter
+        categoryAdapter = new CategoryAdapter(categories, new CategoryAdapter.OnCategoryClickListener() {
+            @Override
+            public void onCategoryClick(Category category) {
+                navigateToCategoryProducts(category);
+            }
+        });
+
+        LinearLayoutManager categoriesLayoutManager = new LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false);
+        rvCategories.setLayoutManager(categoriesLayoutManager);
+        rvCategories.setAdapter(categoryAdapter);
+
+        // Product adapter
+        productAdapter = new ProductAdapter(products, new ProductAdapter.OnProductClickListener() {
+            @Override
+            public void onProductClick(Product product) {
+                navigateToProductDetail(product);
             }
 
-            // Products RecyclerView (grid)
-            if (rvRecentProducts != null) {
-                productAdapter = new ProductAdapter(products, product -> {
-                    Log.d(TAG, "Product clicked: " + product.getTitle());
-                    navigateToProductDetail(product);
-                });
-                rvRecentProducts.setLayoutManager(new GridLayoutManager(getContext(), 2));
-                rvRecentProducts.setAdapter(productAdapter);
+            @Override
+            public void onProductSave(Product product) {
+                toggleSaveProduct(product);
             }
+        });
 
-            Log.d(TAG, "✅ HomeFragment RecyclerViews setup");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error setting up RecyclerViews", e);
-        }
+        GridLayoutManager productsLayoutManager = new GridLayoutManager(requireContext(), 2);
+        rvRecentProducts.setLayoutManager(productsLayoutManager);
+        rvRecentProducts.setAdapter(productAdapter);
+
+        Log.d(TAG, "✅ Adapters set up");
     }
 
     private void setupListeners() {
-        try {
-            if (swipeRefresh != null) {
-                swipeRefresh.setOnRefreshListener(this::loadData);
-            }
+        // Swipe to refresh
+        swipeRefresh.setOnRefreshListener(this::loadData);
 
-            // 🔥 HOẠT ĐỘNG CLICK VIEW ALL CATEGORIES
-            if (tvViewAllCategories != null) {
-                tvViewAllCategories.setOnClickListener(v -> {
-                    Log.d(TAG, "View All Categories clicked");
-                    navigateToAllCategories();
-                });
-            }
+        // View all categories
+        tvViewAllCategories.setOnClickListener(v -> {
+            // Navigate to all categories
+            Toast.makeText(requireContext(), "All categories", Toast.LENGTH_SHORT).show();
+        });
 
-            // 🔥 HOẠT ĐỘNG CLICK VIEW ALL PRODUCTS
-            if (tvViewAllProducts != null) {
-                tvViewAllProducts.setOnClickListener(v -> {
-                    Log.d(TAG, "View All Products clicked");
-                    navigateToAllProducts();
-                });
-            }
+        // View all products
+        tvViewAllProducts.setOnClickListener(v -> {
+            navigateToAllProducts();
+        });
 
-            if (fabQuickAdd != null) {
-                fabQuickAdd.setOnClickListener(v -> {
-                    navigateToAddProduct();
-                });
-            }
+        // Quick add FAB
+        fabQuickAdd.setOnClickListener(v -> {
+            navigateToAddProduct();
+        });
 
-            Log.d(TAG, "✅ HomeFragment listeners setup");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error setting up listeners", e);
-        }
+        Log.d(TAG, "✅ Listeners set up");
     }
 
     private void loadData() {
-        try {
-            if (swipeRefresh != null) {
-                swipeRefresh.setRefreshing(true);
-            }
-
-            loadCategoriesFromBackend();
-            loadProductsFromBackend();
-
-            Log.d(TAG, "✅ Data loading started");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error starting data load", e);
-            if (swipeRefresh != null) {
-                swipeRefresh.setRefreshing(false);
-            }
-        }
+        swipeRefresh.setRefreshing(true);
+        loadCategories();
+        loadRecentProducts();
     }
 
-    private void loadCategoriesFromBackend() {
-        ApiClient.getApiService().getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<List<Map<String, Object>>>> call,
-                                   Response<StandardResponse<List<Map<String, Object>>>> response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        StandardResponse<List<Map<String, Object>>> apiResponse = response.body();
+    private void loadCategories() {
+        Log.d(TAG, "🔍 Loading categories");
 
-                        if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                            categories.clear();
-
-                            for (Map<String, Object> categoryData : apiResponse.getData()) {
-                                Category category = new Category();
-                                category.setId(((Number) categoryData.get("id")).longValue());
-                                category.setName((String) categoryData.get("name"));
-                                category.setDescription((String) categoryData.get("description"));
-                                category.setIcon((String) categoryData.get("icon"));
-                                categories.add(category);
+        ApiClient.getProductService().getCategories()
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
+                            if (apiResponse.isSuccess()) {
+                                handleCategoriesResponse(apiResponse.getData());
+                            } else {
+                                showError(apiResponse.getMessage());
                             }
-
-                            if (categoryAdapter != null) {
-                                categoryAdapter.notifyDataSetChanged();
-                            }
-
-                            Log.d(TAG, "✅ Loaded " + categories.size() + " categories from backend");
                         } else {
-                            Log.w(TAG, "❌ Categories response unsuccessful");
-                            loadSampleCategories();
+                            showError("Failed to load categories");
                         }
-                    } else {
-                        Log.w(TAG, "❌ Categories response failed");
-                        loadSampleCategories();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error parsing categories", e);
-                    loadSampleCategories();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<StandardResponse<List<Map<String, Object>>>> call, Throwable t) {
-                Log.e(TAG, "❌ Categories API call failed", t);
-                loadSampleCategories();
-            }
-        });
-    }
-
-    private void loadSampleCategories() {
-        categories.clear();
-        categories.add(new Category(1L, "Electronics", "Electronics devices", "electronics", true));
-        categories.add(new Category(2L, "Fashion", "Clothing and accessories", "fashion", true));
-        categories.add(new Category(3L, "Home & Garden", "Home decor and garden", "home", true));
-        categories.add(new Category(4L, "Books", "Books and educational materials", "books", true));
-        categories.add(new Category(5L, "Sports", "Sports and outdoor equipment", "sports", true));
-        categories.add(new Category(6L, "Beauty", "Beauty and health products", "beauty", true));
-        categories.add(new Category(7L, "Vehicles", "Cars and motorbikes", "vehicles", true));
-        categories.add(new Category(8L, "Toys", "Toys and kids items", "toys", true));
-
-        if (categoryAdapter != null) {
-            categoryAdapter.notifyDataSetChanged();
-        }
-
-        Log.d(TAG, "✅ Loaded sample categories");
-    }
-
-    private void loadProductsFromBackend() {
-        ApiClient.getApiService().getProducts().enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                   Response<StandardResponse<Map<String, Object>>> response) {
-                try {
-                    if (swipeRefresh != null) {
-                        swipeRefresh.setRefreshing(false);
+                        checkLoadingComplete();
                     }
 
-                    if (response.isSuccessful() && response.body() != null) {
-                        StandardResponse<Map<String, Object>> apiResponse = response.body();
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.e(TAG, "❌ Failed to load categories", t);
+                        showError("Network error loading categories");
+                        checkLoadingComplete();
+                    }
+                });
+    }
 
-                        if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                            Map<String, Object> data = apiResponse.getData();
-                            List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
+    private void loadRecentProducts() {
+        Log.d(TAG, "🔍 Loading recent products");
 
-                            if (productList != null) {
-                                products.clear();
-
-                                for (Map<String, Object> productData : productList) {
-                                    Product product = new Product();
-                                    product.setId(((Number) productData.get("id")).longValue());
-                                    product.setTitle((String) productData.get("title"));
-                                    product.setDescription((String) productData.get("description"));
-
-                                    // Handle price conversion - SỬA LỖI TẠI ĐÂY
-                                    Object priceObj = productData.get("price");
-                                    if (priceObj instanceof Number) {
-                                        product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
-                                    }
-
-                                    product.setLocation((String) productData.get("location"));
-
-                                    // Handle imageUrls - SỬA LỖI TẠI ĐÂY
-                                    Object imageUrlsObj = productData.get("imageUrls");
-                                    if (imageUrlsObj instanceof List) {
-                                        product.setImageUrls((List<String>) imageUrlsObj);
-                                    } else if (imageUrlsObj instanceof String) {
-                                        product.setImageUrl((String) imageUrlsObj);
-                                    }
-
-                                    // Handle condition - SỬA LỖI TẠI ĐÂY
-                                    String condition = (String) productData.get("condition");
-                                    if (condition != null) {
-                                        try {
-                                            product.setCondition(Product.ProductCondition.valueOf(condition));
-                                        } catch (IllegalArgumentException e) {
-                                            product.setCondition(Product.ProductCondition.GOOD);
-                                        }
-                                    }
-
-                                    products.add(product);
-                                }
-
-                                if (productAdapter != null) {
-                                    productAdapter.notifyDataSetChanged();
-                                }
-
-                                // Show/hide empty view
-                                if (emptyView != null && rvRecentProducts != null) {
-                                    if (products.isEmpty()) {
-                                        emptyView.setVisibility(View.VISIBLE);
-                                        rvRecentProducts.setVisibility(View.GONE);
-                                    } else {
-                                        emptyView.setVisibility(View.GONE);
-                                        rvRecentProducts.setVisibility(View.VISIBLE);
-                                    }
-                                }
-
-                                Log.d(TAG, "✅ Loaded " + products.size() + " products from backend");
+        ApiClient.getProductService().getProducts(0, 10, null, null, null, null, null, null, "newest")
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
+                            if (apiResponse.isSuccess()) {
+                                handleProductsResponse(apiResponse.getData());
+                            } else {
+                                showError(apiResponse.getMessage());
                             }
                         } else {
-                            Log.w(TAG, "❌ Products response unsuccessful");
                             showError("Failed to load products");
                         }
-                    } else {
-                        Log.w(TAG, "❌ Products response failed");
-                        showError("Failed to load products");
+                        checkLoadingComplete();
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error parsing products", e);
-                    showError("Error loading products");
-                }
-            }
 
-            @Override
-            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                if (swipeRefresh != null) {
-                    swipeRefresh.setRefreshing(false);
-                }
-                Log.e(TAG, "❌ Products API call failed", t);
-                showError("Network error loading products");
-            }
-        });
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.e(TAG, "❌ Failed to load products", t);
+                        showError("Network error loading products");
+                        checkLoadingComplete();
+                    }
+                });
     }
 
-    // Navigation methods
-    private void navigateToCategoryProducts(Category category) {
+    @SuppressWarnings("unchecked")
+    private void handleCategoriesResponse(Map<String, Object> data) {
         try {
-            Intent intent = new Intent(getContext(), CategoryProductsActivity.class);
-            intent.putExtra("category_id", category.getId());
-            intent.putExtra("category_name", category.getName());
-            startActivity(intent);
+            List<Map<String, Object>> categoryList = (List<Map<String, Object>>) data.get("categories");
+            if (categoryList != null) {
+                categories.clear();
+                for (Map<String, Object> categoryData : categoryList) {
+                    Category category = Category.fromMap(categoryData);
+                    categories.add(category);
+                }
+                categoryAdapter.notifyDataSetChanged();
+                Log.d(TAG, "✅ Categories loaded: " + categories.size());
+            }
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error navigating to category products", e);
-            showError("Cannot open category");
+            Log.e(TAG, "❌ Error processing categories", e);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void handleProductsResponse(Map<String, Object> data) {
+        try {
+            List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
+            if (productList != null) {
+                products.clear();
+                for (Map<String, Object> productData : productList) {
+                    Product product = Product.fromMap(productData);
+                    products.add(product);
+                }
+                productAdapter.notifyDataSetChanged();
+                updateEmptyState();
+                Log.d(TAG, "✅ Products loaded: " + products.size());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error processing products", e);
+        }
+    }
+
+    private void checkLoadingComplete() {
+        // Stop refresh animation when both requests are complete
+        if (swipeRefresh.isRefreshing()) {
+            swipeRefresh.setRefreshing(false);
+        }
+    }
+
+    private void updateEmptyState() {
+        if (products.isEmpty()) {
+            emptyView.setVisibility(View.VISIBLE);
+            rvRecentProducts.setVisibility(View.GONE);
+        } else {
+            emptyView.setVisibility(View.GONE);
+            rvRecentProducts.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void navigateToCategoryProducts(Category category) {
+        Intent intent = new Intent(requireContext(), CategoryProductsActivity.class);
+        intent.putExtra(Constants.EXTRA_CATEGORY_ID, category.getId());
+        intent.putExtra(Constants.EXTRA_CATEGORY_NAME, category.getName());
+        startActivity(intent);
     }
 
     private void navigateToProductDetail(Product product) {
-        try {
-            Intent intent = new Intent(getContext(), ProductDetailActivity.class);
-            intent.putExtra("product_id", product.getId());
-            intent.putExtra("product_title", product.getTitle());
-            intent.putExtra("product_price", product.getFormattedPrice());
-            startActivity(intent);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error navigating to product detail", e);
-            showError("Cannot open product");
-        }
-    }
-
-    private void navigateToAllCategories() {
-        try {
-            // Navigate to search fragment and show all categories
-            NavController navController = Navigation.findNavController(requireView());
-            navController.navigate(R.id.nav_search);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error navigating to all categories", e);
-            showError("Cannot open categories");
-        }
+        Intent intent = new Intent(requireContext(), ProductDetailActivity.class);
+        intent.putExtra(Constants.EXTRA_PRODUCT_ID, product.getId());
+        intent.putExtra(Constants.EXTRA_PRODUCT_TITLE, product.getTitle());
+        intent.putExtra(Constants.EXTRA_PRODUCT_PRICE, Constants.formatPrice(product.getPrice()));
+        startActivity(intent);
     }
 
     private void navigateToAllProducts() {
-        try {
-            Intent intent = new Intent(getContext(), AllProductsActivity.class);
-            startActivity(intent);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error navigating to all products", e);
-            showError("Cannot open all products");
-        }
+        Intent intent = new Intent(requireContext(), AllProductsActivity.class);
+        startActivity(intent);
     }
 
     private void navigateToAddProduct() {
-        try {
-            NavController navController = Navigation.findNavController(requireView());
-            navController.navigate(R.id.nav_add_product);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error navigating to add product", e);
-            showError("Cannot open add product");
+        if (!prefsManager.isLoggedIn()) {
+            Toast.makeText(requireContext(), "Please log in to add products", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        NavController navController = Navigation.findNavController(requireView());
+        navController.navigate(R.id.action_home_to_addProduct);
+    }
+
+    private void toggleSaveProduct(Product product) {
+        Long userId = prefsManager.getUserId();
+        if (userId == null) {
+            Toast.makeText(requireContext(), "Please log in to save products", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (product.isSaved()) {
+            // Remove from saved
+            ApiClient.getSavedItemService().removeSavedItem(userId, product.getId())
+                    .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                               Response<StandardResponse<Map<String, Object>>> response) {
+                            if (response.isSuccessful() && response.body() != null) {
+                                StandardResponse<Map<String, Object>> apiResponse = response.body();
+                                if (apiResponse.isSuccess()) {
+                                    product.setSaved(false);
+                                    productAdapter.notifyDataSetChanged();
+                                    Toast.makeText(requireContext(), "Removed from saved", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                            Log.e(TAG, "❌ Failed to remove from saved", t);
+                        }
+                    });
+        } else {
+            // Add to saved
+            ApiClient.getSavedItemService().saveItem(userId, product.getId())
+                    .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                               Response<StandardResponse<Map<String, Object>>> response) {
+                            if (response.isSuccessful() && response.body() != null) {
+                                StandardResponse<Map<String, Object>> apiResponse = response.body();
+                                if (apiResponse.isSuccess()) {
+                                    product.setSaved(true);
+                                    productAdapter.notifyDataSetChanged();
+                                    Toast.makeText(requireContext(), "Added to saved", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                            Log.e(TAG, "❌ Failed to save item", t);
+                        }
+                    });
         }
     }
 
     private void showError(String message) {
-        if (getContext() != null) {
-            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-        }
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+        Log.w(TAG, "Error: " + message);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh data when returning to fragment
+        loadData();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        Log.d(TAG, "HomeFragment destroyed");
     }
 }

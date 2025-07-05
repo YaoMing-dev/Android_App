@@ -12,29 +12,35 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.example.newtrade.ui.profile.UserProfileActivity;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.viewpager2.widget.ViewPager2;
 
+import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
+import com.example.newtrade.adapters.ProductImageAdapter;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.chat.ChatActivity;
-import com.example.newtrade.utils.ImageUtils;
+import com.example.newtrade.ui.offer.MakeOfferActivity;
+import com.example.newtrade.ui.profile.UserProfileActivity;
+import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
-import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.example.newtrade.utils.NavigationUtils;
-import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 
-import java.math.BigDecimal;
-import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import de.hdodenhof.circleimageview.CircleImageView;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -42,21 +48,31 @@ import retrofit2.Response;
 public class ProductDetailActivity extends AppCompatActivity {
 
     private static final String TAG = "ProductDetailActivity";
+    private static final int REQUEST_MAKE_OFFER = 1001;
 
     // UI Components
     private MaterialToolbar toolbar;
-    private ImageView ivProductImage;
+    private ViewPager2 vpProductImages;
+    private TabLayout tlImageIndicator;
     private TextView tvTitle, tvPrice, tvDescription, tvLocation, tvCondition;
-    private TextView tvSellerName, tvSellerRating, tvMemberSince;
+    private TextView tvSellerName, tvSellerRating, tvMemberSince, tvViewCount;
+    private CircleImageView ivSellerAvatar;
     private Button btnContact, btnMakeOffer, btnViewProfile;
     private FloatingActionButton fabShare, fabSave;
+    private View layoutSellerInfo;
+
+    // Adapters
+    private ProductImageAdapter imageAdapter;
 
     // Data
     private Long productId;
     private String productTitle;
     private String productPrice;
     private Map<String, Object> productData;
+    private Map<String, Object> sellerData;
     private SharedPrefsManager prefsManager;
+    private boolean isProductSaved = false;
+    private boolean isOwnProduct = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,23 +89,32 @@ public class ProductDetailActivity extends AppCompatActivity {
         initViews();
         setupToolbar();
         setupListeners();
+        setupImageSlider();
 
         // Load product details
         loadProductDetails();
+        recordProductView();
+
+        Log.d(TAG, "✅ ProductDetailActivity created for product ID: " + productId);
     }
 
     private void getIntentData() {
         Intent intent = getIntent();
-        productId = intent.getLongExtra("product_id", 0L);
-        productTitle = intent.getStringExtra("product_title");
-        productPrice = intent.getStringExtra("product_price");
+        productId = intent.getLongExtra(Constants.EXTRA_PRODUCT_ID, -1L);
+        productTitle = intent.getStringExtra(Constants.EXTRA_PRODUCT_TITLE);
+        productPrice = intent.getStringExtra(Constants.EXTRA_PRODUCT_PRICE);
 
-        Log.d(TAG, "Product ID: " + productId + ", Title: " + productTitle);
+        if (productId == -1L) {
+            Log.e(TAG, "❌ Product ID not provided in intent");
+            finish();
+            return;
+        }
     }
 
     private void initViews() {
         toolbar = findViewById(R.id.toolbar);
-        ivProductImage = findViewById(R.id.iv_product_image);
+        vpProductImages = findViewById(R.id.vp_product_images);
+        tlImageIndicator = findViewById(R.id.tl_image_indicator);
         tvTitle = findViewById(R.id.tv_title);
         tvPrice = findViewById(R.id.tv_price);
         tvDescription = findViewById(R.id.tv_description);
@@ -98,318 +123,458 @@ public class ProductDetailActivity extends AppCompatActivity {
         tvSellerName = findViewById(R.id.tv_seller_name);
         tvSellerRating = findViewById(R.id.tv_seller_rating);
         tvMemberSince = findViewById(R.id.tv_member_since);
+        tvViewCount = findViewById(R.id.tv_view_count);
+        ivSellerAvatar = findViewById(R.id.iv_seller_avatar);
         btnContact = findViewById(R.id.btn_contact);
         btnMakeOffer = findViewById(R.id.btn_make_offer);
         btnViewProfile = findViewById(R.id.btn_view_profile);
         fabShare = findViewById(R.id.fab_share);
         fabSave = findViewById(R.id.fab_save);
+        layoutSellerInfo = findViewById(R.id.layout_seller_info);
+
+        Log.d(TAG, "✅ Views initialized");
     }
 
     private void setupToolbar() {
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle(productTitle != null ? productTitle : "Product Detail");
+            getSupportActionBar().setTitle(productTitle != null ? productTitle : "Product Details");
         }
     }
 
     private void setupListeners() {
-        btnContact.setOnClickListener(v -> showContactOptions());
+        btnContact.setOnClickListener(v -> contactSeller());
         btnMakeOffer.setOnClickListener(v -> makeOffer());
         btnViewProfile.setOnClickListener(v -> viewSellerProfile());
         fabShare.setOnClickListener(v -> shareProduct());
-        fabSave.setOnClickListener(v -> saveProduct());
+        fabSave.setOnClickListener(v -> toggleSaveProduct());
+
+        layoutSellerInfo.setOnClickListener(v -> viewSellerProfile());
+    }
+
+    private void setupImageSlider() {
+        imageAdapter = new ProductImageAdapter(new ArrayList<>());
+        vpProductImages.setAdapter(imageAdapter);
+
+        // Connect TabLayout with ViewPager2
+        new TabLayoutMediator(tlImageIndicator, vpProductImages,
+                (tab, position) -> {
+                    // Tab configuration is handled automatically
+                }
+        ).attach();
     }
 
     private void loadProductDetails() {
-        if (productId == null || productId <= 0) {
-            Toast.makeText(this, "Invalid product ID", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
+        Log.d(TAG, "🔍 Loading product details for ID: " + productId);
 
-        Log.d(TAG, "Loading product details for ID: " + productId);
-
-        ApiClient.getApiService().getProductDetail(productId)
+        ApiClient.getProductService().getProduct(productId)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                            Response<StandardResponse<Map<String, Object>>> response) {
-
                         if (response.isSuccessful() && response.body() != null) {
-                            StandardResponse<Map<String, Object>> standardResponse = response.body();
-
-                            if (standardResponse.isSuccess()) {
-                                productData = standardResponse.getData();
-                                displayProductData(productData);
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
+                            if (apiResponse.isSuccess()) {
+                                productData = apiResponse.getData();
+                                displayProductDetails();
+                                checkIfProductSaved();
+                                Log.d(TAG, "✅ Product details loaded successfully");
                             } else {
-                                showError("Failed to load product: " + standardResponse.getMessage());
+                                showError(apiResponse.getMessage());
                             }
                         } else {
-                            showError("Failed to load product details");
+                            showError("Product not found");
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        showError("Network error: " + t.getMessage());
-                        Log.e(TAG, "Failed to load product details", t);
+                        Log.e(TAG, "❌ Failed to load product details", t);
+                        showError("Network error. Please try again.");
                     }
                 });
     }
 
-    private void displayProductData(Map<String, Object> data) {
+    @SuppressWarnings("unchecked")
+    private void displayProductDetails() {
+        if (productData == null) return;
+
         try {
-            // Basic product info
-            if (data.get("title") != null) {
-                tvTitle.setText(data.get("title").toString());
-                if (getSupportActionBar() != null) {
-                    getSupportActionBar().setTitle(data.get("title").toString());
-                }
-            }
-
-            if (data.get("description") != null) {
-                tvDescription.setText(data.get("description").toString());
-            }
-
-            if (data.get("location") != null) {
-                tvLocation.setText(data.get("location").toString());
-            }
-
-            if (data.get("condition") != null) {
-                tvCondition.setText(data.get("condition").toString());
-            }
+            // Product basic info
+            tvTitle.setText((String) productData.get("title"));
+            tvDescription.setText((String) productData.get("description"));
+            tvLocation.setText((String) productData.get("location"));
+            tvCondition.setText((String) productData.get("condition"));
 
             // Price formatting
-            if (data.get("price") != null) {
-                Object priceObj = data.get("price");
-                if (priceObj instanceof Number) {
-                    BigDecimal price = new BigDecimal(priceObj.toString());
-                    tvPrice.setText(formatPrice(price));
+            Number priceNumber = (Number) productData.get("price");
+            if (priceNumber != null) {
+                tvPrice.setText(Constants.formatPrice(priceNumber.doubleValue()));
+            }
+
+            // View count
+            Number viewCount = (Number) productData.get("viewCount");
+            if (viewCount != null) {
+                tvViewCount.setText(viewCount.toString() + " views");
+            }
+
+            // Product images
+            List<String> imageUrls = (List<String>) productData.get("imageUrls");
+            if (imageUrls != null && !imageUrls.isEmpty()) {
+                // Convert to full URLs
+                List<String> fullImageUrls = new ArrayList<>();
+                for (String imageUrl : imageUrls) {
+                    fullImageUrls.add(Constants.getImageUrl(imageUrl));
                 }
-            }
+                imageAdapter.updateImages(fullImageUrls);
 
-            // ✅ SETUP PRODUCT IMAGE USING ImageUtils
-            setupProductImage(data);
-
-            // Seller information
-            if (data.get("seller") != null || data.get("user") != null) {
-                Map<String, Object> seller = (Map<String, Object>)
-                        (data.get("seller") != null ? data.get("seller") : data.get("user"));
-
-                if (seller.get("displayName") != null) {
-                    tvSellerName.setText(seller.get("displayName").toString());
-                }
-
-                if (seller.get("rating") != null) {
-                    tvSellerRating.setText("★ " + seller.get("rating").toString());
-                }
-
-                if (seller.get("createdAt") != null) {
-                    tvMemberSince.setText("Member since " +
-                            seller.get("createdAt").toString().substring(0, 4));
-                }
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error displaying product data", e);
-        }
-    }
-
-    // ✅ THÊM METHOD setupProductImage
-    private void setupProductImage(Map<String, Object> productData) {
-        if (ivProductImage == null || productData == null) return;
-
-        try {
-            String imageUrl = null;
-
-            // Try different ways to get image URL from backend response
-            if (productData.get("primaryImageUrl") != null) {
-                imageUrl = productData.get("primaryImageUrl").toString();
-            } else if (productData.get("imageUrl") != null) {
-                imageUrl = productData.get("imageUrl").toString();
-            } else if (productData.get("imageUrls") != null) {
-                Object imageUrlsObj = productData.get("imageUrls");
-                if (imageUrlsObj instanceof List) {
-                    List<String> imageUrls = (List<String>) imageUrlsObj;
-                    if (!imageUrls.isEmpty()) {
-                        imageUrl = imageUrls.get(0);
-                    }
-                }
-            }
-
-            // Use ImageUtils to load the image
-            ImageUtils.loadProductImage(this, imageUrl, ivProductImage);
-
-            Log.d(TAG, "Product image setup complete. URL: " + imageUrl);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error setting up product image", e);
-            ivProductImage.setImageResource(R.drawable.ic_image_placeholder);
-        }
-    }
-
-    private String formatPrice(BigDecimal price) {
-        if (price == null) return "Free";
-        NumberFormat formatter = NumberFormat.getNumberInstance(new Locale("vi", "VN"));
-        return formatter.format(price) + " VNĐ";
-    }
-
-    // ✅ FIXED: showContactOptions với safe ID parsing
-    private void showContactOptions() {
-        if (productData == null) return;
-
-        try {
-            // Get seller info
-            Map<String, Object> seller = (Map<String, Object>)
-                    (productData.get("seller") != null ? productData.get("seller") : productData.get("user"));
-
-            if (seller == null) {
-                Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // ✅ FIX: Parse ID an toàn cho cả Integer và Double
-            Long sellerId = parseToLong(seller.get("id"));
-            String sellerName = seller.get("displayName") != null ? seller.get("displayName").toString() : "Seller";
-
-            if (sellerId == null || sellerId <= 0) {
-                Toast.makeText(this, "Invalid seller ID", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            Log.d(TAG, "Starting chat with seller ID: " + sellerId + ", name: " + sellerName);
-
-            // Start chat
-            Intent chatIntent = new Intent(this, ChatActivity.class);
-            chatIntent.putExtra("product_id", productId);
-            chatIntent.putExtra("seller_id", sellerId);
-            chatIntent.putExtra("seller_name", sellerName);
-            startActivity(chatIntent);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error starting chat", e);
-            Toast.makeText(this, "Unable to start conversation", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    // ✅ THÊM HELPER METHOD để parse ID an toàn
-    private Long parseToLong(Object value) {
-        if (value == null) return null;
-
-        try {
-            String valueStr = value.toString();
-
-            // Nếu là số thập phân, chuyển thành số nguyên
-            if (valueStr.contains(".")) {
-                return Math.round(Double.parseDouble(valueStr));
-            }
-
-            // Nếu là số nguyên
-            return Long.parseLong(valueStr);
-
-        } catch (NumberFormatException e) {
-            Log.e(TAG, "Error parsing ID: " + value, e);
-            return null;
-        }
-    }
-
-    // ✅ FIXED: makeOffer với đơn giản hóa
-    private void makeOffer() {
-        BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
-        View view = getLayoutInflater().inflate(R.layout.bottom_sheet_make_offer, null);
-        bottomSheet.setContentView(view);
-
-        // ✅ CHỈ CẦN et_offer_amount (không có et_offer_message)
-        TextInputEditText etOfferAmount = view.findViewById(R.id.et_offer_amount);
-        Button btnSubmitOffer = view.findViewById(R.id.btn_submit_offer);
-
-        btnSubmitOffer.setOnClickListener(v -> {
-            String offerAmount = etOfferAmount.getText().toString().trim();
-
-            if (offerAmount.isEmpty()) {
-                etOfferAmount.setError("Please enter offer amount");
-                return;
-            }
-
-            // ✅ GỌI submitOffer VỚI MESSAGE RỖNG
-            submitOffer(offerAmount, ""); // Không có message
-            bottomSheet.dismiss();
-        });
-
-        bottomSheet.show();
-    }
-
-    private void submitOffer(String amount, String message) {
-        Map<String, Object> offerData = new HashMap<>();
-        offerData.put("productId", productId);
-        offerData.put("amount", Double.parseDouble(amount));
-        offerData.put("message", message);
-
-        // TODO: Implement offer submission API call
-        Toast.makeText(this, "Offer submitted: " + amount + " VNĐ", Toast.LENGTH_SHORT).show();
-    }
-
-    // ✅ FIXED: viewSellerProfile với safe ID parsing
-    private void viewSellerProfile() {
-        if (productData == null) return;
-
-        try {
-            Map<String, Object> seller = (Map<String, Object>)
-                    (productData.get("seller") != null ? productData.get("seller") : productData.get("user"));
-
-            if (seller != null && seller.get("id") != null) {
-                // ✅ FIX: Parse ID an toàn
-                Long sellerId = parseToLong(seller.get("id"));
-
-                if (sellerId != null && sellerId > 0) {
-                    Intent intent = new Intent(this, UserProfileActivity.class);
-                    intent.putExtra("user_id", sellerId);
-                    startActivity(intent);
-
-                    Log.d(TAG, "Opening seller profile for ID: " + sellerId);
+                // Show/hide image indicator based on image count
+                if (imageUrls.size() > 1) {
+                    tlImageIndicator.setVisibility(View.VISIBLE);
                 } else {
-                    Toast.makeText(this, "Invalid seller ID", Toast.LENGTH_SHORT).show();
+                    tlImageIndicator.setVisibility(View.GONE);
                 }
-            } else {
-                Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show();
             }
+
+            // Seller info
+            sellerData = (Map<String, Object>) productData.get("seller");
+            if (sellerData != null) {
+                displaySellerInfo();
+            }
+
+            // Check if this is user's own product
+            Long currentUserId = prefsManager.getUserId();
+            if (currentUserId != null && sellerData != null) {
+                Number sellerIdNumber = (Number) sellerData.get("id");
+                if (sellerIdNumber != null) {
+                    isOwnProduct = currentUserId.equals(sellerIdNumber.longValue());
+                    updateActionButtons();
+                }
+            }
+
         } catch (Exception e) {
-            Log.e(TAG, "Error viewing seller profile", e);
-            Toast.makeText(this, "Unable to view seller profile", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "❌ Error displaying product details", e);
+            showError("Error displaying product details");
         }
+    }
+
+    private void displaySellerInfo() {
+        if (sellerData == null) return;
+
+        try {
+            tvSellerName.setText((String) sellerData.get("displayName"));
+
+            // Seller rating
+            Number rating = (Number) sellerData.get("rating");
+            if (rating != null) {
+                tvSellerRating.setText(String.format(Locale.getDefault(), "%.1f ★", rating.doubleValue()));
+            }
+
+            // Member since
+            String createdAt = (String) sellerData.get("createdAt");
+            if (createdAt != null) {
+                try {
+                    SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+                    SimpleDateFormat outputFormat = new SimpleDateFormat("MMM yyyy", Locale.getDefault());
+                    Date date = inputFormat.parse(createdAt);
+                    if (date != null) {
+                        tvMemberSince.setText("Member since " + outputFormat.format(date));
+                    }
+                } catch (Exception e) {
+                    tvMemberSince.setText("Member since " + createdAt);
+                }
+            }
+
+            // Seller avatar
+            String avatarUrl = (String) sellerData.get("profilePicture");
+            if (avatarUrl != null && !avatarUrl.isEmpty()) {
+                Glide.with(this)
+                        .load(Constants.getImageUrl(avatarUrl))
+                        .placeholder(R.drawable.ic_placeholder_avatar)
+                        .error(R.drawable.ic_placeholder_avatar)
+                        .circleCrop()
+                        .into(ivSellerAvatar);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error displaying seller info", e);
+        }
+    }
+
+    private void updateActionButtons() {
+        if (isOwnProduct) {
+            // Hide buyer actions for own products
+            btnContact.setVisibility(View.GONE);
+            btnMakeOffer.setVisibility(View.GONE);
+            btnViewProfile.setVisibility(View.GONE);
+
+            // Show edit option
+            btnContact.setText("Edit Product");
+            btnContact.setVisibility(View.VISIBLE);
+            btnContact.setOnClickListener(v -> editProduct());
+        } else {
+            // Show buyer actions
+            btnContact.setVisibility(View.VISIBLE);
+            btnMakeOffer.setVisibility(View.VISIBLE);
+            btnViewProfile.setVisibility(View.VISIBLE);
+
+            // Check if product allows offers
+            Boolean isNegotiable = (Boolean) productData.get("isNegotiable");
+            if (isNegotiable != null && !isNegotiable) {
+                btnMakeOffer.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private void recordProductView() {
+        Long userId = prefsManager.getUserId();
+        if (userId == null) return;
+
+        // Don't record views for own products
+        if (isOwnProduct) return;
+
+        ApiClient.getProductService().recordProductView(userId, productId)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            Log.d(TAG, "✅ Product view recorded");
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.d(TAG, "Failed to record product view");
+                    }
+                });
+    }
+
+    private void checkIfProductSaved() {
+        Long userId = prefsManager.getUserId();
+        if (userId == null) return;
+
+        ApiClient.getSavedItemService().isItemSaved(userId, productId)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
+                            if (apiResponse.isSuccess()) {
+                                Map<String, Object> data = apiResponse.getData();
+                                Boolean isSaved = (Boolean) data.get("isSaved");
+                                isProductSaved = isSaved != null && isSaved;
+                                updateSaveButton();
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.d(TAG, "Failed to check if product is saved");
+                    }
+                });
+    }
+
+    private void updateSaveButton() {
+        if (isProductSaved) {
+            fabSave.setImageResource(R.drawable.ic_bookmark_filled);
+        } else {
+            fabSave.setImageResource(R.drawable.ic_bookmark_border);
+        }
+    }
+
+    private void contactSeller() {
+        if (isOwnProduct) {
+            editProduct();
+            return;
+        }
+
+        if (sellerData == null) return;
+
+        // Start conversation with seller
+        Long userId = prefsManager.getUserId();
+        if (userId == null) {
+            Toast.makeText(this, "Please log in to contact seller", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Log.d(TAG, "🔄 Starting conversation with seller");
+
+        ApiClient.getChatService().findOrCreateConversation(userId, productId)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, Object>> apiResponse = response.body();
+                            if (apiResponse.isSuccess()) {
+                                Map<String, Object> conversationData = apiResponse.getData();
+                                Long conversationId = ((Number) conversationData.get("id")).longValue();
+
+                                // Navigate to chat
+                                Intent intent = new Intent(ProductDetailActivity.this, ChatActivity.class);
+                                intent.putExtra(Constants.EXTRA_CONVERSATION_ID, conversationId);
+                                intent.putExtra(Constants.EXTRA_PRODUCT_ID, productId);
+                                startActivity(intent);
+
+                                Log.d(TAG, "✅ Conversation started: " + conversationId);
+                            } else {
+                                showError(apiResponse.getMessage());
+                            }
+                        } else {
+                            showError("Failed to start conversation");
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.e(TAG, "❌ Failed to start conversation", t);
+                        showError("Network error. Please try again.");
+                    }
+                });
+    }
+
+    private void makeOffer() {
+        if (isOwnProduct) return;
+
+        Long userId = prefsManager.getUserId();
+        if (userId == null) {
+            Toast.makeText(this, "Please log in to make an offer", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Navigate to make offer activity
+        Intent intent = new Intent(this, MakeOfferActivity.class);
+        intent.putExtra(Constants.EXTRA_PRODUCT_ID, productId);
+        intent.putExtra(Constants.EXTRA_PRODUCT_TITLE, tvTitle.getText().toString());
+
+        String priceStr = tvPrice.getText().toString().replaceAll("[^0-9.]", "");
+        try {
+            double price = Double.parseDouble(priceStr);
+            intent.putExtra(Constants.EXTRA_PRODUCT_PRICE, price);
+        } catch (NumberFormatException e) {
+            intent.putExtra(Constants.EXTRA_PRODUCT_PRICE, 0.0);
+        }
+
+        startActivityForResult(intent, REQUEST_MAKE_OFFER);
+    }
+
+    private void viewSellerProfile() {
+        if (sellerData == null) return;
+
+        Number sellerIdNumber = (Number) sellerData.get("id");
+        if (sellerIdNumber == null) return;
+
+        Intent intent = new Intent(this, UserProfileActivity.class);
+        intent.putExtra(Constants.EXTRA_USER_ID, sellerIdNumber.longValue());
+        intent.putExtra(Constants.EXTRA_USER_NAME, (String) sellerData.get("displayName"));
+        startActivity(intent);
     }
 
     private void shareProduct() {
-        if (productData == null) return;
-
-        String shareText = "Check out this item: " +
-                (productData.get("title") != null ? productData.get("title").toString() : "Product") +
-                " - " +
-                (productData.get("price") != null ? productData.get("price").toString() + " VNĐ" : "");
+        String shareText = "Check out this product: " + tvTitle.getText().toString() +
+                "\nPrice: " + tvPrice.getText().toString() +
+                "\nLocation: " + tvLocation.getText().toString() +
+                "\n\nShared from TradeUp app";
 
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
         shareIntent.putExtra(Intent.EXTRA_TEXT, shareText);
-        startActivity(Intent.createChooser(shareIntent, "Share Product"));
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Product from TradeUp");
+
+        startActivity(Intent.createChooser(shareIntent, "Share product"));
     }
 
-    private void saveProduct() {
-        // TODO: Implement save product functionality
-        Toast.makeText(this, "Product saved to favorites", Toast.LENGTH_SHORT).show();
+    private void toggleSaveProduct() {
+        Long userId = prefsManager.getUserId();
+        if (userId == null) {
+            Toast.makeText(this, "Please log in to save products", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (isProductSaved) {
+            // Remove from saved items
+            ApiClient.getSavedItemService().removeSavedItem(userId, productId)
+                    .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                               Response<StandardResponse<Map<String, Object>>> response) {
+                            if (response.isSuccessful() && response.body() != null) {
+                                StandardResponse<Map<String, Object>> apiResponse = response.body();
+                                if (apiResponse.isSuccess()) {
+                                    isProductSaved = false;
+                                    updateSaveButton();
+                                    Toast.makeText(ProductDetailActivity.this, "Removed from saved items", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                            Log.e(TAG, "❌ Failed to remove from saved items", t);
+                        }
+                    });
+        } else {
+            // Add to saved items
+            ApiClient.getSavedItemService().saveItem(userId, productId)
+                    .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                               Response<StandardResponse<Map<String, Object>>> response) {
+                            if (response.isSuccessful() && response.body() != null) {
+                                StandardResponse<Map<String, Object>> apiResponse = response.body();
+                                if (apiResponse.isSuccess()) {
+                                    isProductSaved = true;
+                                    updateSaveButton();
+                                    Toast.makeText(ProductDetailActivity.this, "Added to saved items", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                            Log.e(TAG, "❌ Failed to save item", t);
+                        }
+                    });
+        }
+    }
+
+    private void editProduct() {
+        // Navigate to edit product activity
+        Toast.makeText(this, "Edit product functionality", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_MAKE_OFFER && resultCode == RESULT_OK) {
+            Toast.makeText(this, "Offer submitted successfully", Toast.LENGTH_SHORT).show();
+            // Refresh product details to show updated offer count
+            loadProductDetails();
+        }
     }
 
     private void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-        Log.e(TAG, message);
+        Log.w(TAG, "Error: " + message);
     }
 
     @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
             finish();
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "ProductDetailActivity destroyed");
     }
 }
