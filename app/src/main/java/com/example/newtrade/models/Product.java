@@ -4,21 +4,36 @@ package com.example.newtrade.models;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-import java.text.SimpleDateFormat;
+import com.example.newtrade.utils.PriceFormatter;
+
+import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 public class Product implements Parcelable {
+
+    // =============================================
+    // ENUMS
+    // =============================================
+    public enum ProductCondition {
+        NEW, LIKE_NEW, GOOD, FAIR, POOR
+    }
+
+    public enum ProductStatus {
+        AVAILABLE, SOLD, PAUSED, EXPIRED, REPORTED
+    }
+
+    // =============================================
+    // PROPERTIES
+    // =============================================
     private Long id;
     private String title;
     private String description;
-    private double price;
-    private String condition;
+    private BigDecimal price;
+    private ProductCondition condition;
     private String location;
-    private String status;
+    private ProductStatus status;
     private boolean isNegotiable;
     private List<String> imageUrls;
     private List<String> tags;
@@ -43,23 +58,15 @@ public class Product implements Parcelable {
     private boolean isSaved;
     private boolean isOwn;
 
-    // Constructors
+    // =============================================
+    // CONSTRUCTORS
+    // =============================================
     public Product() {
         this.imageUrls = new ArrayList<>();
         this.tags = new ArrayList<>();
-    }
-
-    public Product(Long id, String title, String description, double price, String condition,
-                   String location, String status, boolean isNegotiable) {
-        this();
-        this.id = id;
-        this.title = title;
-        this.description = description;
-        this.price = price;
-        this.condition = condition;
-        this.location = location;
-        this.status = status;
-        this.isNegotiable = isNegotiable;
+        this.price = BigDecimal.ZERO;
+        this.condition = ProductCondition.GOOD;
+        this.status = ProductStatus.AVAILABLE;
     }
 
     protected Product(Parcel in) {
@@ -70,10 +77,33 @@ public class Product implements Parcelable {
         }
         title = in.readString();
         description = in.readString();
-        price = in.readDouble();
-        condition = in.readString();
+
+        // Read BigDecimal price
+        String priceStr = in.readString();
+        if (priceStr != null) {
+            price = new BigDecimal(priceStr);
+        } else {
+            price = BigDecimal.ZERO;
+        }
+
+        // Read enum condition
+        String conditionStr = in.readString();
+        if (conditionStr != null) {
+            condition = ProductCondition.valueOf(conditionStr);
+        } else {
+            condition = ProductCondition.GOOD;
+        }
+
         location = in.readString();
-        status = in.readString();
+
+        // Read enum status
+        String statusStr = in.readString();
+        if (statusStr != null) {
+            status = ProductStatus.valueOf(statusStr);
+        } else {
+            status = ProductStatus.AVAILABLE;
+        }
+
         isNegotiable = in.readByte() != 0;
         imageUrls = in.createStringArrayList();
         tags = in.createStringArrayList();
@@ -83,19 +113,23 @@ public class Product implements Parcelable {
         longitude = in.readDouble();
         createdAt = in.readString();
         updatedAt = in.readString();
+
         if (in.readByte() == 0) {
             sellerId = null;
         } else {
             sellerId = in.readLong();
         }
+
         sellerName = in.readString();
         sellerAvatar = in.readString();
         sellerRating = in.readDouble();
+
         if (in.readByte() == 0) {
             categoryId = null;
         } else {
             categoryId = in.readLong();
         }
+
         categoryName = in.readString();
         isSaved = in.readByte() != 0;
         isOwn = in.readByte() != 0;
@@ -113,7 +147,9 @@ public class Product implements Parcelable {
         }
     };
 
-    // Factory method from Map
+    // =============================================
+    // FACTORY METHODS
+    // =============================================
     @SuppressWarnings("unchecked")
     public static Product fromMap(Map<String, Object> productData) {
         Product product = new Product();
@@ -122,44 +158,80 @@ public class Product implements Parcelable {
             if (productData.get("id") != null) {
                 product.id = ((Number) productData.get("id")).longValue();
             }
+
             product.title = (String) productData.get("title");
             product.description = (String) productData.get("description");
-            if (productData.get("price") != null) {
-                product.price = ((Number) productData.get("price")).doubleValue();
+
+            // Handle price
+            Object priceObj = productData.get("price");
+            if (priceObj instanceof Number) {
+                product.price = BigDecimal.valueOf(((Number) priceObj).doubleValue());
+            } else if (priceObj instanceof String) {
+                product.price = new BigDecimal((String) priceObj);
             }
-            product.condition = (String) productData.get("condition");
+
+            // Handle condition
+            String conditionStr = (String) productData.get("condition");
+            if (conditionStr != null) {
+                try {
+                    product.condition = ProductCondition.valueOf(conditionStr.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    product.condition = ProductCondition.GOOD;
+                }
+            }
+
             product.location = (String) productData.get("location");
-            product.status = (String) productData.get("status");
-            product.isNegotiable = Boolean.TRUE.equals(productData.get("isNegotiable"));
+
+            // Handle status
+            String statusStr = (String) productData.get("status");
+            if (statusStr != null) {
+                try {
+                    product.status = ProductStatus.valueOf(statusStr.toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    product.status = ProductStatus.AVAILABLE;
+                }
+            }
+
+            Boolean negotiable = (Boolean) productData.get("negotiable");
+            if (negotiable != null) {
+                product.isNegotiable = negotiable;
+            }
 
             // Handle image URLs
             Object imageUrlsObj = productData.get("imageUrls");
             if (imageUrlsObj instanceof List) {
-                product.imageUrls = new ArrayList<>((List<String>) imageUrlsObj);
+                product.imageUrls = (List<String>) imageUrlsObj;
+            } else if (imageUrlsObj instanceof String) {
+                product.imageUrls = new ArrayList<>();
+                product.imageUrls.add((String) imageUrlsObj);
             }
 
             // Handle tags
             Object tagsObj = productData.get("tags");
             if (tagsObj instanceof List) {
-                product.tags = new ArrayList<>((List<String>) tagsObj);
+                product.tags = (List<String>) tagsObj;
             }
 
+            // Handle counts
             if (productData.get("viewCount") != null) {
                 product.viewCount = ((Number) productData.get("viewCount")).intValue();
             }
             if (productData.get("offerCount") != null) {
                 product.offerCount = ((Number) productData.get("offerCount")).intValue();
             }
+
+            // Handle location coordinates
             if (productData.get("latitude") != null) {
                 product.latitude = ((Number) productData.get("latitude")).doubleValue();
             }
             if (productData.get("longitude") != null) {
                 product.longitude = ((Number) productData.get("longitude")).doubleValue();
             }
+
             product.createdAt = (String) productData.get("createdAt");
             product.updatedAt = (String) productData.get("updatedAt");
 
-            // Seller information
+            // Handle seller information
             Map<String, Object> sellerData = (Map<String, Object>) productData.get("seller");
             if (sellerData != null) {
                 if (sellerData.get("id") != null) {
@@ -172,7 +244,7 @@ public class Product implements Parcelable {
                 }
             }
 
-            // Category information
+            // Handle category information
             Map<String, Object> categoryData = (Map<String, Object>) productData.get("category");
             if (categoryData != null) {
                 if (categoryData.get("id") != null) {
@@ -182,13 +254,15 @@ public class Product implements Parcelable {
             }
 
         } catch (Exception e) {
-            // Handle parsing errors
+            // Handle parsing errors silently
         }
 
         return product;
     }
 
-    // Getters and Setters
+    // =============================================
+    // GETTERS AND SETTERS
+    // =============================================
     public Long getId() {
         return id;
     }
@@ -213,20 +287,36 @@ public class Product implements Parcelable {
         this.description = description;
     }
 
-    public double getPrice() {
+    public BigDecimal getPrice() {
         return price;
     }
 
-    public void setPrice(double price) {
-        this.price = price;
+    public void setPrice(BigDecimal price) {
+        this.price = price != null ? price : BigDecimal.ZERO;
     }
 
-    public String getCondition() {
+    // Compatibility method for double price
+    public void setPrice(double price) {
+        this.price = BigDecimal.valueOf(price);
+    }
+
+    public ProductCondition getCondition() {
         return condition;
     }
 
+    public void setCondition(ProductCondition condition) {
+        this.condition = condition != null ? condition : ProductCondition.GOOD;
+    }
+
+    // Compatibility method for string condition
     public void setCondition(String condition) {
-        this.condition = condition;
+        if (condition != null) {
+            try {
+                this.condition = ProductCondition.valueOf(condition.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                this.condition = ProductCondition.GOOD;
+            }
+        }
     }
 
     public String getLocation() {
@@ -237,12 +327,23 @@ public class Product implements Parcelable {
         this.location = location;
     }
 
-    public String getStatus() {
+    public ProductStatus getStatus() {
         return status;
     }
 
+    public void setStatus(ProductStatus status) {
+        this.status = status != null ? status : ProductStatus.AVAILABLE;
+    }
+
+    // Compatibility method for string status
     public void setStatus(String status) {
-        this.status = status;
+        if (status != null) {
+            try {
+                this.status = ProductStatus.valueOf(status.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                this.status = ProductStatus.AVAILABLE;
+            }
+        }
     }
 
     public boolean isNegotiable() {
@@ -254,15 +355,46 @@ public class Product implements Parcelable {
     }
 
     public List<String> getImageUrls() {
-        return imageUrls;
+        return imageUrls != null ? imageUrls : new ArrayList<>();
     }
 
     public void setImageUrls(List<String> imageUrls) {
         this.imageUrls = imageUrls != null ? imageUrls : new ArrayList<>();
     }
 
+    // Compatibility method for single image URL
+    public void setImageUrl(String imageUrl) {
+        if (this.imageUrls == null) {
+            this.imageUrls = new ArrayList<>();
+        }
+        if (imageUrl != null) {
+            this.imageUrls.clear();
+            this.imageUrls.add(imageUrl);
+        }
+    }
+
+    public String getPrimaryImageUrl() {
+        if (imageUrls != null && !imageUrls.isEmpty()) {
+            return imageUrls.get(0);
+        }
+        return null;
+    }
+
+    public void setPrimaryImageUrl(String primaryImageUrl) {
+        if (this.imageUrls == null) {
+            this.imageUrls = new ArrayList<>();
+        }
+        if (primaryImageUrl != null) {
+            if (this.imageUrls.isEmpty()) {
+                this.imageUrls.add(primaryImageUrl);
+            } else {
+                this.imageUrls.set(0, primaryImageUrl);
+            }
+        }
+    }
+
     public List<String> getTags() {
-        return tags;
+        return tags != null ? tags : new ArrayList<>();
     }
 
     public void setTags(List<String> tags) {
@@ -291,6 +423,12 @@ public class Product implements Parcelable {
 
     public void setLatitude(double latitude) {
         this.latitude = latitude;
+    }
+    public String getFormattedPrice() {
+        if (price != null) {
+            return PriceFormatter.format(price);
+        }
+        return "Free";
     }
 
     public double getLongitude() {
@@ -381,126 +519,9 @@ public class Product implements Parcelable {
         isOwn = own;
     }
 
-    // Utility methods
-    public String getFormattedPrice() {
-        return String.format(Locale.getDefault(), "$%.2f", price);
-    }
-
-    public String getConditionDisplay() {
-        if (condition == null) return "Unknown";
-
-        switch (condition.toLowerCase()) {
-            case "new":
-                return "New";
-            case "like_new":
-                return "Like New";
-            case "good":
-                return "Good";
-            case "fair":
-                return "Fair";
-            case "poor":
-                return "Poor";
-            default:
-                return condition;
-        }
-    }
-
-    public String getStatusDisplay() {
-        if (status == null) return "Unknown";
-
-        switch (status.toLowerCase()) {
-            case "available":
-                return "Available";
-            case "sold":
-                return "Sold";
-            case "paused":
-                return "Paused";
-            case "expired":
-                return "Expired";
-            default:
-                return status;
-        }
-    }
-
-    public String getMainImageUrl() {
-        if (imageUrls != null && !imageUrls.isEmpty()) {
-            return imageUrls.get(0);
-        }
-        return null;
-    }
-
-    public String getFormattedCreatedAt() {
-        if (createdAt == null) return "";
-
-        try {
-            SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
-            SimpleDateFormat outputFormat = new SimpleDateFormat("MMM d, yyyy", Locale.getDefault());
-            Date date = inputFormat.parse(createdAt);
-            return date != null ? outputFormat.format(date) : createdAt;
-        } catch (Exception e) {
-            return createdAt;
-        }
-    }
-
-    public String getTimeAgo() {
-        if (createdAt == null) return "";
-
-        try {
-            SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
-            Date date = inputFormat.parse(createdAt);
-            if (date != null) {
-                long diff = System.currentTimeMillis() - date.getTime();
-                long seconds = diff / 1000;
-                long minutes = seconds / 60;
-                long hours = minutes / 60;
-                long days = hours / 24;
-
-                if (days > 0) {
-                    return days + (days == 1 ? " day ago" : " days ago");
-                } else if (hours > 0) {
-                    return hours + (hours == 1 ? " hour ago" : " hours ago");
-                } else if (minutes > 0) {
-                    return minutes + (minutes == 1 ? " minute ago" : " minutes ago");
-                } else {
-                    return "Just now";
-                }
-            }
-        } catch (Exception e) {
-            return createdAt;
-        }
-
-        return "";
-    }
-
-    public boolean isAvailable() {
-        return "AVAILABLE".equalsIgnoreCase(status);
-    }
-
-    public boolean isSold() {
-        return "SOLD".equalsIgnoreCase(status);
-    }
-
-    public boolean isPaused() {
-        return "PAUSED".equalsIgnoreCase(status);
-    }
-
-    public boolean hasLocation() {
-        return latitude != 0.0 && longitude != 0.0;
-    }
-
-    public boolean hasImages() {
-        return imageUrls != null && !imageUrls.isEmpty();
-    }
-
-    public boolean hasTags() {
-        return tags != null && !tags.isEmpty();
-    }
-
-    public String getTagsString() {
-        if (tags == null || tags.isEmpty()) return "";
-        return String.join(", ", tags);
-    }
-
+    // =============================================
+    // PARCELABLE IMPLEMENTATION
+    // =============================================
     @Override
     public int describeContents() {
         return 0;
@@ -516,10 +537,10 @@ public class Product implements Parcelable {
         }
         dest.writeString(title);
         dest.writeString(description);
-        dest.writeDouble(price);
-        dest.writeString(condition);
+        dest.writeString(price != null ? price.toString() : null);
+        dest.writeString(condition != null ? condition.name() : null);
         dest.writeString(location);
-        dest.writeString(status);
+        dest.writeString(status != null ? status.name() : null);
         dest.writeByte((byte) (isNegotiable ? 1 : 0));
         dest.writeStringList(imageUrls);
         dest.writeStringList(tags);
@@ -529,21 +550,25 @@ public class Product implements Parcelable {
         dest.writeDouble(longitude);
         dest.writeString(createdAt);
         dest.writeString(updatedAt);
+
         if (sellerId == null) {
             dest.writeByte((byte) 0);
         } else {
             dest.writeByte((byte) 1);
             dest.writeLong(sellerId);
         }
+
         dest.writeString(sellerName);
         dest.writeString(sellerAvatar);
         dest.writeDouble(sellerRating);
+
         if (categoryId == null) {
             dest.writeByte((byte) 0);
         } else {
             dest.writeByte((byte) 1);
             dest.writeLong(categoryId);
         }
+
         dest.writeString(categoryName);
         dest.writeByte((byte) (isSaved ? 1 : 0));
         dest.writeByte((byte) (isOwn ? 1 : 0));
@@ -555,9 +580,9 @@ public class Product implements Parcelable {
                 "id=" + id +
                 ", title='" + title + '\'' +
                 ", price=" + price +
-                ", condition='" + condition + '\'' +
+                ", condition=" + condition +
                 ", location='" + location + '\'' +
-                ", status='" + status + '\'' +
+                ", status=" + status +
                 ", isNegotiable=" + isNegotiable +
                 ", viewCount=" + viewCount +
                 ", sellerName='" + sellerName + '\'' +

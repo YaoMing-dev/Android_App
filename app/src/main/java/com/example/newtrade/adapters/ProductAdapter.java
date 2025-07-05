@@ -14,6 +14,7 @@ import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.PriceFormatter;
 
 import java.util.List;
 
@@ -22,9 +23,18 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
     private List<Product> products;
     private OnProductClickListener listener;
 
+    // ✅ SỬA INTERFACE - chỉ có 1 abstract method để có thể dùng lambda
     public interface OnProductClickListener {
         void onProductClick(Product product);
-        void onProductSave(Product product);
+
+        // ✅ THÊM default methods để không bắt buộc implement
+        default void onProductSave(Product product) {
+            // Default implementation - do nothing
+        }
+
+        default void onProductLongClick(Product product) {
+            // Default implementation - do nothing
+        }
     }
 
     public ProductAdapter(List<Product> products, OnProductClickListener listener) {
@@ -51,122 +61,80 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
     }
 
     static class ProductViewHolder extends RecyclerView.ViewHolder {
-        private ImageView ivProductImage;
-        private ImageView ivSaveProduct;
-        private TextView tvCondition;
-        private TextView tvDistance;
-        private TextView tvProductTitle;
-        private TextView tvProductPrice;
-        private TextView tvOriginalPrice;
-        private TextView tvProductLocation;
-        private TextView tvTimePosted;
-        private ImageView ivSellerAvatar;
-        private TextView tvSellerName;
-        private TextView tvSellerRating;
+        private ImageView ivProductImage, ivSaveIcon;
+        private TextView tvTitle, tvPrice, tvLocation, tvCondition;
 
         public ProductViewHolder(@NonNull View itemView) {
             super(itemView);
+
             ivProductImage = itemView.findViewById(R.id.iv_product_image);
-            ivSaveProduct = itemView.findViewById(R.id.iv_save_product);
+            ivSaveIcon = itemView.findViewById(R.id.iv_save_icon);
+            tvTitle = itemView.findViewById(R.id.tv_title);
+            tvPrice = itemView.findViewById(R.id.tv_price);
+            tvLocation = itemView.findViewById(R.id.tv_location);
             tvCondition = itemView.findViewById(R.id.tv_condition);
-            tvDistance = itemView.findViewById(R.id.tv_distance);
-            tvProductTitle = itemView.findViewById(R.id.tv_product_title);
-            tvProductPrice = itemView.findViewById(R.id.tv_product_price);
-            tvOriginalPrice = itemView.findViewById(R.id.tv_original_price);
-            tvProductLocation = itemView.findViewById(R.id.tv_product_location);
-            tvTimePosted = itemView.findViewById(R.id.tv_time_posted);
-            ivSellerAvatar = itemView.findViewById(R.id.iv_seller_avatar);
-            tvSellerName = itemView.findViewById(R.id.tv_seller_name);
-            tvSellerRating = itemView.findViewById(R.id.tv_seller_rating);
         }
 
         public void bind(Product product, OnProductClickListener listener) {
-            // Product title
-            tvProductTitle.setText(product.getTitle());
-
-            // Product price
-            tvProductPrice.setText(product.getFormattedPrice());
-
-            // Product location
-            tvProductLocation.setText(product.getLocation());
-
-            // Time posted
-            tvTimePosted.setText(product.getTimeAgo());
-
-            // Condition
-            tvCondition.setText(product.getConditionDisplay());
-
-            // Seller name
-            if (product.getSellerName() != null) {
-                tvSellerName.setText(product.getSellerName());
+            // Set title
+            if (tvTitle != null) {
+                tvTitle.setText(product.getTitle());
             }
 
-            // Seller rating
-            if (product.getSellerRating() > 0) {
-                tvSellerRating.setText(String.format("%.1f ★", product.getSellerRating()));
-                tvSellerRating.setVisibility(View.VISIBLE);
-            } else {
-                tvSellerRating.setVisibility(View.GONE);
+            // Set price
+            if (tvPrice != null) {
+                tvPrice.setText(PriceFormatter.format(product.getPrice()));
             }
 
-            // Product image
-            String imageUrl = product.getMainImageUrl();
-            if (imageUrl != null) {
-                Glide.with(itemView.getContext())
-                        .load(Constants.getImageUrl(imageUrl))
-                        .placeholder(R.drawable.ic_placeholder_image)
-                        .error(R.drawable.ic_placeholder_image)
-                        .centerCrop()
-                        .into(ivProductImage);
-            } else {
-                ivProductImage.setImageResource(R.drawable.ic_placeholder_image);
+            // Set location
+            if (tvLocation != null) {
+                tvLocation.setText(product.getLocation());
             }
 
-            // Seller avatar
-            if (product.getSellerAvatar() != null) {
-                Glide.with(itemView.getContext())
-                        .load(Constants.getImageUrl(product.getSellerAvatar()))
-                        .placeholder(R.drawable.ic_placeholder_avatar)
-                        .error(R.drawable.ic_placeholder_avatar)
-                        .circleCrop()
-                        .into(ivSellerAvatar);
-            } else {
-                ivSellerAvatar.setImageResource(R.drawable.ic_placeholder_avatar);
+            // Set condition
+            if (tvCondition != null && product.getCondition() != null) {
+                tvCondition.setText(product.getCondition().name());
             }
 
-            // Save button
-            updateSaveButton(product.isSaved());
-            ivSaveProduct.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onProductSave(product);
+            // Load image
+            if (ivProductImage != null) {
+                String imageUrl = product.getPrimaryImageUrl();
+                if (imageUrl != null && !imageUrl.isEmpty()) {
+                    Glide.with(itemView.getContext())
+                            .load(Constants.BASE_URL + imageUrl)
+                            .placeholder(R.drawable.ic_placeholder)
+                            .error(R.drawable.ic_placeholder)
+                            .into(ivProductImage);
+                } else {
+                    ivProductImage.setImageResource(R.drawable.ic_placeholder);
                 }
-            });
-
-            // Show/hide distance (placeholder implementation)
-            if (product.hasLocation()) {
-                tvDistance.setText("2.5 km"); // Placeholder distance
-                tvDistance.setVisibility(View.VISIBLE);
-            } else {
-                tvDistance.setVisibility(View.GONE);
             }
 
-            // Hide original price if no discount
-            tvOriginalPrice.setVisibility(View.GONE);
+            // Set save icon
+            if (ivSaveIcon != null) {
+                ivSaveIcon.setImageResource(product.isSaved() ?
+                        R.drawable.ic_bookmark_filled : R.drawable.ic_bookmark_outlined);
 
-            // Product click listener
+                ivSaveIcon.setOnClickListener(v -> {
+                    if (listener != null) {
+                        listener.onProductSave(product);
+                    }
+                });
+            }
+
+            // Set click listeners
             itemView.setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onProductClick(product);
                 }
             });
-        }
 
-        private void updateSaveButton(boolean isSaved) {
-            if (isSaved) {
-                ivSaveProduct.setImageResource(R.drawable.ic_bookmark_filled);
-            } else {
-                ivSaveProduct.setImageResource(R.drawable.ic_bookmark_border);
-            }
+            itemView.setOnLongClickListener(v -> {
+                if (listener != null) {
+                    listener.onProductLongClick(product);
+                }
+                return true;
+            });
         }
     }
 }

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Add Product Form -->
+    <item name="til_title" type="id" />
+    <item name="til_description" type="id" />
+    <item name="til_price" type="id" />
+    <item name="til_location" type="id" />
+    <item name="til_tags" type="id" />
+    <item name="rv_selected_images" type="id" />
+
+    <!-- Edit Product -->
+    <item name="btn_update_product" type="id" />
+
+    <!-- Product Detail -->
+    <item name="vp_product_images" type="id" />
+    <item name="tl_image_indicator" type="id" />
+    <item name="tv_view_count" type="id" />
+    <item name="layout_seller_info" type="id" />
+
+    <!-- Review -->
+    <item name="tv_review_title" type="id" />
+    <item name="tv_reviewee_info" type="id" />
+    <item name="tv_rating_label" type="id" />
+    <item name="rb_rating" type="id" />
+    <item name="til_review_comment" type="id" />
+    <item name="et_review_comment" type="id" />
+    <item name="btn_submit_review" type="id" />
+    <item name="rv_reviews" type="id" />
+
+
+    <!-- Search Fragment -->
+    <item name="rv_recent_searches" type="id" />
+
+    <!-- Product Detail -->
+    <item name="iv_seller_avatar" type="id" />
+
+    <!-- Navigation Actions -->
+    <item name="action_home_to_addProduct" type="id" />
+    <item name="action_addProduct_to_home" type="id" />
+</resources>

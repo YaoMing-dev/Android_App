@@ -216,7 +216,7 @@ public class EditProductActivity extends AppCompatActivity {
         updateData.put("condition", spCondition.getSelectedItem().toString());
 
         Call<StandardResponse<Map<String, Object>>> call =
-                ApiClient.getProductService().updateProduct(productId, updateData);
+                ApiClient.getProductService().updateProduct(prefsManager.getUserId(), productId, updateData);
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override

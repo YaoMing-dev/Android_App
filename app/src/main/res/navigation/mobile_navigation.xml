@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/mobile_navigation">
+
+    <fragment
+        android:id="@+id/nav_home"
+        android:name="com.example.newtrade.ui.home.HomeFragment"
+        android:label="Home">
+
+        <!-- ✅ THÊM ACTION -->
+        <action
+            android:id="@+id/action_home_to_addProduct"
+            app:destination="@id/nav_add_product" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_add_product"
+        android:name="com.example.newtrade.ui.product.AddProductFragment"
+        android:label="Add Product">
+
+        <!-- ✅ THÊM ACTION -->
+        <action
+            android:id="@+id/action_addProduct_to_home"
+            app:destination="@id/nav_home" />
+    </fragment>
+
+    <!-- Other fragments... -->
+</navigation>

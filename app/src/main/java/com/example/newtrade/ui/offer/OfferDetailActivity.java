@@ -13,7 +13,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.utils.Constants;
+import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 
 import java.util.Map;
@@ -33,11 +33,15 @@ public class OfferDetailActivity extends AppCompatActivity {
 
     // Data
     private Long offerId;
+    private SharedPrefsManager prefsManager; // ✅ THÊM
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_offer_detail);
+
+        // ✅ KHỞI TẠO SharedPrefsManager
+        prefsManager = SharedPrefsManager.getInstance(this);
 
         offerId = getIntent().getLongExtra("offer_id", -1L);
         if (offerId == -1L) {
@@ -79,23 +83,77 @@ public class OfferDetailActivity extends AppCompatActivity {
     }
 
     private void loadOfferDetails() {
+        Long userId = prefsManager.getUserId();
+        if (userId == null) {
+            Toast.makeText(this, "Please log in first", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        // ✅ SỬA METHOD CALL - thêm userId parameter
         Call<StandardResponse<Map<String, Object>>> call =
-                ApiClient.getOfferService().getOfferById(offerId);
+                ApiClient.getOfferService().getOfferById(userId, offerId);
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                    Response<StandardResponse<Map<String, Object>>> response) {
                 if (response.isSuccessful() && response.body() != null) {
-                    // Handle offer details
+                    StandardResponse<Map<String, Object>> apiResponse = response.body();
+
+                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                        displayOfferDetails(apiResponse.getData());
+                    } else {
+                        Log.e(TAG, "Offer API Error: " + apiResponse.getMessage());
+                        showError("Failed to load offer details");
+                    }
+                } else {
+                    Log.e(TAG, "Offer response unsuccessful: " + response.code());
+                    showError("Failed to load offer details");
                 }
             }
 
             @Override
             public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                 Log.e(TAG, "Failed to load offer details", t);
+                showError("Network error. Please try again.");
             }
         });
+    }
+
+    private void displayOfferDetails(Map<String, Object> offerData) {
+        try {
+            // Display offer amount
+            Object amountObj = offerData.get("offerAmount");
+            if (amountObj != null && tvOfferAmount != null) {
+                tvOfferAmount.setText("$" + amountObj.toString());
+            }
+
+            // Display offer status
+            String status = (String) offerData.get("status");
+            if (status != null && tvOfferStatus != null) {
+                tvOfferStatus.setText(status);
+            }
+
+            // Display offer message
+            String message = (String) offerData.get("message");
+            if (message != null && tvOfferMessage != null) {
+                tvOfferMessage.setText(message);
+            }
+
+            // Display product title
+            Map<String, Object> productData = (Map<String, Object>) offerData.get("product");
+            if (productData != null) {
+                String productTitle = (String) productData.get("title");
+                if (productTitle != null && tvProductTitle != null) {
+                    tvProductTitle.setText(productTitle);
+                }
+            }
+
+            Log.d(TAG, "✅ Offer details displayed");
+        } catch (Exception e) {
+            Log.e(TAG, "Error displaying offer details", e);
+        }
     }
 
     private void acceptOffer() {
@@ -110,6 +168,10 @@ public class OfferDetailActivity extends AppCompatActivity {
 
     private void counterOffer() {
         Toast.makeText(this, "Counter offer feature coming soon", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
     @Override

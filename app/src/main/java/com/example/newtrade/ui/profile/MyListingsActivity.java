@@ -63,10 +63,9 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
 
         prefsManager = SharedPrefsManager.getInstance(this);
 
-        // Load user's products
-        loadMyProducts();
+        loadMyListings();
 
-        Log.d(TAG, "MyListingsActivity created");
+        Log.d(TAG, "✅ MyListingsActivity created");
     }
 
     private void initViews() {
@@ -87,174 +86,157 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
 
     private void setupRecyclerView() {
         productAdapter = new ProductAdapter(myProducts, this);
-
         rvMyListings.setLayoutManager(new LinearLayoutManager(this));
         rvMyListings.setAdapter(productAdapter);
-        rvMyListings.setHasFixedSize(true);
     }
 
     private void setupListeners() {
-        // Swipe to refresh
-        swipeRefresh.setOnRefreshListener(this::loadMyProducts);
+        swipeRefresh.setOnRefreshListener(this::loadMyListings);
 
-        // Add new product
-        fabAddProduct.setOnClickListener(v -> openAddProduct());
+        if (fabAddProduct != null) {
+            fabAddProduct.setOnClickListener(v -> {
+                Intent intent = new Intent(this, AddProductActivity.class);
+                startActivity(intent);
+            });
+        }
     }
 
-    private void loadMyProducts() {
+    private void loadMyListings() {
         if (swipeRefresh != null) {
             swipeRefresh.setRefreshing(true);
         }
 
         Long userId = prefsManager.getUserId();
-        if (userId == null || userId <= 0) {
-            Log.w(TAG, "User not logged in, loading mock data");
-            loadMockProducts();
+        if (userId == null) {
+            Log.e(TAG, "User ID is null");
+            showMockData();
             return;
         }
 
-        Log.d(TAG, "Loading products for user: " + userId);
-
         ProductService productService = ApiClient.getProductService();
-        Call<StandardResponse<List<Map<String, Object>>>> call = productService.getProductsByUser(userId);
+        Call<StandardResponse<List<Map<String, Object>>>> call = productService.getProductsByUser(userId, 0, 20);
 
         call.enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
                                    @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
-
-                if (swipeRefresh != null) {
-                    swipeRefresh.setRefreshing(false);
-                }
-
                 if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<List<Map<String, Object>>> standardResponse = response.body();
+                    StandardResponse<List<Map<String, Object>>> apiResponse = response.body();
 
-                    if (standardResponse.isSuccess()) {
-                        List<Map<String, Object>> productDataList = standardResponse.getData();
-                        if (productDataList != null) {
-                            parseAndDisplayProducts(productDataList);
-                            Log.d(TAG, "✅ Loaded " + productDataList.size() + " user products");
-                        } else {
-                            Log.w(TAG, "Product data list is null");
-                            loadMockProducts();
+                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                        myProducts.clear();
+
+                        for (Map<String, Object> productData : apiResponse.getData()) {
+                            Product product = parseProductFromMap(productData);
+                            myProducts.add(product);
                         }
+
+                        updateUI();
+                        Log.d(TAG, "✅ Loaded " + myProducts.size() + " products");
                     } else {
-                        Log.w(TAG, "❌ Failed to load user products: " + standardResponse.getMessage());
-                        showError("Failed to load your products");
-                        loadMockProducts();
+                        Log.e(TAG, "API Error: " + apiResponse.getMessage());
+                        showMockData();
                     }
                 } else {
-                    Log.w(TAG, "❌ User products API response not successful: " + response.code());
-                    showError("Failed to load your products");
-                    loadMockProducts();
+                    Log.e(TAG, "Response unsuccessful: " + response.code());
+                    showMockData();
                 }
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
-                if (swipeRefresh != null) {
-                    swipeRefresh.setRefreshing(false);
-                }
-                Log.e(TAG, "❌ User products API call failed", t);
-                showError("Network error while loading your products");
-                loadMockProducts();
+            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
+                                  @NonNull Throwable t) {
+                Log.e(TAG, "API call failed", t);
+                showMockData();
             }
         });
     }
 
-    private void parseAndDisplayProducts(@NonNull List<Map<String, Object>> productDataList) {
-        myProducts.clear();
+    // ✅ SỬA PHƯƠNG THỨC PARSE PRODUCT
+    private Product parseProductFromMap(Map<String, Object> productData) {
+        Product product = new Product();
 
-        for (Map<String, Object> productData : productDataList) {
-            try {
-                Product product = new Product();
-
-                // Basic info
-                Object idObj = productData.get("id");
-                if (idObj instanceof Number) {
-                    product.setId(((Number) idObj).longValue());
-                }
-
-                product.setTitle((String) productData.get("title"));
-                product.setDescription((String) productData.get("description"));
-                product.setLocation((String) productData.get("location"));
-
-                // Price
-                Object priceObj = productData.get("price");
-                if (priceObj instanceof Number) {
-                    product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
-                }
-
-                // Condition - Fix enum conversion
-                String conditionStr = (String) productData.get("condition");
-                if (conditionStr != null) {
-                    try {
-                        Product.ProductCondition condition = Product.ProductCondition.valueOf(conditionStr);
-                        product.setCondition(condition);
-                    } catch (IllegalArgumentException e) {
-                        Log.w(TAG, "Unknown condition: " + conditionStr + ", using GOOD as default");
-                        product.setCondition(Product.ProductCondition.GOOD);
-                    }
-                }
-
-                // Status
-                String statusStr = (String) productData.get("status");
-                if (statusStr != null) {
-                    try {
-                        Product.ProductStatus status = Product.ProductStatus.valueOf(statusStr);
-                        product.setStatus(status);
-                    } catch (IllegalArgumentException e) {
-                        Log.w(TAG, "Unknown status: " + statusStr + ", using AVAILABLE as default");
-                        product.setStatus(Product.ProductStatus.AVAILABLE);
-                    }
-                }
-
-                // Image URLs
-                Object imageUrlsObj = productData.get("imageUrls");
-                if (imageUrlsObj instanceof List) {
-                    @SuppressWarnings("unchecked")
-                    List<String> imageUrls = (List<String>) imageUrlsObj;
-                    product.setImageUrls(imageUrls);
-                } else if (imageUrlsObj instanceof String) {
-                    List<String> imageUrls = new ArrayList<>();
-                    imageUrls.add((String) imageUrlsObj);
-                    product.setImageUrls(imageUrls);
-                }
-
-                // Additional fields
-                Object viewCountObj = productData.get("viewCount");
-                if (viewCountObj instanceof Number) {
-                    product.setViewCount(((Number) viewCountObj).intValue());
-                }
-
-                product.setCreatedAt((String) productData.get("createdAt"));
-                product.setCategoryName((String) productData.get("categoryName"));
-
-                myProducts.add(product);
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error parsing product data", e);
+        try {
+            // Basic info
+            Object idObj = productData.get("id");
+            if (idObj instanceof Number) {
+                product.setId(((Number) idObj).longValue());
             }
+
+            product.setTitle((String) productData.get("title"));
+            product.setDescription((String) productData.get("description"));
+            product.setLocation((String) productData.get("location"));
+
+            // ✅ SỬA PRICE - sử dụng BigDecimal
+            Object priceObj = productData.get("price");
+            if (priceObj instanceof Number) {
+                product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
+            }
+
+            // ✅ SỬA CONDITION - sử dụng enum
+            String conditionStr = (String) productData.get("condition");
+            if (conditionStr != null) {
+                try {
+                    product.setCondition(Product.ProductCondition.valueOf(conditionStr.toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Unknown condition: " + conditionStr + ", using GOOD as default");
+                    product.setCondition(Product.ProductCondition.GOOD);
+                }
+            }
+
+            // ✅ SỬA STATUS - sử dụng enum
+            String statusStr = (String) productData.get("status");
+            if (statusStr != null) {
+                try {
+                    product.setStatus(Product.ProductStatus.valueOf(statusStr.toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Unknown status: " + statusStr + ", using AVAILABLE as default");
+                    product.setStatus(Product.ProductStatus.AVAILABLE);
+                }
+            }
+
+            // Image URLs
+            Object imageUrlsObj = productData.get("imageUrls");
+            if (imageUrlsObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<String> imageUrls = (List<String>) imageUrlsObj;
+                product.setImageUrls(imageUrls);
+            }
+
+            // View count
+            Object viewCountObj = productData.get("viewCount");
+            if (viewCountObj instanceof Number) {
+                product.setViewCount(((Number) viewCountObj).intValue());
+            }
+
+            // Category
+            Object categoryObj = productData.get("category");
+            if (categoryObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> categoryData = (Map<String, Object>) categoryObj;
+                product.setCategoryName((String) categoryData.get("name"));
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing product data", e);
         }
 
-        updateUI();
+        return product;
     }
 
-    private void loadMockProducts() {
-        Log.d(TAG, "Loading mock products for testing");
+    private void showMockData() {
         myProducts.clear();
 
         // Mock listing 1
         Product product1 = new Product();
         product1.setId(1L);
-        product1.setTitle("iPhone 14 Pro Max");
-        product1.setDescription("iPhone 14 Pro Max 256GB Deep Purple - excellent condition, barely used");
+        product1.setTitle("iPhone 14 Pro");
+        product1.setDescription("iPhone 14 Pro 256GB Deep Purple - Excellent condition");
         product1.setPrice(new BigDecimal("18500000"));
         product1.setCondition(Product.ProductCondition.LIKE_NEW);
         product1.setLocation("Ho Chi Minh City");
         product1.setStatus(Product.ProductStatus.AVAILABLE);
-        product1.setViewCount(45);
+        product1.setViewCount(156);
         product1.setCategoryName("Electronics");
 
         List<String> images1 = new ArrayList<>();
@@ -266,8 +248,8 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
         // Mock listing 2
         Product product2 = new Product();
         product2.setId(2L);
-        product2.setTitle("MacBook Air M1");
-        product2.setDescription("MacBook Air M1 2020, 8GB/256GB - well maintained, comes with original box");
+        product2.setTitle("MacBook Pro M2");
+        product2.setDescription("MacBook Pro M2 13-inch 512GB - Like new with original box");
         product2.setPrice(new BigDecimal("22000000"));
         product2.setCondition(Product.ProductCondition.GOOD);
         product2.setLocation("Ho Chi Minh City");
@@ -329,44 +311,34 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
         openProductDetail(product);
     }
 
+    // ✅ IMPLEMENT onProductSave method
     @Override
-    public void onProductLongClick(Product product) {
-        // TODO: Show context menu for edit/delete/etc.
-        Log.d(TAG, "Long clicked on product: " + product.getTitle());
-        // Could show AlertDialog with options here
+    public void onProductSave(Product product) {
+        // Toggle save state
+        product.setSaved(!product.isSaved());
+        productAdapter.notifyDataSetChanged();
+
+        // TODO: Call API to save/unsave product
+        Log.d(TAG, "Product save toggled: " + product.getTitle());
     }
 
     private void openProductDetail(Product product) {
         Intent intent = new Intent(this, ProductDetailActivity.class);
         intent.putExtra("product_id", product.getId());
         intent.putExtra("product_title", product.getTitle());
+
+        // ✅ SỬA LỖI PRICE - sử dụng BigDecimal
         if (product.getPrice() != null) {
             intent.putExtra("product_price", product.getPrice().toString());
         }
+
         startActivity(intent);
     }
 
-    private void openAddProduct() {
-        Intent intent = new Intent(this, AddProductActivity.class);
-        startActivity(intent);
-    }
-
-    private void showError(String message) {
-        Log.e(TAG, "Error: " + message);
-        // Could use Snackbar here for better UX
-    }
-
     @Override
-    protected void onResume() {
-        super.onResume();
-        // Refresh products when returning to this activity
-        loadMyProducts();
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            getOnBackPressedDispatcher().onBackPressed();
+            onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);

@@ -2,6 +2,7 @@
 package com.example.newtrade.api;
 
 import com.example.newtrade.models.StandardResponse;
+import java.util.List;
 import java.util.Map;
 import okhttp3.MultipartBody;
 import retrofit2.Call;
@@ -44,7 +45,15 @@ public interface ProductService {
             @Query("sort") String sort);
 
     @GET("/api/products/{productId}")
+    Call<StandardResponse<Map<String, Object>>> getProductById(@Path("productId") Long productId);
+
+    // ✅ THÊM getProduct method để tương thích
+    @GET("/api/products/{productId}")
     Call<StandardResponse<Map<String, Object>>> getProduct(@Path("productId") Long productId);
+
+    // ✅ THÊM getCategories method
+    @GET("/api/categories")
+    Call<StandardResponse<List<Map<String, Object>>>> getCategories();
 
     @POST("/api/products")
     Call<StandardResponse<Map<String, Object>>> createProduct(
@@ -69,46 +78,47 @@ public interface ProductService {
             @Query("status") String status);
 
     @GET("/api/products/user/{userId}")
-    Call<StandardResponse<Map<String, Object>>> getUserProducts(
+    Call<StandardResponse<List<Map<String, Object>>>> getProductsByUser(
             @Path("userId") Long userId,
             @Query("page") int page,
             @Query("size") int size);
 
-    @GET("/api/products/my-listings")
-    Call<StandardResponse<Map<String, Object>>> getMyListings(
+    @GET("/api/products/my")
+    Call<StandardResponse<Map<String, Object>>> getMyProducts(
             @Header("User-ID") Long userId,
             @Query("page") int page,
             @Query("size") int size);
 
-    @GET("/api/products/categories")
-    Call<StandardResponse<Map<String, Object>>> getCategories();
-
-    @GET("/api/products/featured")
-    Call<StandardResponse<Map<String, Object>>> getFeaturedProducts(
-            @Query("page") int page,
-            @Query("size") int size);
-
-    @GET("/api/products/nearby")
-    Call<StandardResponse<Map<String, Object>>> getNearbyProducts(
-            @Query("latitude") double latitude,
-            @Query("longitude") double longitude,
-            @Query("radius") double radius,
-            @Query("page") int page,
-            @Query("size") int size);
+    @GET("/api/products/{productId}/offers")
+    Call<StandardResponse<Map<String, Object>>> getProductOffers(
+            @Header("User-ID") Long userId,
+            @Path("productId") Long productId);
 
     @POST("/api/products/{productId}/view")
     Call<StandardResponse<Map<String, Object>>> recordProductView(
             @Header("User-ID") Long userId,
             @Path("productId") Long productId);
 
-    @Multipart
-    @POST("/api/files/upload/product")
-    Call<StandardResponse<Map<String, Object>>> uploadProductImage(
-            @Header("User-ID") Long userId,
-            @Part MultipartBody.Part file);
-
-    @GET("/api/products/{productId}/stats")
-    Call<StandardResponse<Map<String, Object>>> getProductStats(
+    @POST("/api/products/{productId}/save")
+    Call<StandardResponse<Map<String, Object>>> saveProduct(
             @Header("User-ID") Long userId,
             @Path("productId") Long productId);
+
+    @DELETE("/api/products/{productId}/save")
+    Call<StandardResponse<Map<String, Object>>> unsaveProduct(
+            @Header("User-ID") Long userId,
+            @Path("productId") Long productId);
+
+    @Multipart
+    @POST("/api/products/{productId}/images")
+    Call<StandardResponse<Map<String, Object>>> uploadProductImages(
+            @Header("User-ID") Long userId,
+            @Path("productId") Long productId,
+            @Part List<MultipartBody.Part> images);
+
+    @DELETE("/api/products/{productId}/images/{imageId}")
+    Call<StandardResponse<Map<String, Object>>> deleteProductImage(
+            @Header("User-ID") Long userId,
+            @Path("productId") Long productId,
+            @Path("imageId") Long imageId);
 }

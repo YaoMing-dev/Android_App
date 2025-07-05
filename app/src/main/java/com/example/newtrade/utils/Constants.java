@@ -1,6 +1,9 @@
 // app/src/main/java/com/example/newtrade/utils/Constants.java
 package com.example.newtrade.utils;
 
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+
 public class Constants {
 
     // =============================================
@@ -271,8 +274,78 @@ public class Constants {
         return String.format("₫%.0f", price);
     }
 
+    public static String formatPrice(java.math.BigDecimal price) {
+        if (price == null || price.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            return "Free";
+        }
+
+        java.text.DecimalFormat formatter = new java.text.DecimalFormat("#,###");
+        return formatter.format(price) + " ₫";
+    }
+
+    // Compatibility method for double
+
+
     // Private constructor to prevent instantiation
     private Constants() {
         throw new UnsupportedOperationException("Cannot instantiate utility class");
     }
+
+
+
+
+
+    // =============================================
+    // INTENT EXTRAS
+    // =============================================
+
+    // =============================================
+    // REQUEST CODES
+    // =============================================
+
+
+    // =============================================
+    // PRODUCT CATEGORIES - ✅ THÊM ARRAY BỊ THIẾU
+    // =============================================
+    public static final String[] PRODUCT_CATEGORIES = {
+            "Electronics",
+            "Clothing & Fashion",
+            "Home & Garden",
+            "Sports & Outdoors",
+            "Books & Education",
+            "Health & Beauty",
+            "Automotive",
+            "Toys & Games",
+            "Music & Instruments",
+            "Art & Crafts",
+            "Baby & Kids",
+            "Food & Beverages",
+            "Services",
+            "Other"
+    };
+
+    // =============================================
+    // PRODUCT CONDITIONS
+    // =============================================
+    public static final String[] PRODUCT_CONDITIONS = {
+            "NEW",
+            "LIKE_NEW",
+            "GOOD",
+            "FAIR",
+            "POOR"
+    };
+
+    // =============================================
+    // ERROR MESSAGES
+    // =============================================
+
+    // =============================================
+    // SUCCESS MESSAGES
+    // =============================================
+
+
+    // =============================================
+    // UTILITY METHODS
+    // =============================================
+
 }

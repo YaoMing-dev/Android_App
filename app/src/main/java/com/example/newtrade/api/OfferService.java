@@ -49,6 +49,13 @@ public interface OfferService {
             @Header("User-ID") Long userId,
             @Path("id") Long offerId);
 
+    // ✅ SỬA getOfferById method để có User-ID header
+    @GET("/api/offers/{id}")
+    Call<StandardResponse<Map<String, Object>>> getOfferById(
+            @Header("User-ID") Long userId,
+            @Path("id") Long offerId);
+
+    // Compatibility method
     @GET("/api/offers/{id}")
     Call<StandardResponse<Map<String, Object>>> getOffer(
             @Header("User-ID") Long userId,

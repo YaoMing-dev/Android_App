@@ -12,6 +12,8 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+// Thêm vào ProductDetailActivity.java
+import androidx.annotation.Nullable;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;

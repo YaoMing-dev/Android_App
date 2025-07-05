@@ -24,6 +24,7 @@ public class ApiClient {
 
     // Service instances
     private static AuthService authService;
+    private static ApiService apiService; // ✅ THÊM ApiService
     private static UserService userService;
     private static ProductService productService;
     private static ChatService chatService;
@@ -85,7 +86,13 @@ public class ApiClient {
         return authService;
     }
 
-
+    // ✅ THÊM getApiService() để sửa lỗi compilation
+    public static ApiService getApiService() {
+        if (apiService == null) {
+            apiService = getRetrofit().create(ApiService.class);
+        }
+        return apiService;
+    }
 
     public static UserService getUserService() {
         if (userService == null) {
