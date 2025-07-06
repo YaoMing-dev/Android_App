@@ -183,20 +183,23 @@ public class RegisterActivity extends AppCompatActivity {
         request.put("email", email);
         request.put("password", password);
 
-        ApiClient.getAuthService().register(request).enqueue(new Callback<StandardResponse<User>>() {
+        // ✅ SỬA: Đổi từ StandardResponse<User> thành StandardResponse<Map<String, Object>>
+        ApiClient.getAuthService().register(request).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(@NonNull Call<StandardResponse<User>> call,
-                                   @NonNull Response<StandardResponse<User>> response) {
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
                 showLoading(false);
 
                 Log.d(TAG, "🔍 Register response code: " + response.code());
 
                 if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<User> apiResponse = response.body();
+                    StandardResponse<Map<String, Object>> apiResponse = response.body();
                     Log.d(TAG, "🔍 Register response: " + new Gson().toJson(apiResponse));
 
                     if (apiResponse.isSuccess() && apiResponse.hasData()) {
-                        handleRegisterSuccess(apiResponse.getData(), email);
+                        // ✅ SỬA: Parse user từ response data
+                        Map<String, Object> responseData = apiResponse.getData();
+                        handleRegisterSuccess(responseData, email);
                     } else {
                         showError(apiResponse.getMessage() != null ?
                                 apiResponse.getMessage() : "Đăng ký thất bại");
@@ -224,7 +227,7 @@ public class RegisterActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<User>> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 showLoading(false);
                 Log.e(TAG, "❌ Register network error", t);
 
@@ -239,20 +242,52 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
-    // ===== CHỈ SỬA METHOD NÀY =====
-    private void handleRegisterSuccess(User user, String email) {
-        Log.d(TAG, "✅ Registration successful for user: " + user.getDisplayName());
+    // ✅ SỬA: Đổi parameter từ User thành Map<String, Object>
+    private void handleRegisterSuccess(Map<String, Object> responseData, String email) {
+        Log.d(TAG, "✅ Registration successful");
 
-        // Save user session immediately - KHÔNG CẦN EMAIL VERIFICATION cho register
-        prefsManager.saveUserSession(user.getId(), user.getEmail(), user.getDisplayName(), true);
+        try {
+            // ✅ Parse user object từ response
+            Object userObj = responseData.get("user");
+            if (userObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> userMap = (Map<String, Object>) userObj;
 
-        Toast.makeText(this, "Đăng ký thành công! Chào mừng " + user.getDisplayName(), Toast.LENGTH_LONG).show();
+                // Extract user info
+                Object idObj = userMap.get("id");
+                String userEmail = (String) userMap.get("email");
+                String displayName = (String) userMap.get("displayName");
 
-        // Navigate directly to MainActivity - KHÔNG QUA OTP
-        navigateToMain();
+                Long userId = null;
+                if (idObj instanceof Number) {
+                    userId = ((Number) idObj).longValue();
+                }
+
+                if (userId != null && userEmail != null && displayName != null) {
+                    // ✅ Save user session
+                    prefsManager.saveUserSession(userId, userEmail, displayName, true);
+
+                    Toast.makeText(this, "Đăng ký thành công! Chào mừng " + displayName, Toast.LENGTH_LONG).show();
+
+                    // ✅ Navigate directly to MainActivity - KHÔNG CẦN OTP
+                    navigateToMain();
+                } else {
+                    Log.e(TAG, "❌ Invalid user data in response");
+                    showError("Đăng ký thành công nhưng không thể lưu thông tin. Vui lòng đăng nhập lại.");
+                    navigateToLogin();
+                }
+            } else {
+                Log.e(TAG, "❌ User object not found in response");
+                showError("Đăng ký thành công nhưng không thể lấy thông tin user. Vui lòng đăng nhập lại.");
+                navigateToLogin();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error parsing user data", e);
+            showError("Đăng ký thành công nhưng có lỗi xử lý dữ liệu. Vui lòng đăng nhập lại.");
+            navigateToLogin();
+        }
     }
 
-    // ===== THÊM METHOD MỚI =====
     private void navigateToMain() {
         Intent intent = new Intent(this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -260,7 +295,6 @@ public class RegisterActivity extends AppCompatActivity {
         finish();
     }
 
-    // ===== CÁC METHOD KHÁC GIỮ NGUYÊN =====
     private void navigateToLogin() {
         Intent intent = new Intent(this, LoginActivity.class);
         startActivity(intent);

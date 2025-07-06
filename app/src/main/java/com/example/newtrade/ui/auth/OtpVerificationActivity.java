@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/newtrade/ui/auth/OtpVerificationActivity.java
 package com.example.newtrade.ui.auth;
 
 import android.content.Intent;
@@ -20,7 +21,6 @@ import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.models.User;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.ValidationUtils;
@@ -46,7 +46,7 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
     // Data
     private String email;
-    private boolean fromRegister;
+    private boolean fromRegister; // ✅ TRUE = register, FALSE = forgot password
     private CountDownTimer resendTimer;
     private boolean isLoading = false;
 
@@ -75,13 +75,13 @@ public class OtpVerificationActivity extends AppCompatActivity {
         // Send OTP automatically
         sendOtp();
 
-        Log.d(TAG, "OtpVerificationActivity created for email: " + email);
+        Log.d(TAG, "OtpVerificationActivity created - fromRegister: " + fromRegister + ", email: " + email);
     }
 
     private void getIntentData() {
         Intent intent = getIntent();
         email = intent.getStringExtra("email");
-        fromRegister = intent.getBooleanExtra("fromRegister", false);
+        fromRegister = intent.getBooleanExtra("fromRegister", true); // Default true
 
         if (email == null || email.isEmpty()) {
             Log.e(TAG, "❌ Email not provided in intent");
@@ -169,9 +169,10 @@ public class OtpVerificationActivity extends AppCompatActivity {
     private void updateSubtitle() {
         if (tvSubtitle != null) {
             if (fromRegister) {
-                tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email + "\nđể xác thực tài khoản");
+                tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email + "\nđể xác thực tài khoản của bạn");
             } else {
-                tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email + "\nđể khôi phục mật khẩu");
+                // ✅ FORGOT PASSWORD MESSAGE
+                tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email + "\nđể khôi phục mật khẩu của bạn");
             }
         }
     }
@@ -203,7 +204,6 @@ public class OtpVerificationActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null) {
                     StandardResponse<Map<String, String>> apiResponse = response.body();
                     Log.d(TAG, "✅ OTP sent successfully");
-                    // Don't show success message, just log
                 } else {
                     Log.e(TAG, "❌ Failed to send OTP - Response code: " + response.code());
                     showError("Gửi mã OTP thất bại");
@@ -309,46 +309,21 @@ public class OtpVerificationActivity extends AppCompatActivity {
         Log.d(TAG, "✅ OTP verification successful");
 
         if (fromRegister) {
-            // Register flow (không dùng nữa)
-            Log.w(TAG, "Register không cần OTP nữa");
-            navigateToLogin();
+            // ✅ REGISTER FLOW: OTP verify → MainActivity
+            Toast.makeText(this, "Xác thực email thành công! Chào mừng bạn đến với TradeUp.", Toast.LENGTH_LONG).show();
+            navigateToMain();
         } else {
-            // Forgot password flow - navigate to reset password
-            Toast.makeText(this, "Xác thực OTP thành công! Vui lòng tạo mật khẩu mới.",
-                    Toast.LENGTH_SHORT).show();
+            // ✅ FORGOT PASSWORD FLOW: OTP verify → ResetPasswordActivity
+            Toast.makeText(this, "Xác thực OTP thành công! Vui lòng tạo mật khẩu mới.", Toast.LENGTH_SHORT).show();
             navigateToResetPassword();
         }
     }
+
+    // ✅ NAVIGATE TO RESET PASSWORD (không cần token)
     private void navigateToResetPassword() {
         Intent intent = new Intent(this, ResetPasswordActivity.class);
         intent.putExtra("email", email);
-        intent.putExtra("fromOtpVerification", true); // Flag để biết đến từ OTP
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-    }
-
-    private void navigateToResetPasswordWithEmail() {
-        Intent intent = new Intent(this, ResetPasswordActivity.class);
-        intent.putExtra("email", email);
-        intent.putExtra("resetToken", ""); // Không cần token
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-    }
-
-    private void navigateToResetPassword(String resetToken) {
-        Intent intent = new Intent(this, ResetPasswordActivity.class);
-        intent.putExtra("email", email);
-        if (resetToken != null) {
-            intent.putExtra("resetToken", resetToken);
-        }
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-    }
-    private void navigateToLogin() {
-        Intent intent = new Intent(this, LoginActivity.class);
+        intent.putExtra("fromOtpVerification", true); // ✅ Đánh dấu từ OTP verification
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
@@ -356,6 +331,13 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
     private void navigateToMain() {
         Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void navigateToLogin() {
+        Intent intent = new Intent(this, LoginActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
@@ -425,14 +407,12 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        // If coming from register, go back to login instead of register
         if (fromRegister) {
-            Intent intent = new Intent(this, LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
+            // From register → go back to login
+            navigateToLogin();
         } else {
-            super.onBackPressed();
+            // From forgot password → go back to login
+            navigateToLogin();
         }
     }
 }

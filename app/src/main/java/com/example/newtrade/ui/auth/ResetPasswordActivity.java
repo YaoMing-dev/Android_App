@@ -39,10 +39,9 @@ public class ResetPasswordActivity extends AppCompatActivity {
     private TextView tvLogin;
     private LinearLayout llBack;
 
-    private String resetToken; // THÊM field này
-
     // Data
     private String email;
+    private boolean fromOtpVerification;
     private boolean isLoading = false;
 
     @Override
@@ -50,7 +49,7 @@ public class ResetPasswordActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_reset_password);
 
-        // Get email from intent
+        // Get data from intent
         getIntentData();
 
         initViews();
@@ -63,15 +62,17 @@ public class ResetPasswordActivity extends AppCompatActivity {
     private void getIntentData() {
         Intent intent = getIntent();
         email = intent.getStringExtra("email");
-        boolean fromOtpVerification = intent.getBooleanExtra("fromOtpVerification", false);
+        fromOtpVerification = intent.getBooleanExtra("fromOtpVerification", false);
 
+        // ✅ CHỈ CẦN EMAIL (không cần token nữa vì đã verify OTP)
         if (email == null || email.isEmpty()) {
             Log.e(TAG, "❌ Email not provided in intent");
-            Toast.makeText(this, "Lỗi: Không có email", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Lỗi: Không có thông tin email", Toast.LENGTH_LONG).show();
             finish();
+            return;
         }
 
-        Log.d(TAG, "Reset password for email: " + email + ", fromOtp: " + fromOtpVerification);
+        Log.d(TAG, "Reset password for email: " + email + ", fromOtpVerification: " + fromOtpVerification);
     }
 
     private void initViews() {
@@ -161,38 +162,91 @@ public class ResetPasswordActivity extends AppCompatActivity {
     }
 
     private void performResetPassword(String newPassword) {
-        Log.d(TAG, "🔍 Resetting password for email: " + email);
-
+        Log.d(TAG, "🔍 Performing password reset with email (after OTP verification)");
         showLoading(true);
 
-        // Giả lập thành công vì OTP đã verify
-        simulatePasswordResetSuccess(newPassword);
-    }
-    private void simulatePasswordResetSuccess(String newPassword) {
-        // Simulate network delay
-        new android.os.Handler().postDelayed(() -> {
-            showLoading(false);
+        Map<String, String> request = new HashMap<>();
+        request.put("email", email);
+        request.put("newPassword", newPassword);
 
-            // Show success dialog với mật khẩu mới
-            showPasswordResetSuccessDialog(newPassword);
+        // ✅ GỌI ĐÚNG ENDPOINT: /api/auth/reset-password-with-email
+        ApiClient.getAuthService().resetPasswordWithEmail(request)
+                .enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                           @NonNull Response<StandardResponse<Map<String, String>>> response) {
+                        showLoading(false);
 
-        }, 1500); // 1.5 second delay
+                        Log.d(TAG, "🔍 Reset password with email response code: " + response.code());
+
+                        if (response.isSuccessful() && response.body() != null) {
+                            StandardResponse<Map<String, String>> apiResponse = response.body();
+                            Log.d(TAG, "🔍 Reset password with email response: " + new Gson().toJson(apiResponse));
+
+                            if (apiResponse.isSuccess()) {
+                                Log.d(TAG, "✅ Password reset with email successful");
+                                handleResetPasswordSuccess(newPassword);
+                            } else {
+                                Log.e(TAG, "❌ Password reset with email failed: " + apiResponse.getMessage());
+                                showError(apiResponse.getMessage() != null ?
+                                        apiResponse.getMessage() : "Đặt lại mật khẩu thất bại");
+                            }
+                        } else {
+                            try {
+                                if (response.errorBody() != null) {
+                                    String errorBody = response.errorBody().string();
+                                    Log.e(TAG, "❌ Reset password with email error response: " + errorBody);
+
+                                    StandardResponse<?> errorResponse = new Gson().fromJson(errorBody, StandardResponse.class);
+                                    if (errorResponse != null && errorResponse.getMessage() != null) {
+                                        showError(errorResponse.getMessage());
+                                    } else {
+                                        showError("Đặt lại mật khẩu thất bại");
+                                    }
+                                } else {
+                                    showError("Đặt lại mật khẩu thất bại");
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error parsing error response", e);
+                                showError("Đặt lại mật khẩu thất bại. Vui lòng thử lại.");
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
+                        showLoading(false);
+                        Log.e(TAG, "❌ Reset password with email network error", t);
+
+                        if (t instanceof java.net.ConnectException) {
+                            showError("Không thể kết nối đến server. Kiểm tra kết nối mạng.");
+                        } else if (t instanceof java.net.SocketTimeoutException) {
+                            showError("Kết nối timeout. Thử lại sau.");
+                        } else {
+                            showError("Lỗi mạng: " + t.getMessage());
+                        }
+                    }
+                });
     }
-    private void showPasswordResetSuccessDialog(String newPassword) {
+
+    private void handleResetPasswordSuccess(String newPassword) {
+        Log.d(TAG, "✅ Password reset successful");
+
+        // Show success dialog
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("✅ Đặt Mật Khẩu Thành Công!");
+        builder.setTitle("✅ Đặt Lại Mật Khẩu Thành Công!");
 
-        builder.setMessage("Mật khẩu mới của bạn đã được tạo thành công.\n\n" +
+        builder.setMessage("Mật khẩu của bạn đã được đặt lại thành công!\n\n" +
                 "📧 Email: " + email + "\n" +
                 "🔑 Mật khẩu mới: " + newPassword + "\n\n" +
-                "Vui lòng lưu lại mật khẩu này để đăng nhập.");
+                "Bạn có thể đăng nhập ngay với mật khẩu mới.");
 
         builder.setPositiveButton("Đăng Nhập Ngay", (dialog, which) -> {
             dialog.dismiss();
             navigateToLoginWithCredentials(email, newPassword);
         });
 
-        builder.setNegativeButton("Về Trang Chủ", (dialog, which) -> {
+        builder.setNegativeButton("Về Đăng Nhập", (dialog, which) -> {
             dialog.dismiss();
             navigateToLogin();
         });
@@ -200,6 +254,7 @@ public class ResetPasswordActivity extends AppCompatActivity {
         builder.setCancelable(false);
         builder.show();
     }
+
     private void navigateToLoginWithCredentials(String email, String password) {
         Intent intent = new Intent(this, LoginActivity.class);
         intent.putExtra("prefill_email", email);
@@ -207,17 +262,6 @@ public class ResetPasswordActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
-    }
-
-    private void handleResetPasswordSuccess() {
-        Log.d(TAG, "✅ Password reset successful");
-
-        Toast.makeText(this,
-                "Đặt mật khẩu mới thành công! Bạn có thể đăng nhập với mật khẩu mới.",
-                Toast.LENGTH_LONG).show();
-
-        // Navigate to login
-        navigateToLogin();
     }
 
     private void navigateToLogin() {
@@ -230,7 +274,7 @@ public class ResetPasswordActivity extends AppCompatActivity {
     private void showLoading(boolean show) {
         isLoading = show;
         btnResetPassword.setEnabled(!show && isFormValid());
-        btnResetPassword.setText(show ? "Đang đặt mật khẩu..." : "Đặt Mật Khẩu Mới");
+        btnResetPassword.setText(show ? "Đang đặt lại..." : "Đặt Lại Mật Khẩu");
 
         // Disable inputs during loading
         etNewPassword.setEnabled(!show);
