@@ -2,49 +2,90 @@
 package com.example.newtrade.utils;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.wifi.WifiManager;
+import android.text.format.Formatter;
 import android.util.Log;
+
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Collections;
+import java.util.List;
 
 public class Constants {
 
     private static final String TAG = "Constants";
 
-    // ===== API CONFIGURATION =====
-    public static final String BASE_URL = "http://10.0.2.2:8080/";
-    public static final String WS_BASE_URL = "ws://10.0.2.2:8080"; // ✅ Fixed for WebSocket
+    // ===== IP CONFIGURATION - NEW =====
+    private static final String PREFS_IP_CONFIG = "ip_config_prefs";
+    private static final String PREF_CUSTOM_HOST_IP = "custom_host_ip";
+    private static final String PREF_USE_CUSTOM_IP = "use_custom_ip";
 
-    // ===== GOOGLE OAUTH - UPDATED =====
+    // Default IPs for different scenarios
+    private static final String EMULATOR_HOST_IP = "10.0.2.2";
+    private static final String LOCALHOST_IP = "127.0.0.1";
+    private static final String DEFAULT_PORT = "8080";
+
+    // Backup IPs - common router ranges
+    private static final String[] COMMON_HOST_IPS = {
+            "192.168.1.1", "192.168.1.100", "192.168.1.101", "192.168.1.102",
+            "192.168.0.1", "192.168.0.100", "192.168.0.101", "192.168.0.102",
+            "10.0.0.1", "10.0.0.100", "10.0.0.101", "10.0.0.102"
+    };
+
+    // ===== DYNAMIC API CONFIGURATION =====
+    public static String getBaseURL(Context context) {
+        String hostIP = getOptimalHostIP(context);
+        String url = "http://" + hostIP + ":" + DEFAULT_PORT + "/";
+        Log.d(TAG, "🌐 Generated BASE_URL: " + url);
+        return url;
+    }
+
+    public static String getWebSocketURL(Context context) {
+        String hostIP = getOptimalHostIP(context);
+        String url = "ws://" + hostIP + ":" + DEFAULT_PORT;
+        Log.d(TAG, "🔌 Generated WS_URL: " + url);
+        return url;
+    }
+
+    // ===== LEGACY CONSTANTS (KEPT FOR COMPATIBILITY) =====
+    public static final String BASE_URL = "http://10.0.2.2:8080/"; // ← GIỮ NGUYÊN CHO COMPATIBILITY
+    public static final String WS_BASE_URL = "ws://10.0.2.2:8080"; // ← GIỮ NGUYÊN CHO COMPATIBILITY
+
+    // ===== GOOGLE OAUTH - CỦA BẠN =====
     public static final String GOOGLE_CLIENT_ID =
-            "197776863490-0j3eukit867ircvr4nbddjrurf7c2gr0.apps.googleusercontent.com";
+            "638175281882-lqsdj0iur1i079l0vlqni71gelshrdgj.apps.googleusercontent.com"; // ← SỬA THÀNH CỦA BẠN
 
-    // ===== API ENDPOINTS - UPDATED =====
+    // ===== API ENDPOINTS - UNCHANGED =====
     public static final String API_AUTH = "/api/auth";
     public static final String API_USERS = "/api/users";
     public static final String API_PRODUCTS = "/api/products";
     public static final String API_CATEGORIES = "/api/categories";
     public static final String API_FILES = "/api/files";
-    public static final String API_MESSAGES = "/api/messages"; // ✅ NEW
-    public static final String API_CONVERSATIONS = "/api/conversations"; // ✅ NEW
-    public static final String API_NOTIFICATIONS = "/api/notifications"; // ✅ NEW
+    public static final String API_MESSAGES = "/api/messages";
+    public static final String API_CONVERSATIONS = "/api/conversations";
+    public static final String API_NOTIFICATIONS = "/api/notifications";
     public static final String API_OFFERS = "/api/offers";
     public static final String API_TRANSACTIONS = "/api/transactions";
     public static final String API_REVIEWS = "/api/reviews";
     public static final String API_SAVED_ITEMS = "/api/saved-items";
     public static final String API_ANALYTICS = "/api/analytics";
 
-    // ===== WEBSOCKET TOPICS - NEW =====
+    // ===== WEBSOCKET TOPICS - UNCHANGED =====
     public static final String TOPIC_NOTIFICATIONS = "/user/queue/notifications";
     public static final String TOPIC_CONVERSATION = "/topic/conversation/";
     public static final String TOPIC_MESSAGES = "/topic/messages";
 
-    // ===== WEBSOCKET SEND DESTINATIONS - NEW =====
+    // ===== WEBSOCKET SEND DESTINATIONS - UNCHANGED =====
     public static final String SEND_MESSAGE = "/app/send/message";
     public static final String SEND_NOTIFICATION = "/app/send/notification";
     public static final String JOIN_CONVERSATION = "/app/join/conversation/";
     public static final String LEAVE_CONVERSATION = "/app/leave/conversation/";
 
-    // ===== SHARED PREFERENCES =====
+    // ===== SHARED PREFERENCES - UNCHANGED =====
     public static final String PREFS_NAME = "TradeUpPrefs";
     public static final String PREF_USER_ID = "user_id";
     public static final String PREF_USER_EMAIL = "user_email";
@@ -54,80 +95,283 @@ public class Constants {
     public static final String PREF_IS_LOGGED_IN = "is_logged_in";
     public static final String PREF_IS_EMAIL_VERIFIED = "is_email_verified";
 
-    // ===== REQUEST CODES =====
+    // ===== REQUEST CODES - UNCHANGED =====
     public static final int RC_GOOGLE_SIGN_IN = 1001;
     public static final int RC_PICK_IMAGE = 1002;
     public static final int RC_CAMERA = 1003;
     public static final int RC_LOCATION_PICKER = 1004;
 
-    // ===== HEADERS =====
+    // ===== HEADERS - UNCHANGED =====
     public static final String HEADER_USER_ID = "User-ID";
     public static final String HEADER_CONTENT_TYPE = "Content-Type";
     public static final String CONTENT_TYPE_JSON = "application/json";
     public static final String CONTENT_TYPE_MULTIPART = "multipart/form-data";
 
-    // ===== VALIDATION =====
+    // ===== VALIDATION - UNCHANGED =====
     public static final int MIN_PASSWORD_LENGTH = 6;
     public static final int OTP_LENGTH = 6;
     public static final int OTP_RESEND_TIME_SECONDS = 60;
 
-    // ===== FILE UPLOAD - UPDATED =====
+    // ===== FILE UPLOAD - UNCHANGED =====
     public static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for products
     public static final long MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB for avatars
     public static final String[] ALLOWED_IMAGE_TYPES = {
             "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"
     };
 
-    // ===== PAGINATION =====
+    // ===== PAGINATION - UNCHANGED =====
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final String DEFAULT_SORT_BY = "createdAt";
     public static final String DEFAULT_SORT_DIR = "desc";
     public static final int SEARCH_DELAY_MS = 200;
     public static final int MIN_SEARCH_LENGTH = 2;
 
-    // ===== LOCATION =====
+    // ===== LOCATION - UNCHANGED =====
     public static final int DEFAULT_LOCATION_RADIUS = 10; // km
     public static final int MAX_LOCATION_RADIUS = 100; // km
 
-    // ===== MESSAGING =====
+    // ===== MESSAGING - UNCHANGED =====
     public static final int MESSAGE_POLLING_INTERVAL = 3000; // 3 seconds
     public static final int MAX_MESSAGE_LENGTH = 1000;
 
-    // ===== ERROR MESSAGES =====
-    public static final String ERROR_NETWORK = "Kiểm tra kết nối mạng và thử lại";
-    public static final String ERROR_SERVER = "Lỗi server, vui lòng thử lại sau";
-    public static final String ERROR_UNAUTHORIZED = "Phiên đăng nhập hết hạn";
-    public static final String ERROR_UNKNOWN = "Có lỗi xảy ra, vui lòng thử lại";
+    // ===== ERROR MESSAGES - UNCHANGED =====
+    public static final String ERROR_NETWORK = "Lỗi kết nối mạng";
+    public static final String ERROR_TIMEOUT = "Kết nối quá chậm";
+    public static final String ERROR_UNKNOWN = "Lỗi không xác định";
 
-    // ===== PRODUCT CONDITIONS =====
-    public static final String[] PRODUCT_CONDITIONS = {
-            "NEW", "LIKE_NEW", "GOOD", "FAIR", "POOR"
-    };
+    // ===== NEW METHODS FOR IP MANAGEMENT =====
 
-    public static final String[] PRODUCT_CONDITION_DISPLAY = {
-            "Mới", "Như mới", "Tốt", "Khá", "Cũ"
-    };
-
-    // ===== PRODUCT STATUS =====
-    public static final String[] PRODUCT_STATUS = {
-            "AVAILABLE", "SOLD", "PAUSED", "DELETED"
-    };
-
-    // ===== UTILITY METHODS =====
-
-    public static boolean checkNetworkAndLog(Context context) {
-        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-        boolean isConnected = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
-
-        if (isConnected) {
-            Log.d(TAG, "✅ Network connected: " + activeNetwork.getTypeName());
-        } else {
-            Log.e(TAG, "❌ No network connection");
+    private static String getOptimalHostIP(Context context) {
+        // 1. Check if user set custom IP
+        String customIP = getCustomHostIP(context);
+        if (customIP != null && !customIP.isEmpty()) {
+            Log.d(TAG, "✅ Using custom IP: " + customIP);
+            return customIP;
         }
 
-        return isConnected;
+        // 2. Detect if emulator
+        if (isEmulator()) {
+            Log.d(TAG, "📱 Detected emulator, using: " + EMULATOR_HOST_IP);
+            return EMULATOR_HOST_IP;
+        }
+
+        // 3. Try to get gateway IP (router)
+        String gatewayIP = getGatewayIP(context);
+        if (gatewayIP != null && !gatewayIP.equals("0.0.0.0")) {
+            Log.d(TAG, "🏠 Using gateway IP: " + gatewayIP);
+            return gatewayIP;
+        }
+
+        // 4. Try to detect local IP and guess host
+        String localIP = getLocalIPAddress();
+        if (localIP != null) {
+            String guessedHost = guessHostFromLocalIP(localIP);
+            Log.d(TAG, "🔍 Guessed host from local IP " + localIP + ": " + guessedHost);
+            return guessedHost;
+        }
+
+        // 5. Fallback to localhost
+        Log.w(TAG, "⚠️ Using fallback IP: " + LOCALHOST_IP);
+        return LOCALHOST_IP;
     }
+
+    private static boolean isEmulator() {
+        return android.os.Build.FINGERPRINT.startsWith("generic") ||
+                android.os.Build.FINGERPRINT.startsWith("unknown") ||
+                android.os.Build.MODEL.contains("google_sdk") ||
+                android.os.Build.MODEL.contains("Emulator") ||
+                android.os.Build.MODEL.contains("Android SDK built for x86") ||
+                android.os.Build.MANUFACTURER.contains("Genymotion") ||
+                (android.os.Build.BRAND.startsWith("generic") && android.os.Build.DEVICE.startsWith("generic")) ||
+                android.os.Build.PRODUCT.contains("sdk") ||
+                android.os.Build.PRODUCT.contains("vbox");
+    }
+
+    private static String getGatewayIP(Context context) {
+        try {
+            WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifiManager != null) {
+                int gatewayAddress = wifiManager.getDhcpInfo().gateway;
+                if (gatewayAddress != 0) {
+                    return Formatter.formatIpAddress(gatewayAddress);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting gateway IP", e);
+        }
+        return null;
+    }
+
+    private static String getLocalIPAddress() {
+        try {
+            List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
+            for (NetworkInterface intf : interfaces) {
+                List<InetAddress> addrs = Collections.list(intf.getInetAddresses());
+                for (InetAddress addr : addrs) {
+                    if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
+                        String ip = addr.getHostAddress();
+                        Log.d(TAG, "Found local IP: " + ip);
+                        return ip;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting local IP", e);
+        }
+        return null;
+    }
+
+    private static String guessHostFromLocalIP(String localIP) {
+        if (localIP == null) return LOCALHOST_IP;
+
+        // Extract network prefix and guess host
+        String[] parts = localIP.split("\\.");
+        if (parts.length == 4) {
+            // Try common host IPs in same network
+            String network = parts[0] + "." + parts[1] + "." + parts[2] + ".";
+            String[] commonHosts = {"1", "100", "101", "102", "10", "20"};
+
+            for (String host : commonHosts) {
+                if (!host.equals(parts[3])) { // Don't return self
+                    return network + host;
+                }
+            }
+        }
+
+        return LOCALHOST_IP;
+    }
+
+    // ===== CUSTOM IP MANAGEMENT =====
+
+    public static void setCustomHostIP(Context context, String ip) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_IP_CONFIG, Context.MODE_PRIVATE);
+        prefs.edit()
+                .putString(PREF_CUSTOM_HOST_IP, ip)
+                .putBoolean(PREF_USE_CUSTOM_IP, true)
+                .apply();
+        Log.d(TAG, "💾 Saved custom IP: " + ip);
+    }
+
+    public static String getCustomHostIP(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_IP_CONFIG, Context.MODE_PRIVATE);
+        boolean useCustom = prefs.getBoolean(PREF_USE_CUSTOM_IP, false);
+        if (useCustom) {
+            return prefs.getString(PREF_CUSTOM_HOST_IP, null);
+        }
+        return null;
+    }
+
+    public static void clearCustomHostIP(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_IP_CONFIG, Context.MODE_PRIVATE);
+        prefs.edit()
+                .remove(PREF_CUSTOM_HOST_IP)
+                .putBoolean(PREF_USE_CUSTOM_IP, false)
+                .apply();
+        Log.d(TAG, "🗑️ Cleared custom IP");
+    }
+
+    // ===== CONNECTIVITY TESTING =====
+
+    public static void testConnection(Context context, ConnectionTestCallback callback) {
+        String baseUrl = getBaseURL(context);
+        String testUrl = baseUrl + "api/auth/health";
+
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "🧪 Testing connection to: " + testUrl);
+
+                java.net.URL url = new java.net.URL(testUrl);
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+
+                int responseCode = connection.getResponseCode();
+                boolean success = responseCode == 200;
+
+                android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+                mainHandler.post(() -> {
+                    if (success) {
+                        Log.d(TAG, "✅ Connection test successful: " + responseCode);
+                        callback.onSuccess(baseUrl);
+                    } else {
+                        Log.e(TAG, "❌ Connection test failed: " + responseCode);
+                        callback.onFailure("HTTP Error: " + responseCode);
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Connection test exception", e);
+                android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+                mainHandler.post(() -> callback.onFailure("Connection failed: " + e.getMessage()));
+            }
+        }).start();
+    }
+
+    public interface ConnectionTestCallback {
+        void onSuccess(String workingUrl);
+        void onFailure(String error);
+    }
+
+    // ===== AUTO-SCAN MULTIPLE IPS =====
+
+    public static void findWorkingIP(Context context, IPScanCallback callback) {
+        new Thread(() -> {
+            String workingIP = null;
+
+            // Test current optimal IP first
+            String currentIP = getOptimalHostIP(context);
+            if (testSingleIP(currentIP)) {
+                workingIP = currentIP;
+            } else {
+                // Scan common IPs
+                for (String ip : COMMON_HOST_IPS) {
+                    if (testSingleIP(ip)) {
+                        workingIP = ip;
+                        break;
+                    }
+                }
+            }
+
+            final String finalIP = workingIP;
+            android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+            mainHandler.post(() -> {
+                if (finalIP != null) {
+                    Log.d(TAG, "🎯 Found working IP: " + finalIP);
+                    callback.onFound(finalIP);
+                } else {
+                    Log.e(TAG, "😞 No working IP found");
+                    callback.onNotFound();
+                }
+            });
+        }).start();
+    }
+
+    private static boolean testSingleIP(String ip) {
+        try {
+            String testUrl = "http://" + ip + ":" + DEFAULT_PORT + "/api/auth/health";
+            java.net.URL url = new java.net.URL(testUrl);
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(3000);
+            connection.setReadTimeout(3000);
+
+            int responseCode = connection.getResponseCode();
+            Log.d(TAG, "Testing " + ip + ": " + responseCode);
+            return responseCode == 200;
+
+        } catch (Exception e) {
+            Log.d(TAG, "Testing " + ip + ": failed - " + e.getMessage());
+            return false;
+        }
+    }
+
+    public interface IPScanCallback {
+        void onFound(String workingIP);
+        void onNotFound();
+    }
+
+    // ===== EXISTING UTILITY METHODS - UNCHANGED =====
 
     public static String getNetworkErrorMessage(Throwable throwable) {
         if (throwable instanceof java.net.ConnectException) {
@@ -141,6 +385,21 @@ public class Constants {
         }
     }
 
+    public static boolean checkNetworkAndLog(Context context) {
+        try {
+            ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (connectivityManager != null) {
+                NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+                boolean isConnected = activeNetworkInfo != null && activeNetworkInfo.isConnected();
+                Log.d(TAG, "🌐 Network status: " + (isConnected ? "Connected" : "Disconnected"));
+                return isConnected;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking network", e);
+        }
+        return false;
+    }
+
     public static void testBackendConnectivity(Context context) {
         Log.d(TAG, "=== TESTING BACKEND CONNECTIVITY ===");
 
@@ -152,7 +411,7 @@ public class Constants {
 
         new Thread(() -> {
             try {
-                java.net.URL url = new java.net.URL(BASE_URL + "api/auth/health");
+                java.net.URL url = new java.net.URL(getBaseURL(context) + "api/auth/health");
                 java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(5000);
@@ -171,5 +430,16 @@ public class Constants {
                 Log.e(TAG, "❌ Backend connectivity test failed", e);
             }
         }).start();
+    }
+
+    public static void logDeviceInfo() {
+        Log.d(TAG, "=== DEVICE INFO ===");
+        Log.d(TAG, "📱 Device: " + android.os.Build.DEVICE);
+        Log.d(TAG, "🏭 Manufacturer: " + android.os.Build.MANUFACTURER);
+        Log.d(TAG, "📟 Model: " + android.os.Build.MODEL);
+        Log.d(TAG, "🆔 Product: " + android.os.Build.PRODUCT);
+        Log.d(TAG, "👆 Fingerprint: " + android.os.Build.FINGERPRINT);
+        Log.d(TAG, "🤖 Is Emulator: " + isEmulator());
+        Log.d(TAG, "===================");
     }
 }

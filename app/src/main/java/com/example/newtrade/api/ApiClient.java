@@ -26,34 +26,118 @@ public class ApiClient {
     private static Retrofit retrofit = null;
     private static OkHttpClient okHttpClient = null;
     private static Context appContext = null;
+    private static String currentBaseUrl = null;
 
     // Service instances
     private static AuthService authService;
     private static UserService userService;
     private static ProductService productService;
-    private static ApiService apiService; // ✅ THÊM CÁI NÀY
+    private static ApiService apiService;
+
+    // ===== DYNAMIC INITIALIZATION =====
 
     public static void init(Context context) {
-        if (retrofit == null) {
+        init(context, null);
+    }
+
+    public static void init(Context context, InitCallback callback) {
+        if (retrofit == null || shouldReinit(context)) {
             appContext = context.getApplicationContext();
 
-            // Test network connectivity
-            Constants.checkNetworkAndLog(context);
-            Constants.testBackendConnectivity(context);
+            // Log device info for debugging
+            Constants.logDeviceInfo();
 
-            retrofit = createRetrofit(appContext);
+            // Check network connectivity
+            if (!Constants.checkNetworkAndLog(context)) {
+                Log.w(TAG, "⚠️ No network connectivity detected");
+                if (callback != null) callback.onFailure("No network connection");
+                return;
+            }
+
+            // Get dynamic base URL
+            String baseUrl = Constants.getBaseURL(context);
+            Log.d(TAG, "🌐 Initializing ApiClient with URL: " + baseUrl);
+
+            // Test connection and initialize
+            testAndInitialize(context, baseUrl, callback);
+
+        } else {
+            Log.d(TAG, "✅ ApiClient already initialized");
+            if (callback != null) callback.onSuccess(currentBaseUrl);
+        }
+    }
+
+    private static boolean shouldReinit(Context context) {
+        String newBaseUrl = Constants.getBaseURL(context);
+        boolean urlChanged = !newBaseUrl.equals(currentBaseUrl);
+        if (urlChanged) {
+            Log.d(TAG, "🔄 Base URL changed from " + currentBaseUrl + " to " + newBaseUrl);
+        }
+        return urlChanged;
+    }
+
+    private static void testAndInitialize(Context context, String baseUrl, InitCallback callback) {
+        // Test connection first
+        Constants.testConnection(context, new Constants.ConnectionTestCallback() {
+            @Override
+            public void onSuccess(String workingUrl) {
+                // Connection successful, proceed with initialization
+                finalizeInit(context, baseUrl, callback);
+            }
+
+            @Override
+            public void onFailure(String error) {
+                Log.w(TAG, "⚠️ Primary URL failed, scanning for alternatives...");
+
+                // Auto-scan for working IP
+                Constants.findWorkingIP(context, new Constants.IPScanCallback() {
+                    @Override
+                    public void onFound(String workingIP) {
+                        // Save the working IP for future use
+                        Constants.setCustomHostIP(context, workingIP);
+                        String newBaseUrl = "http://" + workingIP + ":8080/";
+                        Log.d(TAG, "🎯 Found working IP, using: " + newBaseUrl);
+                        finalizeInit(context, newBaseUrl, callback);
+                    }
+
+                    @Override
+                    public void onNotFound() {
+                        Log.e(TAG, "😞 No working backend found");
+                        if (callback != null) {
+                            callback.onFailure("No accessible backend server found. Please check if backend is running.");
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    private static void finalizeInit(Context context, String baseUrl, InitCallback callback) {
+        try {
+            currentBaseUrl = baseUrl;
+            retrofit = createRetrofit(context, baseUrl);
 
             // Initialize services
             authService = retrofit.create(AuthService.class);
             userService = retrofit.create(UserService.class);
             productService = retrofit.create(ProductService.class);
-            apiService = retrofit.create(ApiService.class); // ✅ THÊM CÁI NÀY
+            apiService = retrofit.create(ApiService.class);
 
-            Log.d(TAG, "✅ ApiClient initialized with base URL: " + Constants.BASE_URL);
+            Log.d(TAG, "✅ ApiClient initialized successfully with base URL: " + baseUrl);
+
+            if (callback != null) {
+                callback.onSuccess(baseUrl);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to initialize ApiClient", e);
+            if (callback != null) {
+                callback.onFailure("Initialization failed: " + e.getMessage());
+            }
         }
     }
 
-    private static Retrofit createRetrofit(Context context) {
+    private static Retrofit createRetrofit(Context context, String baseUrl) {
         // Gson configuration
         Gson gson = new GsonBuilder()
                 .setDateFormat("yyyy-MM-dd'T'HH:mm:ss")
@@ -81,29 +165,28 @@ public class ApiClient {
 
                     Request newRequest = originalRequest.newBuilder()
                             .addHeader("Content-Type", "application/json")
-                            .addHeader("Accept", "application/json")
                             .build();
 
-                    Log.d(TAG, "🔍 Auth endpoint - no User-ID header added");
+                    Log.d(TAG, "🔓 Auth endpoint - no User-ID header");
                     return chain.proceed(newRequest);
-                }
 
-                // Add User-ID header for authenticated requests
-                SharedPrefsManager prefsManager = SharedPrefsManager.getInstance(context);
-                long userId = prefsManager.getUserId();
-
-                if (userId > 0) {
-                    Request newRequest = originalRequest.newBuilder()
-                            .addHeader("User-ID", String.valueOf(userId))
-                            .addHeader("Content-Type", "application/json")
-                            .addHeader("Accept", "application/json")
-                            .build();
-
-                    Log.d(TAG, "🔍 Adding User-ID header: " + userId);
-                    return chain.proceed(newRequest);
                 } else {
-                    Log.w(TAG, "🔍 No User-ID found, proceeding without auth header");
-                    return chain.proceed(originalRequest);
+                    // Add User-ID header for authenticated endpoints
+                    SharedPrefsManager prefsManager = SharedPrefsManager.getInstance(context);
+                    Long userId = prefsManager.getUserId();
+
+                    if (userId != null && userId > 0) {
+                        Request newRequest = originalRequest.newBuilder()
+                                .addHeader("User-ID", userId.toString())
+                                .addHeader("Content-Type", "application/json")
+                                .build();
+
+                        Log.d(TAG, "🔐 Added User-ID header: " + userId);
+                        return chain.proceed(newRequest);
+                    } else {
+                        Log.w(TAG, "⚠️ No valid User-ID for authenticated endpoint: " + url);
+                        return chain.proceed(originalRequest);
+                    }
                 }
             }
         };
@@ -146,13 +229,14 @@ public class ApiClient {
 
         // Build Retrofit
         return new Retrofit.Builder()
-                .baseUrl(Constants.BASE_URL)
+                .baseUrl(baseUrl)
                 .client(okHttpClient)
                 .addConverterFactory(GsonConverterFactory.create(gson))
                 .build();
     }
 
-    // Service getters
+    // ===== SERVICE GETTERS =====
+
     public static AuthService getAuthService() {
         if (authService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
@@ -174,7 +258,6 @@ public class ApiClient {
         return productService;
     }
 
-    // ✅ THÊM METHOD NÀY
     public static ApiService getApiService() {
         if (apiService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
@@ -182,9 +265,14 @@ public class ApiClient {
         return apiService;
     }
 
-    // Utility methods
+    // ===== UTILITY METHODS =====
+
     public static boolean isInitialized() {
         return retrofit != null;
+    }
+
+    public static String getCurrentBaseUrl() {
+        return currentBaseUrl;
     }
 
     public static void resetClient() {
@@ -192,7 +280,34 @@ public class ApiClient {
         authService = null;
         userService = null;
         productService = null;
-        apiService = null; // ✅ THÊM CÁI NÀY
-        Log.d(TAG, "ApiClient reset");
+        apiService = null;
+        currentBaseUrl = null;
+        Log.d(TAG, "🧹 ApiClient reset");
+    }
+
+    public static void reinitialize(Context context, InitCallback callback) {
+        resetClient();
+        init(context, callback);
+    }
+
+    // ===== IP MANAGEMENT UTILITIES =====
+
+    public static void setCustomIP(Context context, String ip, InitCallback callback) {
+        Log.d(TAG, "🔧 Setting custom IP: " + ip);
+        Constants.setCustomHostIP(context, ip);
+        reinitialize(context, callback);
+    }
+
+    public static void autoDetectIP(Context context, InitCallback callback) {
+        Log.d(TAG, "🔍 Auto-detecting best IP...");
+        Constants.clearCustomHostIP(context);
+        reinitialize(context, callback);
+    }
+
+    // ===== CALLBACK INTERFACE =====
+
+    public interface InitCallback {
+        void onSuccess(String baseUrl);
+        void onFailure(String error);
     }
 }

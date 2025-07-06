@@ -17,7 +17,7 @@ import android.app.AlertDialog;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
+import android.text.InputType;
 import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
@@ -64,25 +64,95 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        // Initialize API client
-        ApiClient.init(this);
+        // Initialize API client with callback
+        ApiClient.init(this, new ApiClient.InitCallback() {
+            @Override
+            public void onSuccess(String baseUrl) {
+                Log.d(TAG, "✅ Backend connected: " + baseUrl);
+                Toast.makeText(LoginActivity.this, "Connected to: " + baseUrl, Toast.LENGTH_SHORT).show();
 
-        // Initialize views and utilities
-        initViews();
-        initGoogleSignIn();
-        initUtils();
-        setupListeners();
+                // Continue with normal initialization
+                initViews();
+                initGoogleSignIn();
+                initUtils();
+                setupListeners();
 
-        // Check if already logged in
-        if (prefsManager.isLoggedIn()) {
-            Log.d(TAG, "User already logged in, redirecting to main");
-            navigateToMain();
-            return;
-        }
+                // Check if already logged in
+                if (prefsManager.isLoggedIn()) {
+                    Log.d(TAG, "User already logged in, redirecting to main");
+                    navigateToMain();
+                }
+            }
 
-        Log.d(TAG, "LoginActivity created successfully");
-        Log.d(TAG, "Backend URL: " + Constants.BASE_URL);
-        Log.d(TAG, "Google Client ID: " + Constants.GOOGLE_CLIENT_ID);
+            @Override
+            public void onFailure(String error) {
+                Log.e(TAG, "❌ Backend connection failed: " + error);
+
+                // Show IP configuration dialog
+                showIPConfigDialog(error);
+            }
+        });
+    }
+
+    private void showIPConfigDialog(String error) {
+        new AlertDialog.Builder(this)
+                .setTitle("Backend Connection Failed")
+                .setMessage("Could not connect to backend server.\n\nError: " + error + "\n\nWould you like to:")
+                .setPositiveButton("Auto-detect IP", (dialog, which) -> {
+                    ApiClient.autoDetectIP(this, new ApiClient.InitCallback() {
+                        @Override
+                        public void onSuccess(String baseUrl) {
+                            Toast.makeText(LoginActivity.this, "✅ Connected: " + baseUrl, Toast.LENGTH_SHORT).show();
+                            recreate(); // Restart activity
+                        }
+
+                        @Override
+                        public void onFailure(String error) {
+                            Toast.makeText(LoginActivity.this, "❌ Still failed: " + error, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                })
+                .setNeutralButton("Set Custom IP", (dialog, which) -> {
+                    showCustomIPDialog();
+                })
+                .setNegativeButton("Retry", (dialog, which) -> {
+                    recreate(); // Restart activity
+                })
+                .setCancelable(false)
+                .show();
+    }
+
+    private void showCustomIPDialog() {
+        EditText editText = new EditText(this);
+        editText.setHint("Enter IP address (e.g., 192.168.1.100)");
+        editText.setInputType(InputType.TYPE_CLASS_TEXT);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Enter Backend IP")
+                .setMessage("Enter the IP address of your backend server:")
+                .setView(editText)
+                .setPositiveButton("Connect", (dialog, which) -> {
+                    String ip = editText.getText().toString().trim();
+                    if (!ip.isEmpty()) {
+                        ApiClient.setCustomIP(this, ip, new ApiClient.InitCallback() {
+                            @Override
+                            public void onSuccess(String baseUrl) {
+                                Toast.makeText(LoginActivity.this, "✅ Connected: " + baseUrl, Toast.LENGTH_SHORT).show();
+                                recreate(); // Restart activity
+                            }
+
+                            @Override
+                            public void onFailure(String error) {
+                                Toast.makeText(LoginActivity.this, "❌ Failed to connect to " + ip + ": " + error, Toast.LENGTH_LONG).show();
+                                showIPConfigDialog(error); // Show dialog again
+                            }
+                        });
+                    }
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> {
+                    showIPConfigDialog("Custom IP cancelled");
+                })
+                .show();
     }
 
     private void initViews() {

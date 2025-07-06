@@ -1,9 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Allow cleartext traffic for all local and private networks -->
     <domain-config cleartextTrafficPermitted="true">
+        <!-- Emulator -->
         <domain includeSubdomains="true">10.0.2.2</domain>
+
+        <!-- Localhost variations -->
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
+
+        <!-- Private network ranges -->
+        <!-- Class A: 10.0.0.0/8 -->
+        <domain includeSubdomains="true">10.0.0.0</domain>
+
+        <!-- Class B: 172.16.0.0/12 -->
+        <domain includeSubdomains="true">172.16.0.0</domain>
+
+        <!-- Class C: 192.168.0.0/16 -->
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">192.168.100.0</domain>
+
+        <!-- Common router IPs -->
+        <domain includeSubdomains="true">192.168.1.1</domain>
         <domain includeSubdomains="true">192.168.1.100</domain>
+        <domain includeSubdomains="true">192.168.1.101</domain>
+        <domain includeSubdomains="true">192.168.1.102</domain>
+        <domain includeSubdomains="true">192.168.0.1</domain>
+        <domain includeSubdomains="true">192.168.0.100</domain>
+        <domain includeSubdomains="true">192.168.0.101</domain>
+        <domain includeSubdomains="true">192.168.0.102</domain>
+
+        <!-- Development IPs -->
+        <domain includeSubdomains="true">10.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.0.100</domain>
+        <domain includeSubdomains="true">10.0.0.101</domain>
+        <domain includeSubdomains="true">10.0.0.102</domain>
     </domain-config>
+
+    <!-- Allow all private IP ranges with wildcard -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
 </network-security-config>
