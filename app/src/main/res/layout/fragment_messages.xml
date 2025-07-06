@@ -32,8 +32,8 @@
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_add_message"
-            android:tint="@android:color/white"
-            android:contentDescription="New Message" />
+            android:contentDescription="New Message"
+            app:tint="@android:color/white" />
 
     </LinearLayout>
 

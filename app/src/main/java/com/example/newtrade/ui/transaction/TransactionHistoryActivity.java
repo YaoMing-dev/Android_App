@@ -6,7 +6,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.TextView;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -47,7 +47,7 @@ public class TransactionHistoryActivity extends AppCompatActivity implements Tra
     private TabLayout tabLayout;
     private SwipeRefreshLayout swipeRefresh;
     private RecyclerView rvTransactions;
-    private TextView tvEmptyState;
+    private LinearLayout layoutEmptyState; // ✅ LinearLayout thay vì TextView
 
     // Data
     private TransactionAdapter transactionAdapter;
@@ -78,7 +78,7 @@ public class TransactionHistoryActivity extends AppCompatActivity implements Tra
         tabLayout = findViewById(R.id.tab_layout);
         swipeRefresh = findViewById(R.id.swipe_refresh);
         rvTransactions = findViewById(R.id.rv_transactions);
-        tvEmptyState = findViewById(R.id.tv_empty_state);
+        layoutEmptyState = findViewById(R.id.tv_empty_state); // ✅ LinearLayout
 
         prefsManager = SharedPrefsManager.getInstance(this);
     }
@@ -113,11 +113,11 @@ public class TransactionHistoryActivity extends AppCompatActivity implements Tra
     }
 
     private void setupRecyclerView() {
+        // ✅ SỬA DÒNG 113: Thêm context (this) làm tham số đầu tiên
         transactionAdapter = new TransactionAdapter(this, transactions, this);
         rvTransactions.setLayoutManager(new LinearLayoutManager(this));
         rvTransactions.setAdapter(transactionAdapter);
 
-        // Add pagination
         rvTransactions.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
@@ -155,6 +155,7 @@ public class TransactionHistoryActivity extends AppCompatActivity implements Tra
             swipeRefresh.setRefreshing(true);
         }
 
+        // ✅ API endpoints chính xác với backend
         Call<StandardResponse<Map<String, Object>>> call;
         if ("PURCHASES".equals(currentTab)) {
             call = ApiClient.getTransactionService().getPurchases(currentPage, Constants.DEFAULT_PAGE_SIZE);
@@ -229,12 +230,10 @@ public class TransactionHistoryActivity extends AppCompatActivity implements Tra
 
         if (transactions.isEmpty()) {
             rvTransactions.setVisibility(View.GONE);
-            tvEmptyState.setVisibility(View.VISIBLE);
-            tvEmptyState.setText("PURCHASES".equals(currentTab) ?
-                    "No purchases yet" : "No sales yet");
+            layoutEmptyState.setVisibility(View.VISIBLE);
         } else {
             rvTransactions.setVisibility(View.VISIBLE);
-            tvEmptyState.setVisibility(View.GONE);
+            layoutEmptyState.setVisibility(View.GONE);
         }
     }
 
@@ -261,7 +260,6 @@ public class TransactionHistoryActivity extends AppCompatActivity implements Tra
 
     @Override
     public void onContactClick(Transaction transaction) {
-        // Start conversation with other party
         Long currentUserId = prefsManager.getUserId();
         Long otherPartyId;
 
@@ -282,7 +280,6 @@ public class TransactionHistoryActivity extends AppCompatActivity implements Tra
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == REQUEST_WRITE_REVIEW && resultCode == RESULT_OK) {
-            // Reload transactions to update review status
             currentPage = 0;
             hasMoreData = true;
             loadTransactions();

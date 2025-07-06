@@ -37,14 +37,13 @@
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.Material3.DayNight">
-            <!-- ✅ SỬA: Chỉ có MAIN launcher intent, không có action VIEW -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- ===== AUTHENTICATION ACTIVITIES ===== -->
+        <!-- ===== AUTH ACTIVITIES ===== -->
         <activity
             android:name=".ui.auth.LoginActivity"
             android:exported="false"
@@ -53,50 +52,22 @@
         <activity
             android:name=".ui.auth.RegisterActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.auth.ForgotPasswordActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".ui.auth.OtpVerificationActivity"
             android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".ui.auth.LoginActivity" />
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
-        <!-- ✅ SỬA: ResetPasswordActivity với Deep Link support -->
         <activity
             android:name=".ui.auth.ResetPasswordActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:screenOrientation="portrait"
-            android:parentActivityName=".ui.auth.LoginActivity">
-
-            <!-- ✅ THÊM: Deep Link Intent Filter cho email reset links -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <!-- Backend sẽ gửi link dạng: https://tradeup.app/reset-password?token=xxx&email=xxx -->
-                <data android:scheme="https"
-                    android:host="tradeup.app"
-                    android:pathPrefix="/reset-password" />
-            </intent-filter>
-
-            <!-- ✅ THÊM: Custom scheme fallback cho testing -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <!-- Cho testing: tradeup://reset-password?token=xxx&email=xxx -->
-                <data android:scheme="tradeup"
-                    android:host="reset-password" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <!-- ===== PRODUCT ACTIVITIES ===== -->
         <activity
@@ -111,15 +82,10 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
+
         <!-- ===== PROFILE ACTIVITIES ===== -->
         <activity
             android:name=".ui.profile.EditProfileActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-            android:parentActivityName=".MainActivity" />
-
-        <activity
-            android:name=".ui.profile.SettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
@@ -137,7 +103,39 @@
             android:parentActivityName=".MainActivity" />
 
         <activity
+            android:name=".ui.profile.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
             android:name=".ui.profile.UserProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <!-- ===== 🔥 THÊM MỚI: TRANSACTION ACTIVITIES ===== -->
+        <activity
+            android:name=".ui.transaction.TransactionHistoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.transaction.TransactionDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.transaction.TransactionHistoryActivity" />
+
+        <!-- ===== REVIEW ACTIVITIES ===== -->
+        <activity
+            android:name=".ui.review.WriteReviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.review.ReviewListActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
@@ -179,9 +177,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-        <!-- ✅ THÊM: Firebase Messaging Service (nếu dùng push notifications) -->
-
 
     </application>
 

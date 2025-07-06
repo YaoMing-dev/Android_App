@@ -6,6 +6,7 @@ public class ReviewRequest {
     private Integer rating;
     private String comment;
 
+    // Constructors
     public ReviewRequest() {}
 
     public ReviewRequest(Long transactionId, Integer rating, String comment) {

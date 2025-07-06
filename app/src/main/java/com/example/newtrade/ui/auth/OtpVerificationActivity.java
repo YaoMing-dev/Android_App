@@ -407,6 +407,7 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
+        super.onBackPressed();
         if (fromRegister) {
             // From register → go back to login
             navigateToLogin();

@@ -6,7 +6,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.TextView;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -43,8 +43,7 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
     private MaterialToolbar toolbar;
     private SwipeRefreshLayout swipeRefresh;
     private RecyclerView rvSavedItems;
-    private TextView tvEmptyState;
-    private TextView tvItemCount;
+    private LinearLayout layoutEmptyState;
 
     // Data
     private ProductAdapter productAdapter;
@@ -72,8 +71,7 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
         toolbar = findViewById(R.id.toolbar);
         swipeRefresh = findViewById(R.id.swipe_refresh);
         rvSavedItems = findViewById(R.id.rv_saved_items);
-        tvEmptyState = findViewById(R.id.tv_empty_state);
-        tvItemCount = findViewById(R.id.tv_item_count);
+        layoutEmptyState = findViewById(R.id.tv_empty_state);
 
         prefsManager = SharedPrefsManager.getInstance(this);
     }
@@ -91,7 +89,6 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
         rvSavedItems.setLayoutManager(new GridLayoutManager(this, 2));
         rvSavedItems.setAdapter(productAdapter);
 
-        // Add pagination
         rvSavedItems.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
@@ -129,7 +126,8 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
             swipeRefresh.setRefreshing(true);
         }
 
-        ApiClient.getSavedItemsService().getSavedItems(currentPage, Constants.DEFAULT_PAGE_SIZE)
+        // ✅ SỬA: Không cần userId parameter, backend sẽ dùng User-ID header
+        ApiClient.getProductService().getSavedItems(currentPage, Constants.DEFAULT_PAGE_SIZE)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
@@ -195,22 +193,15 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
             productAdapter.notifyDataSetChanged();
         }
 
-        // Update item count
-        if (tvItemCount != null) {
-            tvItemCount.setText(savedItems.size() + " items");
-        }
-
-        // Show/hide empty state
         if (savedItems.isEmpty()) {
             rvSavedItems.setVisibility(View.GONE);
-            tvEmptyState.setVisibility(View.VISIBLE);
+            layoutEmptyState.setVisibility(View.VISIBLE);
         } else {
             rvSavedItems.setVisibility(View.VISIBLE);
-            tvEmptyState.setVisibility(View.GONE);
+            layoutEmptyState.setVisibility(View.GONE);
         }
     }
 
-    // ProductAdapter.OnProductClickListener implementation
     @Override
     public void onProductClick(Product product) {
         Intent intent = new Intent(this, ProductDetailActivity.class);
@@ -219,10 +210,18 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
     }
 
     @Override
+    public void onProductLongClick(Product product) {
+        Log.d(TAG, "Long clicked on saved product: " + product.getTitle());
+    }
+
+    private void showError(String message) {
+        Log.e(TAG, "Error: " + message);
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
-        // Reload saved items when returning from ProductDetail
-        // (in case user unsaved an item)
         currentPage = 0;
         hasMoreData = true;
         loadSavedItems();

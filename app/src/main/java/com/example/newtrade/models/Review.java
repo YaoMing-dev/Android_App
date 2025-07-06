@@ -5,14 +5,15 @@ public class Review {
     private Long id;
     private Long transactionId;
     private Long reviewerId;
-    private Long revieweeId;
     private String reviewerName;
-    private String revieweeName;
     private String reviewerAvatarUrl;
+    private Long revieweeId;
+    private String revieweeName;
+    private String revieweeAvatarUrl;
     private Integer rating;
     private String comment;
     private String createdAt;
-    private Transaction transaction; // Optional
+    private String productTitle;
 
     // Constructors
     public Review() {}
@@ -27,19 +28,22 @@ public class Review {
     public Long getReviewerId() { return reviewerId; }
     public void setReviewerId(Long reviewerId) { this.reviewerId = reviewerId; }
 
-    public Long getRevieweeId() { return revieweeId; }
-    public void setRevieweeId(Long revieweeId) { this.revieweeId = revieweeId; }
-
     public String getReviewerName() { return reviewerName; }
     public void setReviewerName(String reviewerName) { this.reviewerName = reviewerName; }
-
-    public String getRevieweeName() { return revieweeName; }
-    public void setRevieweeName(String revieweeName) { this.revieweeName = revieweeName; }
 
     public String getReviewerAvatarUrl() { return reviewerAvatarUrl; }
     public void setReviewerAvatarUrl(String reviewerAvatarUrl) { this.reviewerAvatarUrl = reviewerAvatarUrl; }
 
-    public Integer getRating() { return rating != null ? rating : 0; }
+    public Long getRevieweeId() { return revieweeId; }
+    public void setRevieweeId(Long revieweeId) { this.revieweeId = revieweeId; }
+
+    public String getRevieweeName() { return revieweeName; }
+    public void setRevieweeName(String revieweeName) { this.revieweeName = revieweeName; }
+
+    public String getRevieweeAvatarUrl() { return revieweeAvatarUrl; }
+    public void setRevieweeAvatarUrl(String revieweeAvatarUrl) { this.revieweeAvatarUrl = revieweeAvatarUrl; }
+
+    public Integer getRating() { return rating; }
     public void setRating(Integer rating) { this.rating = rating; }
 
     public String getComment() { return comment; }
@@ -48,24 +52,23 @@ public class Review {
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 
-    public Transaction getTransaction() { return transaction; }
-    public void setTransaction(Transaction transaction) { this.transaction = transaction; }
+    public String getProductTitle() { return productTitle; }
+    public void setProductTitle(String productTitle) { this.productTitle = productTitle; }
 
     // Helper methods
-    public String getRatingStars() {
-        StringBuilder stars = new StringBuilder();
-        int rating = getRating();
-        for (int i = 1; i <= 5; i++) {
-            if (i <= rating) {
-                stars.append("★");
-            } else {
-                stars.append("☆");
-            }
-        }
-        return stars.toString();
-    }
-
     public boolean hasComment() {
         return comment != null && !comment.trim().isEmpty();
+    }
+
+    public String getRatingText() {
+        if (rating == null) return "No rating";
+        switch (rating) {
+            case 1: return "Poor";
+            case 2: return "Fair";
+            case 3: return "Good";
+            case 4: return "Very Good";
+            case 5: return "Excellent";
+            default: return "No rating";
+        }
     }
 }

@@ -84,8 +84,8 @@
             android:layout_marginStart="8dp"
             android:background="@drawable/rounded_background_primary"
             android:src="@drawable/ic_send"
-            android:tint="@color/white"
-            android:enabled="false" />
+            android:enabled="false"
+            app:tint="@color/white" />
 
     </LinearLayout>
 
