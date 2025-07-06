@@ -59,16 +59,10 @@ public class ForgotPasswordActivity extends AppCompatActivity {
 
         // Initially disable reset button
         btnReset.setEnabled(false);
-
-        // Check if views are found
-        if (etEmail == null || btnReset == null) {
-            Log.e(TAG, "❌ Required views not found in layout");
-            Toast.makeText(this, "Layout error - missing required fields", Toast.LENGTH_LONG).show();
-        }
     }
 
     private void setupListeners() {
-        // Text change listener for validation
+        // Email text change listener
         etEmail.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -82,8 +76,8 @@ public class ForgotPasswordActivity extends AppCompatActivity {
             public void afterTextChanged(Editable s) {}
         });
 
-        // Click listeners
-        btnReset.setOnClickListener(v -> attemptPasswordReset());
+        // Click listeners - SỬA ĐỔI attemptForgotPassword thành sendOtpForForgotPassword
+        btnReset.setOnClickListener(v -> attemptSendOtpForForgotPassword());
         tvLogin.setOnClickListener(v -> navigateToLogin());
 
         if (llBack != null) {
@@ -93,11 +87,11 @@ public class ForgotPasswordActivity extends AppCompatActivity {
 
     private void validateForm() {
         String email = etEmail.getText().toString().trim();
-        boolean isValid = ValidationUtils.isValidEmail(email);
-        btnReset.setEnabled(isValid && !isLoading);
+        btnReset.setEnabled(ValidationUtils.isValidEmail(email) && !isLoading);
     }
 
-    private void attemptPasswordReset() {
+    // ===== SỬA METHOD NÀY =====
+    private void attemptSendOtpForForgotPassword() {
         String email = etEmail.getText().toString().trim();
 
         // Validate email
@@ -107,44 +101,66 @@ public class ForgotPasswordActivity extends AppCompatActivity {
             return;
         }
 
-        performPasswordReset(email);
+        // Clear error
+        etEmail.setError(null);
+
+        sendOtpForForgotPassword(email);
     }
 
-    private void performPasswordReset(String email) {
-        Log.d(TAG, "🔍 Attempting password reset for: " + email);
+    // ===== SỬA METHOD NÀY =====
+    private void sendOtpForForgotPassword(String email) {
+        Log.d(TAG, "🔍 Sending OTP for forgot password: " + email);
 
         showLoading(true);
 
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
 
-        ApiClient.getAuthService().forgotPassword(request).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+        // SỬA: Dùng sendOtp thay vì forgotPassword
+        ApiClient.getAuthService().sendOtp(request).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
                                    @NonNull Response<StandardResponse<Map<String, String>>> response) {
                 showLoading(false);
 
-                Log.d(TAG, "🔍 Password reset response code: " + response.code());
+                Log.d(TAG, "🔍 Send OTP response code: " + response.code());
 
                 if (response.isSuccessful() && response.body() != null) {
                     StandardResponse<Map<String, String>> apiResponse = response.body();
-                    Log.d(TAG, "🔍 Password reset response: " + new Gson().toJson(apiResponse));
+                    Log.d(TAG, "🔍 Send OTP response: " + new Gson().toJson(apiResponse));
 
                     if (apiResponse.isSuccess()) {
-                        handlePasswordResetSuccess(email);
+                        handleOtpSentSuccess(email);
                     } else {
-                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Gửi email khôi phục thất bại");
+                        showError(apiResponse.getMessage() != null ?
+                                apiResponse.getMessage() : "Gửi mã OTP thất bại");
                     }
                 } else {
-                    Log.e(TAG, "❌ Password reset failed - Response code: " + response.code());
-                    showError("Gửi email khôi phục thất bại. Thử lại sau.");
+                    try {
+                        if (response.errorBody() != null) {
+                            String errorBody = response.errorBody().string();
+                            Log.e(TAG, "❌ Send OTP error response: " + errorBody);
+
+                            StandardResponse<?> errorResponse = new Gson().fromJson(errorBody, StandardResponse.class);
+                            if (errorResponse != null && errorResponse.getMessage() != null) {
+                                showError(errorResponse.getMessage());
+                            } else {
+                                showError("Email không tồn tại trong hệ thống");
+                            }
+                        } else {
+                            showError("Email không tồn tại trong hệ thống");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing error response", e);
+                        showError("Gửi mã OTP thất bại. Thử lại sau.");
+                    }
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
                 showLoading(false);
-                Log.e(TAG, "❌ Password reset network error", t);
+                Log.e(TAG, "❌ Send OTP network error", t);
 
                 if (t instanceof java.net.ConnectException) {
                     showError("Không thể kết nối đến server. Kiểm tra kết nối mạng.");
@@ -157,17 +173,28 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         });
     }
 
-    private void handlePasswordResetSuccess(String email) {
-        Log.d(TAG, "✅ Password reset email sent successfully");
+    // ===== SỬA METHOD NÀY =====
+    private void handleOtpSentSuccess(String email) {
+        Log.d(TAG, "✅ OTP sent successfully for forgot password");
 
         Toast.makeText(this,
-                "Chúng tôi đã gửi hướng dẫn khôi phục mật khẩu đến email " + email + ". Vui lòng kiểm tra hộp thư.",
+                "Mã OTP đã được gửi đến email " + email + ". Vui lòng kiểm tra hộp thư.",
                 Toast.LENGTH_LONG).show();
 
-        // Navigate back to login after successful request
-        navigateToLogin();
+        // Navigate to OTP verification for forgot password
+        navigateToOtpVerification(email);
     }
 
+    // ===== THÊM METHOD MỚI =====
+    private void navigateToOtpVerification(String email) {
+        Intent intent = new Intent(this, OtpVerificationActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("fromRegister", false); // FALSE vì đây là forgot password
+        startActivity(intent);
+        finish();
+    }
+
+    // ===== CÁC METHOD KHÁC GIỮ NGUYÊN =====
     private void navigateToLogin() {
         Intent intent = new Intent(this, LoginActivity.class);
         startActivity(intent);
@@ -177,7 +204,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
     private void showLoading(boolean show) {
         isLoading = show;
         btnReset.setEnabled(!show && ValidationUtils.isValidEmail(etEmail.getText().toString().trim()));
-        btnReset.setText(show ? "Đang gửi..." : "Gửi email khôi phục");
+        btnReset.setText(show ? "Đang gửi..." : "Gửi mã OTP"); // SỬA text
 
         // Disable input during loading
         etEmail.setEnabled(!show);

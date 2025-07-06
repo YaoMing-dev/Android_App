@@ -15,6 +15,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
@@ -157,17 +158,23 @@ public class RegisterActivity extends AppCompatActivity {
             return;
         }
 
-        // Check terms
+        // Check terms agreement
         if (!cbTerms.isChecked()) {
-            Toast.makeText(this, "Vui lòng đồng ý với điều khoản sử dụng", Toast.LENGTH_SHORT).show();
+            showError("Vui lòng đồng ý với điều khoản sử dụng");
             return;
         }
+
+        // Clear errors
+        etDisplayName.setError(null);
+        etEmail.setError(null);
+        etPassword.setError(null);
+        etConfirmPassword.setError(null);
 
         performRegister(displayName, email, password);
     }
 
     private void performRegister(String displayName, String email, String password) {
-        Log.d(TAG, "🔍 Attempting registration for: " + email);
+        Log.d(TAG, "🔍 Registering user: " + email);
 
         showLoading(true);
 
@@ -191,17 +198,16 @@ public class RegisterActivity extends AppCompatActivity {
                     if (apiResponse.isSuccess() && apiResponse.hasData()) {
                         handleRegisterSuccess(apiResponse.getData(), email);
                     } else {
-                        showError(apiResponse.getMessage() != null ? apiResponse.getMessage() : "Đăng ký thất bại");
+                        showError(apiResponse.getMessage() != null ?
+                                apiResponse.getMessage() : "Đăng ký thất bại");
                     }
                 } else {
-                    // Try to parse error response
                     try {
                         if (response.errorBody() != null) {
-                            String errorJson = response.errorBody().string();
-                            Log.e(TAG, "❌ Register error body: " + errorJson);
+                            String errorBody = response.errorBody().string();
+                            Log.e(TAG, "❌ Register error response: " + errorBody);
 
-                            // Try to parse as StandardResponse
-                            StandardResponse<?> errorResponse = new Gson().fromJson(errorJson, StandardResponse.class);
+                            StandardResponse<?> errorResponse = new Gson().fromJson(errorBody, StandardResponse.class);
                             if (errorResponse != null && errorResponse.getMessage() != null) {
                                 showError(errorResponse.getMessage());
                             } else {
@@ -233,23 +239,28 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
+    // ===== CHỈ SỬA METHOD NÀY =====
     private void handleRegisterSuccess(User user, String email) {
         Log.d(TAG, "✅ Registration successful for user: " + user.getDisplayName());
 
-        Toast.makeText(this, "Đăng ký thành công! Vui lòng xác thực email.", Toast.LENGTH_LONG).show();
+        // Save user session immediately - KHÔNG CẦN EMAIL VERIFICATION cho register
+        prefsManager.saveUserSession(user.getId(), user.getEmail(), user.getDisplayName(), true);
 
-        // Navigate to OTP verification
-        navigateToOtpVerification(email, true);
+        Toast.makeText(this, "Đăng ký thành công! Chào mừng " + user.getDisplayName(), Toast.LENGTH_LONG).show();
+
+        // Navigate directly to MainActivity - KHÔNG QUA OTP
+        navigateToMain();
     }
 
-    private void navigateToOtpVerification(String email, boolean fromRegister) {
-        Intent intent = new Intent(this, OtpVerificationActivity.class);
-        intent.putExtra("email", email);
-        intent.putExtra("fromRegister", fromRegister);
+    // ===== THÊM METHOD MỚI =====
+    private void navigateToMain() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
-        finish(); // Don't allow back to register after successful registration
+        finish();
     }
 
+    // ===== CÁC METHOD KHÁC GIỮ NGUYÊN =====
     private void navigateToLogin() {
         Intent intent = new Intent(this, LoginActivity.class);
         startActivity(intent);

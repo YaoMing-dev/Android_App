@@ -88,6 +88,7 @@ public class OtpVerificationActivity extends AppCompatActivity {
             Toast.makeText(this, "Lỗi: Không có email", Toast.LENGTH_LONG).show();
             finish();
         }
+        Log.d(TAG, "Email: " + email + ", fromRegister: " + fromRegister);
     }
 
     private void initViews() {
@@ -167,7 +168,11 @@ public class OtpVerificationActivity extends AppCompatActivity {
 
     private void updateSubtitle() {
         if (tvSubtitle != null) {
-            tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email);
+            if (fromRegister) {
+                tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email + "\nđể xác thực tài khoản");
+            } else {
+                tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email + "\nđể khôi phục mật khẩu");
+            }
         }
     }
 
@@ -303,33 +308,22 @@ public class OtpVerificationActivity extends AppCompatActivity {
     private void handleOtpVerificationSuccess(Map<String, Object> data) {
         Log.d(TAG, "✅ OTP verification successful");
 
-        // Parse user data from response
-        Object userObj = data.get("user");
-        if (userObj instanceof Map) {
-            Map<String, Object> userMap = (Map<String, Object>) userObj;
-
-            // Extract user info
-            Long userId = null;
-            Object idObj = userMap.get("id");
-            if (idObj instanceof Number) {
-                userId = ((Number) idObj).longValue();
-            }
-
-            String userEmail = (String) userMap.get("email");
-            String displayName = (String) userMap.get("displayName");
-
-            if (userId != null && userEmail != null && displayName != null) {
-                // Save user session with email verified
-                prefsManager.saveUserSession(userId, userEmail, displayName, true);
-
-                Toast.makeText(this, "Xác thực email thành công!", Toast.LENGTH_SHORT).show();
-                navigateToMain();
-            } else {
-                showError("Dữ liệu người dùng không hợp lệ");
-            }
+        if (fromRegister) {
+            // Nếu từ register - nhưng giờ register không cần OTP nữa
+            Log.w(TAG, "Register không cần OTP nữa");
+            navigateToLogin();
         } else {
-            showError("Định dạng phản hồi không hợp lệ");
+            // Forgot password flow
+            Toast.makeText(this, "Xác thực OTP thành công! Bạn có thể đăng nhập lại với mật khẩu mới.",
+                    Toast.LENGTH_LONG).show();
+            navigateToLogin();
         }
+    }
+    private void navigateToLogin() {
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private void navigateToMain() {
