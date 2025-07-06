@@ -33,6 +33,9 @@ public class ApiClient {
     private static UserService userService;
     private static ProductService productService;
     private static ApiService apiService;
+    private static ReviewService reviewService;           // ✅ ĐÚNG VỊ TRÍ
+    private static TransactionService transactionService; // ✅ ĐÚNG VỊ TRÍ
+    private static SavedItemsService savedItemsService;
 
     // ===== DYNAMIC INITIALIZATION =====
 
@@ -117,11 +120,14 @@ public class ApiClient {
             currentBaseUrl = baseUrl;
             retrofit = createRetrofit(context, baseUrl);
 
-            // Initialize services
+            // Initialize ALL services
             authService = retrofit.create(AuthService.class);
             userService = retrofit.create(UserService.class);
             productService = retrofit.create(ProductService.class);
             apiService = retrofit.create(ApiService.class);
+            reviewService = retrofit.create(ReviewService.class);           // ✅ THÊM
+            transactionService = retrofit.create(TransactionService.class); // ✅ THÊM
+            savedItemsService = retrofit.create(SavedItemsService.class);
 
             Log.d(TAG, "✅ ApiClient initialized successfully with base URL: " + baseUrl);
 
@@ -136,6 +142,14 @@ public class ApiClient {
             }
         }
     }
+
+    public static SavedItemsService getSavedItemsService() {
+        if (savedItemsService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return savedItemsService;
+    }
+
 
     private static Retrofit createRetrofit(Context context, String baseUrl) {
         // Gson configuration
@@ -265,6 +279,22 @@ public class ApiClient {
         return apiService;
     }
 
+    // ✅ SỬA LẠI: REVIEW SERVICE - ĐÚNG VỊ TRÍ VÀ LOGIC
+    public static ReviewService getReviewService() {
+        if (reviewService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return reviewService;
+    }
+
+    // ✅ SỬA LẠI: TRANSACTION SERVICE - ĐÚNG VỊ TRÍ VÀ LOGIC
+    public static TransactionService getTransactionService() {
+        if (transactionService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return transactionService;
+    }
+
     // ===== UTILITY METHODS =====
 
     public static boolean isInitialized() {
@@ -281,6 +311,9 @@ public class ApiClient {
         userService = null;
         productService = null;
         apiService = null;
+        reviewService = null;        // ✅ THÊM RESET
+        transactionService = null;
+        savedItemsService = null;// ✅ THÊM RESET
         currentBaseUrl = null;
         Log.d(TAG, "🧹 ApiClient reset");
     }

@@ -26,6 +26,10 @@ import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.auth.LoginActivity;
+import com.example.newtrade.ui.review.ReviewListActivity;        // ✅ THÊM IMPORT
+import com.example.newtrade.ui.transaction.TransactionHistoryActivity;
+// Thêm imports này nếu chưa có:
+import com.example.newtrade.ui.profile.SavedItemsActivity;// ✅ THÊM IMPORT
 import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -45,21 +49,21 @@ public class ProfileFragment extends Fragment {
     private CircleImageView ivProfilePicture;
     private TextView tvDisplayName, tvEmail, tvMemberSince;
     private TextView tvListingsCount, tvSoldCount, tvBoughtCount;
-    private LinearLayout llMyListings, llSavedItems, llPurchaseHistory;
-    private LinearLayout llAccountSettings, llHelpSupport, llAbout, llLogout;
+    private LinearLayout llMyListings, llSavedItems, llTransactionHistory; // ✅ ĐỔI TÊN
+    private LinearLayout llReviews, llAccountSettings, llHelpSupport, llAbout, llLogout; // ✅ THÊM llReviews
     private FloatingActionButton fabEditProfile;
 
     // Data
     private SharedPrefsManager prefsManager;
     private Map<String, Object> userProfile;
 
-    // ✅ FIX: Modern Activity Result API
+    // Activity Result API
     private ActivityResultLauncher<Intent> editProfileLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
                 if (result.getResultCode() == Activity.RESULT_OK) {
                     Log.d(TAG, "✅ Profile updated, refreshing data");
-                    loadUserProfile(); // Reload profile data
+                    loadUserProfile();
                     Toast.makeText(requireContext(), "Profile updated successfully!", Toast.LENGTH_SHORT).show();
                 }
             }
@@ -94,10 +98,11 @@ public class ProfileFragment extends Fragment {
         tvSoldCount = view.findViewById(R.id.tv_sold_count);
         tvBoughtCount = view.findViewById(R.id.tv_bought_count);
 
-        // Menu items
+        // Menu items - ✅ CẬP NHẬT THEO LAYOUT THỰC TẾ
         llMyListings = view.findViewById(R.id.ll_my_listings);
         llSavedItems = view.findViewById(R.id.ll_saved_items);
-        llPurchaseHistory = view.findViewById(R.id.ll_purchase_history);
+        llTransactionHistory = view.findViewById(R.id.ll_transaction_history); // ✅ THAY ĐỔI TỪ ll_purchase_history
+        llReviews = view.findViewById(R.id.ll_reviews);                        // ✅ THÊM MỚI
         llAccountSettings = view.findViewById(R.id.ll_account_settings);
         llHelpSupport = view.findViewById(R.id.ll_help_support);
         llAbout = view.findViewById(R.id.ll_about);
@@ -112,7 +117,7 @@ public class ProfileFragment extends Fragment {
     }
 
     private void setupListeners() {
-        // ✅ FIX: Edit Profile FAB with proper error handling
+        // Edit Profile FAB
         if (fabEditProfile != null) {
             fabEditProfile.setOnClickListener(v -> {
                 try {
@@ -134,8 +139,14 @@ public class ProfileFragment extends Fragment {
             llSavedItems.setOnClickListener(v -> openSavedItems());
         }
 
-        if (llPurchaseHistory != null) {
-            llPurchaseHistory.setOnClickListener(v -> openPurchaseHistory());
+        // ✅ CẬP NHẬT: Transaction History
+        if (llTransactionHistory != null) {
+            llTransactionHistory.setOnClickListener(v -> openTransactionHistory());
+        }
+
+        // ✅ THÊM MỚI: Reviews navigation
+        if (llReviews != null) {
+            llReviews.setOnClickListener(v -> openReviews());
         }
 
         if (llAccountSettings != null) {
@@ -168,7 +179,6 @@ public class ProfileFragment extends Fragment {
         }
     }
 
-    // ✅ FIXED: displayBasicProfile với Glide cache bypass + DEBUG
     private void displayBasicProfile() {
         try {
             String displayName = prefsManager.getUserName();
@@ -189,7 +199,7 @@ public class ProfileFragment extends Fragment {
                 tvEmail.setText(email != null && !email.isEmpty() ? email : "No email");
             }
 
-            // ✅ FIX: Load profile picture với ImageUtils + debug
+            // Load profile picture
             if (ivProfilePicture != null) {
                 Log.d(TAG, "🔍 About to call ImageUtils.loadAvatarImage()");
                 ImageUtils.loadAvatarImage(requireContext(), profilePicture, ivProfilePicture);
@@ -248,7 +258,7 @@ public class ProfileFragment extends Fragment {
                 tvMemberSince.setText("Member since " + createdAt.substring(0, 4));
             }
 
-            // ✅ FIX: Update profile picture if different from SharedPrefs
+            // Update profile picture if different from SharedPrefs
             if (profile.get("profilePicture") != null) {
                 String serverProfilePicture = profile.get("profilePicture").toString();
                 String localProfilePicture = prefsManager.getUserProfilePicture();
@@ -278,30 +288,66 @@ public class ProfileFragment extends Fragment {
         }
     }
 
-    // ✅ THÊM onResume() để reload khi quay lại
     @Override
     public void onResume() {
         super.onResume();
         Log.d(TAG, "🔄 onResume() called, refreshing profile");
-        // Reload profile để cập nhật những thay đổi từ EditProfileActivity
         displayBasicProfile();
     }
 
-    // Menu navigation methods
+    // ===== MENU NAVIGATION METHODS =====
+
     private void openMyListings() {
         Toast.makeText(requireContext(), "My Listings - Coming soon", Toast.LENGTH_SHORT).show();
     }
 
     private void openSavedItems() {
-        Toast.makeText(requireContext(), "Saved Items - Coming soon", Toast.LENGTH_SHORT).show();
+        try {
+            Intent intent = new Intent(requireContext(), SavedItemsActivity.class);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening saved items", e);
+            Toast.makeText(requireContext(), "Unable to open saved items", Toast.LENGTH_SHORT).show();
+        }
     }
 
-    private void openPurchaseHistory() {
-        Toast.makeText(requireContext(), "Purchase History - Coming soon", Toast.LENGTH_SHORT).show();
+    // ✅ CẬP NHẬT: Transaction History navigation
+    private void openTransactionHistory() {
+        try {
+            Intent intent = new Intent(requireContext(), TransactionHistoryActivity.class);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening transaction history", e);
+            Toast.makeText(requireContext(), "Unable to open transaction history", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ✅ THÊM MỚI: Reviews navigation
+    private void openReviews() {
+        try {
+            Intent intent = new Intent(requireContext(), ReviewListActivity.class);
+            // Pass current user ID and name
+            Long currentUserId = prefsManager.getUserId();
+            String currentUserName = prefsManager.getUserName();
+
+            intent.putExtra(ReviewListActivity.EXTRA_USER_ID, currentUserId);
+            intent.putExtra(ReviewListActivity.EXTRA_USER_NAME, currentUserName);
+
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening reviews", e);
+            Toast.makeText(requireContext(), "Unable to open reviews", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void openAccountSettings() {
-        Toast.makeText(requireContext(), "Account Settings - Coming soon", Toast.LENGTH_SHORT).show();
+        try {
+            Intent intent = new Intent(requireContext(), SettingsActivity.class);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening account settings", e);
+            Toast.makeText(requireContext(), "Unable to open settings", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void openHelpSupport() {

@@ -229,6 +229,47 @@
 
             </LinearLayout>
 
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider_color" />
+
+            <!-- Transaction History -->
+            <LinearLayout
+                android:id="@+id/ll_transaction_history"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:background="@color/white"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@android:drawable/ic_menu_recent_history"
+                    android:layout_gravity="center_vertical" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="16dp"
+                    android:text="Transaction History"
+                    android:textSize="16sp"
+                    android:layout_gravity="center_vertical" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@android:drawable/ic_media_play"
+                    android:rotation="270"
+                    android:layout_gravity="center_vertical" />
+
+            </LinearLayout>
             <!-- Spacer -->
             <View
                 android:layout_width="match_parent"
@@ -326,7 +367,7 @@
                     android:layout_height="24dp"
                     android:src="@android:drawable/ic_menu_revert"
                     android:layout_gravity="center_vertical"
-                    android:tint="@color/error_color" />
+                    app:tint="@color/error_color" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -362,7 +403,7 @@
                     android:layout_height="24dp"
                     android:src="@android:drawable/ic_menu_delete"
                     android:layout_gravity="center_vertical"
-                    android:tint="@color/error_color" />
+                    app:tint="@color/error_color" />
 
                 <TextView
                     android:layout_width="0dp"

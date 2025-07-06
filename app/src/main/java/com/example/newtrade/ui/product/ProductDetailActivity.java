@@ -15,7 +15,8 @@ import android.widget.Toast;
 import com.example.newtrade.ui.profile.UserProfileActivity;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
+// Thêm imports này nếu chưa có:
+import com.example.newtrade.ui.profile.SavedItemsActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
@@ -45,6 +46,8 @@ public class ProductDetailActivity extends AppCompatActivity {
 
     // UI Components
     private MaterialToolbar toolbar;
+
+
     private ImageView ivProductImage;
     private TextView tvTitle, tvPrice, tvDescription, tvLocation, tvCondition;
     private TextView tvSellerName, tvSellerRating, tvMemberSince;
@@ -57,6 +60,7 @@ public class ProductDetailActivity extends AppCompatActivity {
     private String productPrice;
     private Map<String, Object> productData;
     private SharedPrefsManager prefsManager;
+    private boolean isItemSaved = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,6 +107,7 @@ public class ProductDetailActivity extends AppCompatActivity {
         btnViewProfile = findViewById(R.id.btn_view_profile);
         fabShare = findViewById(R.id.fab_share);
         fabSave = findViewById(R.id.fab_save);
+
     }
 
     private void setupToolbar() {
@@ -118,7 +123,79 @@ public class ProductDetailActivity extends AppCompatActivity {
         btnMakeOffer.setOnClickListener(v -> makeOffer());
         btnViewProfile.setOnClickListener(v -> viewSellerProfile());
         fabShare.setOnClickListener(v -> shareProduct());
-        fabSave.setOnClickListener(v -> saveProduct());
+        fabSave.setOnClickListener(v -> toggleSaveItem());
+    }
+
+    private void checkSaveStatus() {
+        if (productId == null || productId <= 0) return;
+
+        ApiClient.getSavedItemsService().isItemSaved(productId)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            Map<String, Object> data = response.body().getData();
+                            if (data != null && data.containsKey("isSaved")) {
+                                isItemSaved = (Boolean) data.get("isSaved");
+                                updateSaveButton();
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.e(TAG, "Error checking save status", t);
+                    }
+                });
+    }
+
+    private void toggleSaveItem() {
+        if (productId == null || productId <= 0) return;
+
+        Call<StandardResponse<String>> call;
+        if (isItemSaved) {
+            call = ApiClient.getSavedItemsService().removeSavedItem(productId);
+        } else {
+            call = ApiClient.getSavedItemsService().saveItem(productId);
+        }
+
+        call.enqueue(new Callback<StandardResponse<String>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<String>> call,
+                                   Response<StandardResponse<String>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    isItemSaved = !isItemSaved;
+                    updateSaveButton();
+
+                    String message = isItemSaved ? "Item saved" : "Item removed from saved";
+                    Toast.makeText(ProductDetailActivity.this, message, Toast.LENGTH_SHORT).show();
+                } else {
+                    String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to update save status";
+                    Toast.makeText(ProductDetailActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
+                Log.e(TAG, "Error toggling save status", t);
+                Toast.makeText(ProductDetailActivity.this, "Network error. Please try again.", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void updateSaveButton() {
+        if (fabSave != null) {
+            fabSave.setImageResource(isItemSaved ?
+                    R.drawable.ic_favorite : R.drawable.ic_favorite_border);
+
+            // Optional: Change FAB color
+            if (isItemSaved) {
+                fabSave.setBackgroundTintList(getColorStateList(android.R.color.holo_red_light));
+            } else {
+                fabSave.setBackgroundTintList(getColorStateList(R.color.primary_color));
+            }
+        }
     }
 
     private void loadProductDetails() {
@@ -210,6 +287,9 @@ public class ProductDetailActivity extends AppCompatActivity {
                             seller.get("createdAt").toString().substring(0, 4));
                 }
             }
+
+            // ✅ THÊM: Check save status sau khi load xong product
+            checkSaveStatus();
 
         } catch (Exception e) {
             Log.e(TAG, "Error displaying product data", e);

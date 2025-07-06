@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Khung ngoài dạng răng cưa của hóa đơn -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M21,2H3v20l3,-1.5L9,22l3,-1.5L15,22l3,-1.5L21,22V2zM19,19.13l-1.5,-0.75L16,19.13l-1.5,-0.75L13,19.13l-1.5,-0.75L10,19.13l-1.5,-0.75L7,19.13V4h12v15.13z" />
+
+    <!-- Dòng kẻ thứ nhất -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,6h8v2H8z" />
+
+    <!-- Dòng kẻ thứ hai -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,10h8v2H8z" />
+
+    <!-- Dòng kẻ thứ ba -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M8,14h5v2H8z" />
+</vector>

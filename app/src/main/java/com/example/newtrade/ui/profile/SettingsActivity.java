@@ -17,6 +17,9 @@ import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.auth.LoginActivity;
+// Thêm imports này nếu chưa có:
+import com.example.newtrade.ui.profile.SavedItemsActivity;
+import com.example.newtrade.ui.transaction.TransactionHistoryActivity; // ✅ THÊM IMPORT
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.switchmaterial.SwitchMaterial;
@@ -34,6 +37,7 @@ public class SettingsActivity extends AppCompatActivity {
     // UI Components
     private MaterialToolbar toolbar;
     private LinearLayout llEditProfile, llMyListings, llSavedItems, llOfferHistory;
+    private LinearLayout llTransactionHistory; // ✅ THÊM MỚI
     private LinearLayout llNotifications, llLogout, llDeleteAccount;
     private SwitchMaterial switchNotifications, switchLocationServices;
     private TextView tvUserName, tvUserEmail;
@@ -63,6 +67,7 @@ public class SettingsActivity extends AppCompatActivity {
         llMyListings = findViewById(R.id.ll_my_listings);
         llSavedItems = findViewById(R.id.ll_saved_items);
         llOfferHistory = findViewById(R.id.ll_offer_history);
+        llTransactionHistory = findViewById(R.id.ll_transaction_history); // ✅ THÊM MỚI
         llNotifications = findViewById(R.id.ll_notifications);
         llLogout = findViewById(R.id.ll_logout);
         llDeleteAccount = findViewById(R.id.ll_delete_account);
@@ -86,6 +91,7 @@ public class SettingsActivity extends AppCompatActivity {
         llMyListings.setOnClickListener(v -> openMyListings());
         llSavedItems.setOnClickListener(v -> openSavedItems());
         llOfferHistory.setOnClickListener(v -> openOfferHistory());
+        llTransactionHistory.setOnClickListener(v -> openTransactionHistory()); // ✅ THÊM MỚI
         llLogout.setOnClickListener(v -> showLogoutDialog());
         llDeleteAccount.setOnClickListener(v -> showDeleteAccountDialog());
 
@@ -123,6 +129,12 @@ public class SettingsActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    // ✅ THÊM METHOD MỚI
+    private void openTransactionHistory() {
+        Intent intent = new Intent(this, TransactionHistoryActivity.class);
+        startActivity(intent);
+    }
+
     private void showLogoutDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Logout")
@@ -149,6 +161,7 @@ public class SettingsActivity extends AppCompatActivity {
                 .setTitle("Delete Account")
                 .setMessage("This action cannot be undone. Are you sure you want to permanently delete your account?")
                 .setPositiveButton("Delete", (dialog, which) -> {
+                    // ✅ TODO: Implement real account deletion API call
                     Toast.makeText(this, "Account deletion feature coming soon", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)

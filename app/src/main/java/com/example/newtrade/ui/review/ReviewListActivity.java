@@ -1,25 +1,22 @@
-// app/src/main/java/com/example/newtrade/ui/profile/SavedItemsActivity.java
-package com.example.newtrade.ui.profile;
+// app/src/main/java/com/example/newtrade/ui/review/ReviewListActivity.java
+package com.example.newtrade.ui.review;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.newtrade.R;
-import com.example.newtrade.adapters.ProductAdapter;
+import com.example.newtrade.adapters.ReviewAdapter;
 import com.example.newtrade.api.ApiClient;
-import com.example.newtrade.models.Product;
+import com.example.newtrade.models.Review;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -35,20 +32,23 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class SavedItemsActivity extends AppCompatActivity implements ProductAdapter.OnProductClickListener {
+public class ReviewListActivity extends AppCompatActivity {
 
-    private static final String TAG = "SavedItemsActivity";
+    private static final String TAG = "ReviewListActivity";
+    public static final String EXTRA_USER_ID = "user_id";
+    public static final String EXTRA_USER_NAME = "user_name";
 
     // UI Components
     private MaterialToolbar toolbar;
     private SwipeRefreshLayout swipeRefresh;
-    private RecyclerView rvSavedItems;
+    private RecyclerView rvReviews;
     private TextView tvEmptyState;
-    private TextView tvItemCount;
 
     // Data
-    private ProductAdapter productAdapter;
-    private List<Product> savedItems = new ArrayList<>();
+    private ReviewAdapter reviewAdapter;
+    private List<Review> reviews = new ArrayList<>();
+    private Long userId;
+    private String userName;
     private SharedPrefsManager prefsManager;
     private int currentPage = 0;
     private boolean isLoading = false;
@@ -57,23 +57,23 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_saved_items);
+        setContentView(R.layout.activity_review_list);
 
         initViews();
         setupToolbar();
+        getIntentData();
         setupRecyclerView();
         setupListeners();
-        loadSavedItems();
+        loadReviews();
 
-        Log.d(TAG, "SavedItemsActivity created");
+        Log.d(TAG, "ReviewListActivity created for user: " + userId);
     }
 
     private void initViews() {
         toolbar = findViewById(R.id.toolbar);
         swipeRefresh = findViewById(R.id.swipe_refresh);
-        rvSavedItems = findViewById(R.id.rv_saved_items);
+        rvReviews = findViewById(R.id.rv_reviews);
         tvEmptyState = findViewById(R.id.tv_empty_state);
-        tvItemCount = findViewById(R.id.tv_item_count);
 
         prefsManager = SharedPrefsManager.getInstance(this);
     }
@@ -82,22 +82,33 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("Saved Items");
+            getSupportActionBar().setTitle(userName != null ? userName + "'s Reviews" : "Reviews");
+        }
+    }
+
+    private void getIntentData() {
+        userId = getIntent().getLongExtra(EXTRA_USER_ID, 0L);
+        userName = getIntent().getStringExtra(EXTRA_USER_NAME);
+
+        if (userId == 0L) {
+            // Default to current user
+            userId = prefsManager.getUserId();
+            userName = prefsManager.getUserName();
         }
     }
 
     private void setupRecyclerView() {
-        productAdapter = new ProductAdapter(savedItems, this);
-        rvSavedItems.setLayoutManager(new GridLayoutManager(this, 2));
-        rvSavedItems.setAdapter(productAdapter);
+        reviewAdapter = new ReviewAdapter(reviews);
+        rvReviews.setLayoutManager(new LinearLayoutManager(this));
+        rvReviews.setAdapter(reviewAdapter);
 
         // Add pagination
-        rvSavedItems.addOnScrollListener(new RecyclerView.OnScrollListener() {
+        rvReviews.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
 
-                GridLayoutManager layoutManager = (GridLayoutManager) recyclerView.getLayoutManager();
+                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
                 if (layoutManager != null && !isLoading && hasMoreData) {
                     int visibleItemCount = layoutManager.getChildCount();
                     int totalItemCount = layoutManager.getItemCount();
@@ -106,7 +117,7 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
                     if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount
                             && firstVisibleItemPosition >= 0
                             && totalItemCount >= Constants.DEFAULT_PAGE_SIZE) {
-                        loadMoreSavedItems();
+                        loadMoreReviews();
                     }
                 }
             }
@@ -117,11 +128,11 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
         swipeRefresh.setOnRefreshListener(() -> {
             currentPage = 0;
             hasMoreData = true;
-            loadSavedItems();
+            loadReviews();
         });
     }
 
-    private void loadSavedItems() {
+    private void loadReviews() {
         if (isLoading) return;
 
         isLoading = true;
@@ -129,7 +140,7 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
             swipeRefresh.setRefreshing(true);
         }
 
-        ApiClient.getSavedItemsService().getSavedItems(currentPage, Constants.DEFAULT_PAGE_SIZE)
+        ApiClient.getReviewService().getUserReviews(userId, currentPage, Constants.DEFAULT_PAGE_SIZE)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
@@ -138,11 +149,9 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
                         swipeRefresh.setRefreshing(false);
 
                         if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            handleSavedItemsResponse(response.body().getData());
+                            handleReviewsResponse(response.body().getData());
                         } else {
-                            String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to load saved items";
-                            Log.e(TAG, "Error loading saved items: " + errorMsg);
-                            Toast.makeText(SavedItemsActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
+                            Log.e(TAG, "Error loading reviews: " + (response.body() != null ? response.body().getMessage() : "Unknown error"));
                             updateUI();
                         }
                     }
@@ -151,81 +160,57 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                         isLoading = false;
                         swipeRefresh.setRefreshing(false);
-                        Log.e(TAG, "Network error loading saved items", t);
-                        Toast.makeText(SavedItemsActivity.this, "Network error. Please try again.", Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "Network error loading reviews", t);
                         updateUI();
                     }
                 });
     }
 
-    private void loadMoreSavedItems() {
+    private void loadMoreReviews() {
         currentPage++;
-        loadSavedItems();
+        loadReviews();
     }
 
-    private void handleSavedItemsResponse(Map<String, Object> data) {
+    private void handleReviewsResponse(Map<String, Object> data) {
         try {
             if (data != null && data.containsKey("content")) {
                 Gson gson = new Gson();
-                Type listType = new TypeToken<List<Product>>(){}.getType();
-                List<Product> newItems = gson.fromJson(gson.toJson(data.get("content")), listType);
+                Type listType = new TypeToken<List<Review>>(){}.getType();
+                List<Review> newReviews = gson.fromJson(gson.toJson(data.get("content")), listType);
 
                 if (currentPage == 0) {
-                    savedItems.clear();
+                    reviews.clear();
                 }
 
-                if (newItems != null && !newItems.isEmpty()) {
-                    savedItems.addAll(newItems);
-                    hasMoreData = newItems.size() >= Constants.DEFAULT_PAGE_SIZE;
+                if (newReviews != null && !newReviews.isEmpty()) {
+                    reviews.addAll(newReviews);
+                    hasMoreData = newReviews.size() >= Constants.DEFAULT_PAGE_SIZE;
                 } else {
                     hasMoreData = false;
                 }
 
-                Log.d(TAG, "Loaded " + (newItems != null ? newItems.size() : 0) + " saved items");
+                Log.d(TAG, "Loaded " + (newReviews != null ? newReviews.size() : 0) + " reviews");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing saved items response", e);
+            Log.e(TAG, "Error parsing reviews response", e);
         }
 
         updateUI();
     }
 
     private void updateUI() {
-        if (productAdapter != null) {
-            productAdapter.notifyDataSetChanged();
+        if (reviewAdapter != null) {
+            reviewAdapter.notifyDataSetChanged();
         }
 
-        // Update item count
-        if (tvItemCount != null) {
-            tvItemCount.setText(savedItems.size() + " items");
-        }
-
-        // Show/hide empty state
-        if (savedItems.isEmpty()) {
-            rvSavedItems.setVisibility(View.GONE);
+        if (reviews.isEmpty()) {
+            rvReviews.setVisibility(View.GONE);
             tvEmptyState.setVisibility(View.VISIBLE);
+            tvEmptyState.setText("No reviews yet");
         } else {
-            rvSavedItems.setVisibility(View.VISIBLE);
+            rvReviews.setVisibility(View.VISIBLE);
             tvEmptyState.setVisibility(View.GONE);
         }
-    }
-
-    // ProductAdapter.OnProductClickListener implementation
-    @Override
-    public void onProductClick(Product product) {
-        Intent intent = new Intent(this, ProductDetailActivity.class);
-        intent.putExtra("product_id", product.getId());
-        startActivity(intent);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Reload saved items when returning from ProductDetail
-        // (in case user unsaved an item)
-        currentPage = 0;
-        hasMoreData = true;
-        loadSavedItems();
     }
 
     @Override
