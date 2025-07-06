@@ -132,11 +132,13 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
+        <activity
+            android:name=".ui.auth.ResetPasswordActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:screenOrientation="portrait" />
         <!-- ===== SERVICES ===== -->
-        <service
-            android:name=".websocket.RealtimeWebSocketService"
-            android:enabled="true"
-            android:exported="false" />
+
 
     </application>
 

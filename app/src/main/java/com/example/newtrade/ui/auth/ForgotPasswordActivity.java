@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/newtrade/ui/auth/ForgotPasswordActivity.java
+// ===== SỬA ForgotPasswordActivity.java =====
 package com.example.newtrade.ui.auth;
 
 import android.content.Intent;
@@ -76,7 +76,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
             public void afterTextChanged(Editable s) {}
         });
 
-        // Click listeners - SỬA ĐỔI attemptForgotPassword thành sendOtpForForgotPassword
+        // ===== SỬA: Gọi sendOtp thay vì password-reset-request =====
         btnReset.setOnClickListener(v -> attemptSendOtpForForgotPassword());
         tvLogin.setOnClickListener(v -> navigateToLogin());
 
@@ -91,7 +91,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
     }
 
     // ===== SỬA METHOD NÀY =====
-    private void attemptSendOtpForForgotPassword() {
+    private void attemptPasswordResetRequest() {
         String email = etEmail.getText().toString().trim();
 
         // Validate email
@@ -104,10 +104,104 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         // Clear error
         etEmail.setError(null);
 
-        sendOtpForForgotPassword(email);
+        sendPasswordResetRequest(email);
     }
 
     // ===== SỬA METHOD NÀY =====
+    private void sendPasswordResetRequest(String email) {
+        Log.d(TAG, "🔍 Sending password reset request: " + email);
+
+        showLoading(true);
+
+        // ===== SỬA: Dùng email parameter trực tiếp thay vì Map =====
+        ApiClient.getAuthService().passwordResetRequest(email).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, String>>> response) {
+                showLoading(false);
+
+                Log.d(TAG, "🔍 Password reset request response code: " + response.code());
+
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Map<String, String>> apiResponse = response.body();
+                    Log.d(TAG, "🔍 Password reset request response: " + new Gson().toJson(apiResponse));
+
+                    if (apiResponse.isSuccess() && apiResponse.hasData()) {
+                        // Lấy token từ response
+                        Map<String, String> responseData = apiResponse.getData();
+                        String resetToken = responseData.get("token");
+
+                        if (resetToken != null && !resetToken.isEmpty()) {
+                            handlePasswordResetRequestSuccess(email, resetToken);
+                        } else {
+                            Log.e(TAG, "No token in password reset response");
+                            Log.d(TAG, "Available keys in response: " + responseData.keySet());
+                            showError("Không nhận được token reset. Thử lại sau.");
+                        }
+                    } else {
+                        showError(apiResponse.getMessage() != null ?
+                                apiResponse.getMessage() : "Gửi yêu cầu reset thất bại");
+                    }
+                } else {
+                    try {
+                        if (response.errorBody() != null) {
+                            String errorBody = response.errorBody().string();
+                            Log.e(TAG, "❌ Password reset request error response: " + errorBody);
+
+                            StandardResponse<?> errorResponse = new Gson().fromJson(errorBody, StandardResponse.class);
+                            if (errorResponse != null && errorResponse.getMessage() != null) {
+                                showError(errorResponse.getMessage());
+                            } else {
+                                showError("Email không tồn tại trong hệ thống");
+                            }
+                        } else {
+                            showError("Email không tồn tại trong hệ thống");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing error response", e);
+                        showError("Gửi yêu cầu reset thất bại. Thử lại sau.");
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, String>>> call, @NonNull Throwable t) {
+                showLoading(false);
+                Log.e(TAG, "❌ Password reset request network error", t);
+
+                if (t instanceof java.net.ConnectException) {
+                    showError("Không thể kết nối đến server. Kiểm tra kết nối mạng.");
+                } else if (t instanceof java.net.SocketTimeoutException) {
+                    showError("Kết nối timeout. Thử lại sau.");
+                } else {
+                    showError("Lỗi mạng: " + t.getMessage());
+                }
+            }
+        });
+    }
+
+    // ===== THÊM METHOD MỚI =====
+    private void handlePasswordResetRequestSuccess(String email, String resetToken) {
+        Log.d(TAG, "✅ Password reset request successful, token received: " + resetToken);
+
+        Toast.makeText(this,
+                "Yêu cầu reset mật khẩu thành công! Bạn có thể tạo mật khẩu mới.",
+                Toast.LENGTH_LONG).show();
+
+        // Navigate directly to reset password với token
+        navigateToResetPassword(email, resetToken);
+    }
+
+    // ===== THÊM METHOD MỚI =====
+    private void navigateToResetPassword(String email, String resetToken) {
+        Intent intent = new Intent(this, ResetPasswordActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("resetToken", resetToken);
+        startActivity(intent);
+        finish();
+    }
+
+
     private void sendOtpForForgotPassword(String email) {
         Log.d(TAG, "🔍 Sending OTP for forgot password: " + email);
 
@@ -116,7 +210,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
 
-        // SỬA: Dùng sendOtp thay vì forgotPassword
+        // ===== QUAN TRỌNG: Dùng sendOtp thay vì passwordResetRequest =====
         ApiClient.getAuthService().sendOtp(request).enqueue(new Callback<StandardResponse<Map<String, String>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, String>>> call,
@@ -173,7 +267,6 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         });
     }
 
-    // ===== SỬA METHOD NÀY =====
     private void handleOtpSentSuccess(String email) {
         Log.d(TAG, "✅ OTP sent successfully for forgot password");
 
@@ -185,7 +278,6 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         navigateToOtpVerification(email);
     }
 
-    // ===== THÊM METHOD MỚI =====
     private void navigateToOtpVerification(String email) {
         Intent intent = new Intent(this, OtpVerificationActivity.class);
         intent.putExtra("email", email);
@@ -201,10 +293,26 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         finish();
     }
 
+    private void attemptSendOtpForForgotPassword() {
+        String email = etEmail.getText().toString().trim();
+
+        // Validate email
+        String emailError = ValidationUtils.getEmailError(email);
+        if (emailError != null) {
+            etEmail.setError(emailError);
+            return;
+        }
+
+        // Clear error
+        etEmail.setError(null);
+
+        sendOtpForForgotPassword(email);
+    }
+
     private void showLoading(boolean show) {
         isLoading = show;
         btnReset.setEnabled(!show && ValidationUtils.isValidEmail(etEmail.getText().toString().trim()));
-        btnReset.setText(show ? "Đang gửi..." : "Gửi mã OTP"); // SỬA text
+        btnReset.setText(show ? "Đang gửi..." : "Reset Mật Khẩu"); // SỬA text
 
         // Disable input during loading
         etEmail.setEnabled(!show);

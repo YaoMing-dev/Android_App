@@ -309,15 +309,43 @@ public class OtpVerificationActivity extends AppCompatActivity {
         Log.d(TAG, "✅ OTP verification successful");
 
         if (fromRegister) {
-            // Nếu từ register - nhưng giờ register không cần OTP nữa
+            // Register flow (không dùng nữa)
             Log.w(TAG, "Register không cần OTP nữa");
             navigateToLogin();
         } else {
-            // Forgot password flow
-            Toast.makeText(this, "Xác thực OTP thành công! Bạn có thể đăng nhập lại với mật khẩu mới.",
-                    Toast.LENGTH_LONG).show();
-            navigateToLogin();
+            // Forgot password flow - navigate to reset password
+            Toast.makeText(this, "Xác thực OTP thành công! Vui lòng tạo mật khẩu mới.",
+                    Toast.LENGTH_SHORT).show();
+            navigateToResetPassword();
         }
+    }
+    private void navigateToResetPassword() {
+        Intent intent = new Intent(this, ResetPasswordActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("fromOtpVerification", true); // Flag để biết đến từ OTP
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void navigateToResetPasswordWithEmail() {
+        Intent intent = new Intent(this, ResetPasswordActivity.class);
+        intent.putExtra("email", email);
+        intent.putExtra("resetToken", ""); // Không cần token
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void navigateToResetPassword(String resetToken) {
+        Intent intent = new Intent(this, ResetPasswordActivity.class);
+        intent.putExtra("email", email);
+        if (resetToken != null) {
+            intent.putExtra("resetToken", resetToken);
+        }
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
     private void navigateToLogin() {
         Intent intent = new Intent(this, LoginActivity.class);

@@ -9,6 +9,7 @@ import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
+import retrofit2.http.Query;
 
 public interface AuthService {
 
@@ -47,9 +48,23 @@ public interface AuthService {
     Call<StandardResponse<Map<String, String>>> forgotPassword(@Body Map<String, String> request);
 
     // Reset password with token
-    @POST("api/auth/reset-password")
-    Call<StandardResponse<Map<String, String>>> resetPassword(@Body Map<String, String> request);
+    @POST("api/users/password-reset-confirm")
+    Call<StandardResponse<Map<String, String>>> resetPassword(
+            @Query("token") String token,
+            @Query("newPassword") String newPassword
+    );
 
+
+
+    @POST("api/users/password-reset-request")
+    Call<StandardResponse<Map<String, String>>> passwordResetRequest(@Query("email") String email);
+
+    @POST("api/auth/reset-password-with-email")
+    Call<StandardResponse<Map<String, String>>> resetPasswordWithEmail(@Body Map<String, String> request);
+
+    // Hoặc nếu backend support:
+    @POST("api/auth/change-password")
+    Call<StandardResponse<Map<String, String>>> changePassword(@Body Map<String, String> request);
     // ===== SESSION MANAGEMENT =====
 
     // Validate session (requires User-ID header)
