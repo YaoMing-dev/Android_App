@@ -27,8 +27,8 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Category;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.ui.product.CategoryProductsActivity;
 import com.example.newtrade.ui.product.ProductDetailActivity;
-import com.example.newtrade.ui.search.CategoryProductsActivity;
 import com.example.newtrade.ui.search.AllProductsActivity;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
@@ -97,6 +97,7 @@ public class HomeFragment extends Fragment {
 
     private void setupRecyclerViews() {
         try {
+            debugApiConnection();
             // Categories RecyclerView (horizontal) với click listener hoạt động
             if (rvCategories != null) {
                 categoryAdapter = new CategoryAdapter(categories, category -> {
@@ -121,6 +122,27 @@ public class HomeFragment extends Fragment {
             Log.d(TAG, "✅ HomeFragment RecyclerViews setup");
         } catch (Exception e) {
             Log.e(TAG, "❌ Error setting up RecyclerViews", e);
+        }
+    }
+    private void debugApiConnection() {
+        String baseUrl = ApiClient.getCurrentBaseUrl();
+        Log.d(TAG, "🔍 Current BASE_URL: " + baseUrl);
+
+        // Test health check
+        if (ApiClient.isInitialized()) {
+            ApiClient.getApiService().healthCheck().enqueue(new Callback<StandardResponse<String>>() {
+                @Override
+                public void onResponse(Call<StandardResponse<String>> call, Response<StandardResponse<String>> response) {
+                    Log.d(TAG, response.isSuccessful() ? "✅ Backend reachable" : "❌ Backend error: " + response.code());
+                }
+
+                @Override
+                public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
+                    Log.e(TAG, "❌ Backend unreachable: " + t.getMessage());
+                }
+            });
+        } else {
+            Log.w(TAG, "⚠️ ApiClient not initialized");
         }
     }
 

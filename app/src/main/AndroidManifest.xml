@@ -155,7 +155,7 @@
             android:parentActivityName=".MainActivity" />
 
         <activity
-            android:name=".ui.search.CategoryProductsActivity"
+            android:name=".ui.product.CategoryProductsActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
