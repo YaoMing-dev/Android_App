@@ -36,6 +36,8 @@ public class ApiClient {
     private static ReviewService reviewService;           // ✅ ĐÚNG VỊ TRÍ
     private static TransactionService transactionService; // ✅ ĐÚNG VỊ TRÍ
     private static SavedItemsService savedItemsService;
+    private static OfferService offerService;
+    private static AnalyticsService analyticsService;
 
     // ===== DYNAMIC INITIALIZATION =====
 
@@ -128,6 +130,8 @@ public class ApiClient {
             reviewService = retrofit.create(ReviewService.class);           // ✅ THÊM
             transactionService = retrofit.create(TransactionService.class); // ✅ THÊM
             savedItemsService = retrofit.create(SavedItemsService.class);
+            offerService = retrofit.create(OfferService.class);
+            analyticsService = retrofit.create(AnalyticsService.class);
 
             Log.d(TAG, "✅ ApiClient initialized successfully with base URL: " + baseUrl);
 
@@ -143,11 +147,24 @@ public class ApiClient {
         }
     }
 
+    public static AnalyticsService getAnalyticsService() {
+        if (analyticsService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return analyticsService;
+    }
     public static SavedItemsService getSavedItemsService() {
         if (savedItemsService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
         }
         return savedItemsService;
+    }
+
+    public static OfferService getOfferService() {
+        if (offerService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return offerService;
     }
 
 
@@ -315,6 +332,8 @@ public class ApiClient {
         transactionService = null;
         savedItemsService = null;// ✅ THÊM RESET
         currentBaseUrl = null;
+        analyticsService = null;
+        offerService = null;
         Log.d(TAG, "🧹 ApiClient reset");
     }
 
@@ -322,6 +341,7 @@ public class ApiClient {
         resetClient();
         init(context, callback);
     }
+
 
     // ===== IP MANAGEMENT UTILITIES =====
 

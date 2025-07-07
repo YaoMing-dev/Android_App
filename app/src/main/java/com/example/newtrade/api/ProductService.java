@@ -65,14 +65,7 @@ public interface ProductService {
 
     // ===== USER SPECIFIC OPERATIONS =====
 
-    @GET("api/products/user/{userId}")
-    Call<StandardResponse<List<Map<String, Object>>>> getProductsByUser(@Path("userId") Long userId);
 
-    @GET("api/products/my-products")
-    Call<StandardResponse<List<Map<String, Object>>>> getMyProducts(
-            @Query("page") int page,
-            @Query("size") int size
-    );
 
     // ===== SEARCH OPERATIONS =====
 
@@ -90,6 +83,17 @@ public interface ProductService {
     @GET("api/products/search")
     Call<StandardResponse<Map<String, Object>>> searchProducts(@Query("query") String query);
 
+    @GET("api/products/user/{userId}")
+    Call<StandardResponse<Map<String, Object>>> getProductsByUser(@Path("userId") Long userId);
+
+    // ✅ SỬA: Backend trả về paginated response
+    @GET("api/products/my-products")
+    Call<StandardResponse<Map<String, Object>>> getMyProducts(
+            @Query("page") int page,
+            @Query("size") int size
+    );
+    @GET("api/products/user/{userId}")
+    Call<StandardResponse<Object>> getUserProducts(@Path("userId") Long userId);
     // ===== FEATURED & SPECIAL PRODUCTS =====
 
     @GET("api/products/featured")
@@ -124,11 +128,9 @@ public interface ProductService {
             @Part MultipartBody.Part image
     );
 
-    @Multipart
-    @POST("api/files/upload/product/multiple")
-    Call<StandardResponse<Map<String, Object>>> uploadProductImages(
-            @Part List<MultipartBody.Part> images
-    );
+
+    // ✅ GIỮ: Backup endpoint nếu cần
+
 
     // ===== PRODUCT INTERACTION =====
 
@@ -188,4 +190,6 @@ public interface ProductService {
             @Path("offerId") Long offerId,
             @Body Map<String, Object> response
     );
+
+
 }

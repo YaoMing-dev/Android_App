@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Change Product Status"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <RadioGroup
+        android:id="@+id/rg_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <RadioButton
+            android:id="@+id/rb_available"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Available"
+            android:textColor="@color/status_available" />
+
+        <RadioButton
+            android:id="@+id/rb_sold"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Sold"
+            android:textColor="@color/status_sold" />
+
+        <!-- ✅ THÊM PAUSED OPTION -->
+        <RadioButton
+            android:id="@+id/rb_paused"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Paused"
+            android:textColor="@color/status_paused" />
+
+        <RadioButton
+            android:id="@+id/rb_reserved"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Reserved"
+            android:textColor="@color/status_pending" />
+
+    </RadioGroup>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="24dp">
+
+        <Button
+            android:id="@+id/btn_cancel"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Cancel" />
+
+        <Button
+            android:id="@+id/btn_update"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Update Status"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

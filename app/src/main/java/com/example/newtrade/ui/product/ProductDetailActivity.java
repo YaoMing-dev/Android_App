@@ -12,6 +12,8 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.example.newtrade.ui.offer.MakeOfferBottomSheetDialogFragment;
 import com.example.newtrade.ui.profile.UserProfileActivity;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -106,7 +108,8 @@ public class ProductDetailActivity extends AppCompatActivity {
         btnMakeOffer = findViewById(R.id.btn_make_offer);
         btnViewProfile = findViewById(R.id.btn_view_profile);
         fabShare = findViewById(R.id.fab_share);
-        fabSave = findViewById(R.id.fab_save);
+        Button btnSave = findViewById(R.id.btn_save);
+
 
     }
 
@@ -119,11 +122,16 @@ public class ProductDetailActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
+        Button btnSave = findViewById(R.id.btn_save);
+
+        // ✅ SAVE BUTTON LISTENER
+        btnSave.setOnClickListener(v -> toggleSaveItem());
+
+        // Existing listeners
         btnContact.setOnClickListener(v -> showContactOptions());
         btnMakeOffer.setOnClickListener(v -> makeOffer());
         btnViewProfile.setOnClickListener(v -> viewSellerProfile());
         fabShare.setOnClickListener(v -> shareProduct());
-        fabSave.setOnClickListener(v -> toggleSaveItem());
     }
 
     private void checkSaveStatus() {
@@ -185,15 +193,14 @@ public class ProductDetailActivity extends AppCompatActivity {
     }
 
     private void updateSaveButton() {
-        if (fabSave != null) {
-            fabSave.setImageResource(isItemSaved ?
-                    R.drawable.ic_favorite : R.drawable.ic_favorite_border);
-
-            // Optional: Change FAB color
+        Button btnSave = findViewById(R.id.btn_save);
+        if (btnSave != null) {
             if (isItemSaved) {
-                fabSave.setBackgroundTintList(getColorStateList(android.R.color.holo_red_light));
+                btnSave.setText("💖 Saved");
+                btnSave.setBackgroundTintList(getColorStateList(android.R.color.holo_red_dark));
             } else {
-                fabSave.setBackgroundTintList(getColorStateList(R.color.primary_color));
+                btnSave.setText("❤️ Save");
+                btnSave.setBackgroundTintList(getColorStateList(android.R.color.holo_red_light));
             }
         }
     }
@@ -207,32 +214,116 @@ public class ProductDetailActivity extends AppCompatActivity {
 
         Log.d(TAG, "Loading product details for ID: " + productId);
 
+        // ✅ THÊM: Show loading state
+        showLoadingState(true);
+
         ApiClient.getApiService().getProductDetail(productId)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                            Response<StandardResponse<Map<String, Object>>> response) {
 
+                        // ✅ Hide loading state
+                        showLoadingState(false);
+
                         if (response.isSuccessful() && response.body() != null) {
                             StandardResponse<Map<String, Object>> standardResponse = response.body();
 
                             if (standardResponse.isSuccess()) {
                                 productData = standardResponse.getData();
+
+                                // ✅ Display product data
                                 displayProductData(productData);
+
+                                // ✅ THÊM: Show FABs after data loaded
+                                showFABs();
+
+                                // ✅ THÊM: Check save status
+                                checkSaveStatus();
+
+                                Log.d(TAG, "Product details loaded successfully");
+
                             } else {
                                 showError("Failed to load product: " + standardResponse.getMessage());
                             }
                         } else {
-                            showError("Failed to load product details");
+                            // ✅ IMPROVED: Better error handling
+                            String errorMsg = "Failed to load product details";
+                            if (response.code() == 404) {
+                                errorMsg = "Product not found";
+                            } else if (response.code() == 403) {
+                                errorMsg = "Access denied";
+                            } else if (response.code() >= 500) {
+                                errorMsg = "Server error. Please try again later.";
+                            }
+                            showError(errorMsg);
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        showError("Network error: " + t.getMessage());
+                        // ✅ Hide loading state
+                        showLoadingState(false);
+
+                        // ✅ IMPROVED: Better network error handling
+                        String errorMsg = "Network error";
+                        if (t.getMessage() != null) {
+                            if (t.getMessage().contains("timeout")) {
+                                errorMsg = "Connection timeout. Please try again.";
+                            } else if (t.getMessage().contains("Unable to resolve host")) {
+                                errorMsg = "No internet connection";
+                            } else {
+                                errorMsg = "Network error: " + t.getMessage();
+                            }
+                        }
+
+                        showError(errorMsg);
                         Log.e(TAG, "Failed to load product details", t);
                     }
                 });
+    }
+
+    private void showLoadingState(boolean isLoading) {
+        Button btnSave = findViewById(R.id.btn_save);
+
+        if (isLoading) {
+            // Disable all buttons during loading
+            if (btnSave != null) btnSave.setEnabled(false);
+            if (btnContact != null) btnContact.setEnabled(false);
+            if (btnMakeOffer != null) btnMakeOffer.setEnabled(false);
+
+            Log.d(TAG, "Showing loading state");
+        } else {
+            // Enable all buttons after loading
+            if (btnSave != null) btnSave.setEnabled(true);
+            if (btnContact != null) btnContact.setEnabled(true);
+            if (btnMakeOffer != null) btnMakeOffer.setEnabled(true);
+
+            Log.d(TAG, "Hiding loading state");
+        }
+    }
+    private void showFABs() {
+        if (fabShare != null) {
+            fabShare.setVisibility(View.VISIBLE);
+            fabShare.show();
+            Log.d(TAG, "FAB Share shown");
+        }
+    }
+
+
+    // ✅ THÊM: Retry dialog for network errors
+    private void showRetryDialog(String errorMessage) {
+        new AlertDialog.Builder(this)
+                .setTitle("Connection Error")
+                .setMessage(errorMessage + "\n\nWould you like to try again?")
+                .setPositiveButton("Retry", (dialog, which) -> {
+                    loadProductDetails(); // Retry loading
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> {
+                    finish(); // Close activity
+                })
+                .setCancelable(false)
+                .show();
     }
 
     private void displayProductData(Map<String, Object> data) {
@@ -396,29 +487,28 @@ public class ProductDetailActivity extends AppCompatActivity {
 
     // ✅ FIXED: makeOffer với đơn giản hóa
     private void makeOffer() {
-        BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
-        View view = getLayoutInflater().inflate(R.layout.bottom_sheet_make_offer, null);
-        bottomSheet.setContentView(view);
+        MakeOfferBottomSheetDialogFragment bottomSheet =
+                MakeOfferBottomSheetDialogFragment.newInstance(productId, productPrice);
 
-        // ✅ CHỈ CẦN et_offer_amount (không có et_offer_message)
-        TextInputEditText etOfferAmount = view.findViewById(R.id.et_offer_amount);
-        Button btnSubmitOffer = view.findViewById(R.id.btn_submit_offer);
-
-        btnSubmitOffer.setOnClickListener(v -> {
-            String offerAmount = etOfferAmount.getText().toString().trim();
-
-            if (offerAmount.isEmpty()) {
-                etOfferAmount.setError("Please enter offer amount");
-                return;
+        bottomSheet.setOnOfferSubmittedListener(new MakeOfferBottomSheetDialogFragment.OnOfferSubmittedListener() {
+            @Override
+            public void onOfferSubmitted(boolean success, String message) {
+                if (success) {
+                    Log.d(TAG, "Offer submitted successfully: " + message);
+                    // Optional: Refresh product data or show some indication
+                } else {
+                    Log.e(TAG, "Offer submission failed: " + message);
+                }
             }
-
-            // ✅ GỌI submitOffer VỚI MESSAGE RỖNG
-            submitOffer(offerAmount, ""); // Không có message
-            bottomSheet.dismiss();
         });
 
-        bottomSheet.show();
+        bottomSheet.show(getSupportFragmentManager(), "make_offer");
     }
+
+// ✅ XÓA method submitOffer cũ vì đã move vào Fragment
+
+// ✅ THÊM import cần thiết vào đầu file
+
 
     private void submitOffer(String amount, String message) {
         Map<String, Object> offerData = new HashMap<>();
@@ -481,7 +571,12 @@ public class ProductDetailActivity extends AppCompatActivity {
 
     private void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-        Log.e(TAG, message);
+        Log.e(TAG, "Error: " + message);
+
+        // ✅ THÊM: Show retry option for network errors
+        if (message.contains("Network") || message.contains("timeout") || message.contains("internet")) {
+            showRetryDialog(message);
+        }
     }
 
     @Override

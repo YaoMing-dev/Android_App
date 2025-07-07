@@ -126,8 +126,8 @@ public class SavedItemsActivity extends AppCompatActivity implements ProductAdap
             swipeRefresh.setRefreshing(true);
         }
 
-        // ✅ SỬA: Không cần userId parameter, backend sẽ dùng User-ID header
-        ApiClient.getProductService().getSavedItems(currentPage, Constants.DEFAULT_PAGE_SIZE)
+        // ✅ SỬA: Dùng SavedItemsService thay vì ProductService
+        ApiClient.getSavedItemsService().getSavedItems(currentPage, Constants.DEFAULT_PAGE_SIZE)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,

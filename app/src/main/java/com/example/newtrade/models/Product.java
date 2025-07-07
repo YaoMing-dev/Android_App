@@ -44,6 +44,7 @@ public class Product {
         AVAILABLE("Có sẵn"),
         SOLD("Đã bán"),
         RESERVED("Đã đặt"),
+        PAUSED("Tạm dừng"),
         DELETED("Đã xóa"),
         ARCHIVED("Lưu trữ");
 

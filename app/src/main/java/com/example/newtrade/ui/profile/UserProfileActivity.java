@@ -131,30 +131,61 @@ public class UserProfileActivity extends AppCompatActivity {
     private void loadUserProfile() {
         Log.d(TAG, "Loading profile for user: " + userId);
 
-        // First load mock data
-        loadMockUserProfile();
-
-        // TODO: Load real profile from API
-        /*
-        ApiClient.getUserService().getUserProfile(userId).enqueue(new Callback<StandardResponse<User>>() {
+        // Load real profile from API
+        ApiClient.getApiService().getUserProfile(userId).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(Call<StandardResponse<User>> call, Response<StandardResponse<User>> response) {
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    userProfile = response.body().getData();
-                    displayUserProfile(userProfile);
+                    Map<String, Object> profileData = response.body().getData();
+                    parseAndDisplayProfile(profileData);
+                    Log.d(TAG, "✅ Profile loaded from API");
                 } else {
                     Log.e(TAG, "Failed to load user profile");
-                    Toast.makeText(UserProfileActivity.this, "Failed to load profile", Toast.LENGTH_SHORT).show();
+                    loadMockUserProfile(); // Fallback
                 }
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<User>> call, Throwable t) {
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 Log.e(TAG, "Error loading user profile", t);
-                Toast.makeText(UserProfileActivity.this, "Network error", Toast.LENGTH_SHORT).show();
+                loadMockUserProfile(); // Fallback
             }
         });
-        */
+    }
+    private void parseAndDisplayProfile(Map<String, Object> profileData) {
+        if (profileData == null) {
+            loadMockUserProfile();
+            return;
+        }
+
+        try {
+            // Parse API response to User object
+            userProfile = new User();
+            userProfile.setId(userId);
+            userProfile.setDisplayName((String) profileData.get("displayName"));
+            userProfile.setEmail((String) profileData.get("email"));
+            userProfile.setBio((String) profileData.get("bio"));
+            userProfile.setContactInfo((String) profileData.get("contactInfo"));
+            userProfile.setProfilePicture((String) profileData.get("profilePicture"));
+
+            // Parse numbers safely
+            Object ratingObj = profileData.get("rating");
+            if (ratingObj instanceof Number) {
+                userProfile.setRating(((Number) ratingObj).doubleValue());
+            }
+
+            Object transactionsObj = profileData.get("totalTransactions");
+            if (transactionsObj instanceof Number) {
+                userProfile.setTotalTransactions(((Number) transactionsObj).intValue());
+            }
+
+            displayUserProfile(userProfile);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing profile data", e);
+            loadMockUserProfile(); // Fallback
+        }
     }
 
     private void loadMockUserProfile() {

@@ -18,6 +18,10 @@
     <color name="background_dark">#212121</color>
     <color name="background_gray">#F5F5F5</color>
     <color name="background_card">#FFFFFF</color>
+    <color name="gray_600">#757575</color>
+    <color name="green_500">#4CAF50</color>
+    <color name="orange_500">#FF9800</color>
+    <color name="gray_200">#EEEEEE</color>
 
     <!-- Text Colors -->
     <color name="text_primary">#212121</color>

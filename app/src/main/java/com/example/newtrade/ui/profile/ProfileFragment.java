@@ -26,10 +26,10 @@ import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.auth.LoginActivity;
-import com.example.newtrade.ui.review.ReviewListActivity;        // ✅ THÊM IMPORT
+import com.example.newtrade.ui.review.ReviewListActivity;
 import com.example.newtrade.ui.transaction.TransactionHistoryActivity;
-// Thêm imports này nếu chưa có:
-import com.example.newtrade.ui.profile.SavedItemsActivity;// ✅ THÊM IMPORT
+import com.example.newtrade.ui.profile.SavedItemsActivity;
+import com.example.newtrade.ui.profile.MyListingsActivity;        // ✅ THÊM IMPORT NÀY
 import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -49,8 +49,8 @@ public class ProfileFragment extends Fragment {
     private CircleImageView ivProfilePicture;
     private TextView tvDisplayName, tvEmail, tvMemberSince;
     private TextView tvListingsCount, tvSoldCount, tvBoughtCount;
-    private LinearLayout llMyListings, llSavedItems, llTransactionHistory; // ✅ ĐỔI TÊN
-    private LinearLayout llReviews, llAccountSettings, llHelpSupport, llAbout, llLogout; // ✅ THÊM llReviews
+    private LinearLayout llMyListings, llSavedItems, llTransactionHistory;
+    private LinearLayout llReviews, llAccountSettings, llHelpSupport, llAbout, llLogout;
     private FloatingActionButton fabEditProfile;
 
     // Data
@@ -98,11 +98,11 @@ public class ProfileFragment extends Fragment {
         tvSoldCount = view.findViewById(R.id.tv_sold_count);
         tvBoughtCount = view.findViewById(R.id.tv_bought_count);
 
-        // Menu items - ✅ CẬP NHẬT THEO LAYOUT THỰC TẾ
+        // Menu items
         llMyListings = view.findViewById(R.id.ll_my_listings);
         llSavedItems = view.findViewById(R.id.ll_saved_items);
-        llTransactionHistory = view.findViewById(R.id.ll_transaction_history); // ✅ THAY ĐỔI TỪ ll_purchase_history
-        llReviews = view.findViewById(R.id.ll_reviews);                        // ✅ THÊM MỚI
+        llTransactionHistory = view.findViewById(R.id.ll_transaction_history);
+        llReviews = view.findViewById(R.id.ll_reviews);
         llAccountSettings = view.findViewById(R.id.ll_account_settings);
         llHelpSupport = view.findViewById(R.id.ll_help_support);
         llAbout = view.findViewById(R.id.ll_about);
@@ -139,12 +139,10 @@ public class ProfileFragment extends Fragment {
             llSavedItems.setOnClickListener(v -> openSavedItems());
         }
 
-        // ✅ CẬP NHẬT: Transaction History
         if (llTransactionHistory != null) {
             llTransactionHistory.setOnClickListener(v -> openTransactionHistory());
         }
 
-        // ✅ THÊM MỚI: Reviews navigation
         if (llReviews != null) {
             llReviews.setOnClickListener(v -> openReviews());
         }
@@ -297,8 +295,16 @@ public class ProfileFragment extends Fragment {
 
     // ===== MENU NAVIGATION METHODS =====
 
+    // ✅ CẬP NHẬT: Navigate tới MyListingsActivity thay vì hiển thị toast
     private void openMyListings() {
-        Toast.makeText(requireContext(), "My Listings - Coming soon", Toast.LENGTH_SHORT).show();
+        try {
+            Intent intent = new Intent(requireContext(), MyListingsActivity.class);
+            startActivity(intent);
+            Log.d(TAG, "✅ Navigating to MyListingsActivity");
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening my listings", e);
+            Toast.makeText(requireContext(), "Unable to open my listings", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void openSavedItems() {
@@ -311,7 +317,6 @@ public class ProfileFragment extends Fragment {
         }
     }
 
-    // ✅ CẬP NHẬT: Transaction History navigation
     private void openTransactionHistory() {
         try {
             Intent intent = new Intent(requireContext(), TransactionHistoryActivity.class);
@@ -322,7 +327,6 @@ public class ProfileFragment extends Fragment {
         }
     }
 
-    // ✅ THÊM MỚI: Reviews navigation
     private void openReviews() {
         try {
             Intent intent = new Intent(requireContext(), ReviewListActivity.class);

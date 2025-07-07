@@ -37,9 +37,9 @@
                     android:padding="8dp"
                     android:clipToPadding="false" />
 
-                <!-- Empty State -->
+                <!-- ✅ SỬA: Empty State - Sử dụng LinearLayout container với TextView bên trong -->
                 <LinearLayout
-                    android:id="@+id/tv_empty_state"
+                    android:id="@+id/ll_empty_state_container"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
@@ -54,7 +54,9 @@
                         android:alpha="0.5"
                         android:layout_marginBottom="16dp" />
 
+                    <!-- ✅ CHÍNH: TextView cho empty state message -->
                     <TextView
+                        android:id="@+id/tv_empty_state"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="No listings yet"

@@ -102,6 +102,8 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
+
+
         <activity
             android:name=".ui.profile.SettingsActivity"
             android:exported="false"
@@ -156,6 +158,12 @@
 
         <activity
             android:name=".ui.product.CategoryProductsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.product.EditProductActivity"
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
