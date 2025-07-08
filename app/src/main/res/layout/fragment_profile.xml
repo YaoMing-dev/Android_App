@@ -244,6 +244,41 @@
 
                 </LinearLayout>
 
+
+                <LinearLayout
+                    android:id="@+id/ll_offer_history"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_offer"
+                        android:contentDescription="@string/offer_history"
+                        app:tint="@color/icon_tint" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:text="@string/offer_history"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_chevron_right"
+                        android:contentDescription="@string/navigate"
+                        app:tint="@color/text_secondary" />
+
+                </LinearLayout>
+
                 <!-- Transaction History -->
                 <LinearLayout
                     android:id="@+id/ll_transaction_history"

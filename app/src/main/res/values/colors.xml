@@ -11,6 +11,8 @@
     <color name="secondary_color">#FF9800</color>
     <color name="secondary_dark">#F57C00</color>
     <color name="secondary_light">#FFE0B2</color>
+    <color name="icon_tint">#FF9800</color> <!-- hoặc bất kỳ màu nào bạn muốn -->
+
 
     <!-- Background Colors -->
     <color name="background_light">#FAFAFA</color>
@@ -22,6 +24,10 @@
     <color name="green_500">#4CAF50</color>
     <color name="orange_500">#FF9800</color>
     <color name="gray_200">#EEEEEE</color>
+
+    <color name="status_error">#F44336</color>     <!-- đỏ -->
+    <color name="status_success">#4CAF50</color>   <!-- xanh lá -->
+    <color name="status_warning">#FFC107</color>
 
     <!-- Text Colors -->
     <color name="text_primary">#212121</color>

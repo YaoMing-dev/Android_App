@@ -434,6 +434,16 @@
     <string name="profile_menu">Profile menu</string>
     <string name="navigate">Navigate to section</string>
 
+
+
+    <string name="offer_history">Offer History</string>
+    <string name="offers_sent">Offers Sent</string>
+    <string name="offers_received">Offers Received</string>
+
+    <string name="offer_submitted">Offer Submitted</string>
+    <string name="submit_offer">Submit Offer</string>
+
+
     <!-- ProductDetail FAB save -->
 
 </resources>

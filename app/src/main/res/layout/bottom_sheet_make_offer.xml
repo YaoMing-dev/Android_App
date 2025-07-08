@@ -26,7 +26,7 @@
         android:textColor="@color/text_primary"
         android:layout_marginBottom="16dp" />
 
-    <!-- Offer Amount Input -->
+    <!-- ✅ SIMPLIFIED: Offer Amount Input - NO ERROR ENABLED -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -45,7 +45,7 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
-    <!-- ✅ THÊM MESSAGE INPUT -->
+    <!-- Message Input -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

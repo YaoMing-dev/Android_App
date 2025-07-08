@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- app/src/main/res/layout/activity_offer_history.xml -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -10,24 +11,24 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@color/primary_color"
-        app:titleTextColor="@color/white"
-        app:navigationIconTint="@color/white" />
+        android:layout_height="wrap_content"
+        android:background="@color/white"
+        android:elevation="4dp"
+        app:title="My Offers"
+        app:titleTextColor="@color/text_primary"
+        app:navigationIcon="@drawable/ic_arrow_back" />
 
-    <!-- TabLayout -->
+    <!-- Tabs -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tab_layout"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="wrap_content"
         android:background="@color/white"
-        app:tabMode="fixed"
-        app:tabGravity="fill"
         app:tabTextColor="@color/text_secondary"
         app:tabSelectedTextColor="@color/primary_color"
         app:tabIndicatorColor="@color/primary_color" />
 
-    <!-- SwipeRefreshLayout -->
+    <!-- Content -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
@@ -42,43 +43,19 @@
                 android:id="@+id/rv_offers"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="8dp"
-                android:clipToPadding="false" />
+                android:clipToPadding="false"
+                android:padding="8dp" />
 
             <!-- Empty State -->
-            <LinearLayout
+            <TextView
                 android:id="@+id/tv_empty_state"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:visibility="gone">
-
-                <ImageView
-                    android:layout_width="64dp"
-                    android:layout_height="64dp"
-                    android:src="@android:drawable/ic_menu_recent_history"
-                    android:alpha="0.5"
-                    android:layout_marginBottom="16dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="No offers yet"
-                    android:textSize="18sp"
-                    android:textColor="@color/text_secondary"
-                    android:layout_marginBottom="8dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Your offer history will appear here"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_hint"
-                    android:textAlignment="center" />
-
-            </LinearLayout>
+                android:text="No offers yet"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp"
+                android:visibility="gone" />
 
         </FrameLayout>
 

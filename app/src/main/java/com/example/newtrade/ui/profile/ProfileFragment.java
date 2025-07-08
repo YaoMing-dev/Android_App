@@ -27,6 +27,7 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.auth.LoginActivity;
 import com.example.newtrade.ui.review.ReviewListActivity;
+import com.example.newtrade.ui.profile.OfferHistoryActivity;
 import com.example.newtrade.ui.transaction.TransactionHistoryActivity;
 import com.example.newtrade.ui.profile.SavedItemsActivity;
 import com.example.newtrade.ui.profile.MyListingsActivity;        // ✅ THÊM IMPORT NÀY
@@ -49,7 +50,8 @@ public class ProfileFragment extends Fragment {
     private CircleImageView ivProfilePicture;
     private TextView tvDisplayName, tvEmail, tvMemberSince;
     private TextView tvListingsCount, tvSoldCount, tvBoughtCount;
-    private LinearLayout llMyListings, llSavedItems, llTransactionHistory;
+    private LinearLayout llMyListings, llSavedItems, llOfferHistory, llTransactionHistory;
+
     private LinearLayout llReviews, llAccountSettings, llHelpSupport, llAbout, llLogout;
     private FloatingActionButton fabEditProfile;
 
@@ -101,12 +103,14 @@ public class ProfileFragment extends Fragment {
         // Menu items
         llMyListings = view.findViewById(R.id.ll_my_listings);
         llSavedItems = view.findViewById(R.id.ll_saved_items);
+        llOfferHistory = view.findViewById(R.id.ll_offer_history);
         llTransactionHistory = view.findViewById(R.id.ll_transaction_history);
         llReviews = view.findViewById(R.id.ll_reviews);
         llAccountSettings = view.findViewById(R.id.ll_account_settings);
         llHelpSupport = view.findViewById(R.id.ll_help_support);
         llAbout = view.findViewById(R.id.ll_about);
         llLogout = view.findViewById(R.id.ll_logout);
+        llTransactionHistory = view.findViewById(R.id.ll_transaction_history);
 
         // FAB
         fabEditProfile = view.findViewById(R.id.fab_edit_profile);
@@ -138,9 +142,15 @@ public class ProfileFragment extends Fragment {
         if (llSavedItems != null) {
             llSavedItems.setOnClickListener(v -> openSavedItems());
         }
+        if (llOfferHistory != null) {
+            llOfferHistory.setOnClickListener(v -> openOfferHistory());
+        }
 
         if (llTransactionHistory != null) {
             llTransactionHistory.setOnClickListener(v -> openTransactionHistory());
+        }
+        if (llOfferHistory != null) {
+            llOfferHistory.setOnClickListener(v -> openOfferHistory()); // ✅ THÊM
         }
 
         if (llReviews != null) {
@@ -174,6 +184,17 @@ public class ProfileFragment extends Fragment {
 
         } catch (Exception e) {
             Log.e(TAG, "Error loading user profile", e);
+        }
+    }
+
+    private void openOfferHistory() {
+        try {
+            Log.d(TAG, "🔄 Opening Offer History");
+            Intent intent = new Intent(requireContext(), OfferHistoryActivity.class);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error opening offer history", e);
+            Toast.makeText(requireContext(), "Unable to open offer history", Toast.LENGTH_SHORT).show();
         }
     }
 

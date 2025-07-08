@@ -2,6 +2,7 @@
 package com.example.newtrade.api;
 
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.models.OfferRequest;
 
 import java.util.Map;
 
@@ -15,6 +16,11 @@ import retrofit2.http.Query;
 
 public interface OfferService {
 
+    // ✅ THÊM type-safe method
+    @POST("api/offers")
+    Call<StandardResponse<Map<String, Object>>> createOfferTypeSafe(@Body OfferRequest request);
+
+    // ✅ Keep existing method for compatibility
     @POST("api/offers")
     Call<StandardResponse<Map<String, Object>>> createOffer(@Body Map<String, Object> offerData);
 
