@@ -21,6 +21,14 @@ public class Product {
     private List<String> imageUrls;
     private String createdAt;
 
+    // ✅ FIX: Implement getImageUrl() method properly
+    public String getImageUrl() {
+        if (imageUrls != null && !imageUrls.isEmpty()) {
+            return imageUrls.get(0); // Return first image as primary
+        }
+        return null;
+    }
+
     // Enums
     public enum ProductCondition {
         NEW("Mới"),
@@ -60,7 +68,9 @@ public class Product {
     }
 
     // Constructors
-    public Product() {}
+    public Product() {
+        this.imageUrls = new ArrayList<>();
+    }
 
     public Product(String title, String description, BigDecimal price, String location) {
         this.title = title;
@@ -105,30 +115,45 @@ public class Product {
     public Integer getViewCount() { return viewCount; }
     public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
 
-    public List<String> getImageUrls() { return imageUrls; }
-    public void setImageUrls(List<String> imageUrls) { this.imageUrls = imageUrls; }
+    public List<String> getImageUrls() {
+        if (imageUrls == null) {
+            imageUrls = new ArrayList<>();
+        }
+        return imageUrls;
+    }
 
-    // Thêm method setImageUrl cho compatibility
+    public void setImageUrls(List<String> imageUrls) {
+        this.imageUrls = imageUrls != null ? imageUrls : new ArrayList<>();
+    }
+
+    // ✅ FIX: setImageUrl method for single image compatibility
     public void setImageUrl(String imageUrl) {
+        if (this.imageUrls == null) {
+            this.imageUrls = new ArrayList<>();
+        }
+
         if (imageUrl != null && !imageUrl.isEmpty()) {
-            this.imageUrls = List.of(imageUrl);
+            // Clear existing and add new primary image
+            this.imageUrls.clear();
+            this.imageUrls.add(imageUrl);
         }
     }
 
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 
-    // ✅ THÊM METHOD setPrimaryImageUrl()
+    // ✅ FIX: setPrimaryImageUrl method
     public void setPrimaryImageUrl(String primaryImageUrl) {
+        if (this.imageUrls == null) {
+            this.imageUrls = new ArrayList<>();
+        }
+
         if (primaryImageUrl != null && !primaryImageUrl.isEmpty()) {
-            if (this.imageUrls == null) {
-                this.imageUrls = new ArrayList<>();
-            }
-            // Nếu chưa có image nào, thêm vào đầu list
             if (this.imageUrls.isEmpty()) {
+                // Add as first image
                 this.imageUrls.add(primaryImageUrl);
             } else {
-                // Nếu đã có images, thay thế image đầu tiên
+                // Replace first image
                 this.imageUrls.set(0, primaryImageUrl);
             }
         }
@@ -141,6 +166,7 @@ public class Product {
         return formatter.format(price) + " VNĐ";
     }
 
+    // ✅ FIX: getPrimaryImageUrl method
     public String getPrimaryImageUrl() {
         if (imageUrls != null && !imageUrls.isEmpty()) {
             return imageUrls.get(0);
@@ -154,5 +180,50 @@ public class Product {
 
     public String getStatusDisplayName() {
         return status != null ? status.getDisplayName() : "";
+    }
+
+    // ✅ ADD: Utility methods for image handling
+    public boolean hasImages() {
+        return imageUrls != null && !imageUrls.isEmpty();
+    }
+
+    public int getImageCount() {
+        return imageUrls != null ? imageUrls.size() : 0;
+    }
+
+    public void addImageUrl(String imageUrl) {
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            if (this.imageUrls == null) {
+                this.imageUrls = new ArrayList<>();
+            }
+            this.imageUrls.add(imageUrl);
+        }
+    }
+
+    public void removeImageUrl(String imageUrl) {
+        if (this.imageUrls != null) {
+            this.imageUrls.remove(imageUrl);
+        }
+    }
+
+    public void clearImages() {
+        if (this.imageUrls != null) {
+            this.imageUrls.clear();
+        }
+    }
+
+    // ✅ ADD: toString method for debugging
+    @Override
+    public String toString() {
+        return "Product{" +
+                "id=" + id +
+                ", title='" + title + '\'' +
+                ", price=" + price +
+                ", location='" + location + '\'' +
+                ", condition=" + condition +
+                ", status=" + status +
+                ", imageCount=" + getImageCount() +
+                ", primaryImage='" + getPrimaryImageUrl() + '\'' +
+                '}';
     }
 }

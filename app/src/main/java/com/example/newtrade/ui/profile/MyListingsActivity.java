@@ -68,7 +68,7 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_my_listings);
-
+        prefsManager = SharedPrefsManager.getInstance(this);
         initViews();
         setupToolbar();
         setupRecyclerView();
@@ -98,11 +98,12 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
-            // ✅ Show current user name
-            String currentUserName = prefsManager.getUserName();
+            // ✅ KIỂM TRA NULL SAFETY
+            String currentUserName = (prefsManager != null) ? prefsManager.getUserName() : null;
             String title = (currentUserName != null && !currentUserName.isEmpty())
                     ? currentUserName + "'s Listings"
                     : "My Listings";
+
             getSupportActionBar().setTitle(title);
         }
     }
