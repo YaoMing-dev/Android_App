@@ -440,7 +440,8 @@ public class LoginActivity extends AppCompatActivity {
 
     private void handleLoginSuccess(Map<String, Object> data) {
         try {
-            Log.d(TAG, "🔍 Processing login success data: " + new Gson().toJson(data));
+            Log.d(TAG, "=== HANDLE LOGIN SUCCESS DEBUG ===");
+            Log.d(TAG, "🔍 FULL BACKEND RESPONSE: " + new Gson().toJson(data));
 
             // Parse user data from response
             Object userObj = data.get("user");
@@ -448,7 +449,7 @@ public class LoginActivity extends AppCompatActivity {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> userMap = (Map<String, Object>) userObj;
 
-                // Extract user info
+                // Extract user info (existing logic)
                 Long userId = null;
                 Object idObj = userMap.get("id");
                 if (idObj instanceof Number) {
@@ -465,14 +466,37 @@ public class LoginActivity extends AppCompatActivity {
                 String displayName = (String) userMap.get("displayName");
                 Boolean isEmailVerified = (Boolean) userMap.get("isEmailVerified");
 
+                Log.d(TAG, "🔍 BACKEND RETURNED:");
+                Log.d(TAG, "🔍 User ID: " + userId);
+                Log.d(TAG, "🔍 Email: " + email);
+                Log.d(TAG, "🔍 Display Name: " + displayName);
+                Log.d(TAG, "🔍 Email Verified: " + isEmailVerified);
+
+                // ❌ CRITICAL EMAIL CHECK
+                if (email != null && !email.equals("miyamoth129@gmail.com")) {
+                    Log.e(TAG, "❌❌❌ BACKEND RETURNED WRONG USER!");
+                    Log.e(TAG, "❌ Expected: miyamoth129@gmail.com");
+                    Log.e(TAG, "❌ Backend returned: " + email);
+                    Log.e(TAG, "❌ This means backend createUserFromGoogle() FAILED!");
+
+                    showError("❌ Backend lỗi: Trả về email " + email + " thay vì miyamoth129@gmail.com");
+                    return;
+                }
+
                 if (userId != null && email != null && displayName != null) {
-                    // Save user session
+                    // Save user session (existing logic)
                     prefsManager.saveUserSession(userId, email, displayName,
                             isEmailVerified != null ? isEmailVerified : false);
 
                     Log.d(TAG, "✅ User session saved successfully");
 
-                    // Check if OTP verification is required
+                    // ✅ VERIFICATION AFTER SAVE
+                    Log.d(TAG, "✅ VERIFICATION AFTER SAVE:");
+                    Log.d(TAG, "✅ Saved User ID: " + prefsManager.getUserId());
+                    Log.d(TAG, "✅ Saved Email: " + prefsManager.getUserEmail());
+                    Log.d(TAG, "✅ Saved Name: " + prefsManager.getUserName());
+
+                    // Check if OTP verification is required (existing logic)
                     Boolean requiresOtp = (Boolean) data.get("requiresOtp");
                     if (requiresOtp != null && requiresOtp && !Boolean.TRUE.equals(isEmailVerified)) {
                         Log.d(TAG, "🔍 OTP verification required");
@@ -490,6 +514,7 @@ public class LoginActivity extends AppCompatActivity {
                 Log.e(TAG, "❌ Invalid user data format");
                 showError("Định dạng dữ liệu không hợp lệ");
             }
+            Log.d(TAG, "=== END HANDLE LOGIN SUCCESS DEBUG ===");
         } catch (Exception e) {
             Log.e(TAG, "❌ Error processing login success", e);
             showError("Lỗi xử lý đăng nhập: " + e.getMessage());

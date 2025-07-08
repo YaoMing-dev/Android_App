@@ -97,7 +97,13 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("My Listings");
+
+            // ✅ Show current user name
+            String currentUserName = prefsManager.getUserName();
+            String title = (currentUserName != null && !currentUserName.isEmpty())
+                    ? currentUserName + "'s Listings"
+                    : "My Listings";
+            getSupportActionBar().setTitle(title);
         }
     }
 
@@ -174,8 +180,8 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
 
         Long userId = prefsManager.getUserId();
         if (userId == null || userId <= 0) {
-            Log.w(TAG, "User not logged in, loading mock data");
-            loadMockProducts();
+            Log.w(TAG, "User not logged in");
+            showEmptyState("Please log in to view your listings");
             return;
         }
 
@@ -197,25 +203,27 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
 
                     if (standardResponse.isSuccess()) {
                         Map<String, Object> paginatedData = standardResponse.getData();
-
                         List<Map<String, Object>> productDataList = extractProductsFromPaginatedResponse(paginatedData);
 
                         if (productDataList != null && !productDataList.isEmpty()) {
                             parseAndDisplayProducts(productDataList);
                             Log.d(TAG, "✅ Loaded " + productDataList.size() + " user products");
                         } else {
-                            Log.w(TAG, "No products found for user");
-                            loadMockProducts();
+                            Log.w(TAG, "No products found for user - showing empty state");
+                            // ✅ THAY THẾ loadMockProducts() bằng empty state
+                            showEmptyState("You haven't listed any products yet.\n\nTap the + button to create your first listing!");
                         }
                     } else {
                         Log.w(TAG, "❌ Failed to load user products: " + standardResponse.getMessage());
                         showError("Failed to load your products");
-                        loadMockProducts();
+                        // ✅ THAY THẾ loadMockProducts() bằng empty state
+                        showEmptyState("Unable to load your listings.\nPlease try again.");
                     }
                 } else {
                     Log.w(TAG, "❌ User products API response not successful: " + response.code());
                     showError("Failed to load your products");
-                    loadMockProducts();
+                    // ✅ THAY THẾ loadMockProducts() bằng empty state
+                    showEmptyState("Unable to load your listings.\nPlease try again.");
                 }
             }
 
@@ -226,9 +234,21 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
                 }
                 Log.e(TAG, "❌ User products API call failed", t);
                 showError("Network error while loading your products");
-                loadMockProducts();
+                // ✅ THAY THẾ loadMockProducts() bằng empty state
+                showEmptyState("Network error.\nPlease check your connection and try again.");
             }
         });
+    }
+
+    private void showEmptyState(String message) {
+        myProducts.clear();
+        updateUI(); // This will show empty state container
+
+        if (tvEmptyState != null) {
+            tvEmptyState.setText(message);
+        }
+
+        Log.d(TAG, "Showing empty state: " + message);
     }
 
     @SuppressWarnings("unchecked")
@@ -376,63 +396,7 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
         updateUI();
     }
 
-    private void loadMockProducts() {
-        Log.d(TAG, "Loading mock products for testing");
-        myProducts.clear();
 
-        // Mock listing 1
-        Product product1 = new Product();
-        product1.setId(1L);
-        product1.setTitle("iPhone 14 Pro Max");
-        product1.setDescription("iPhone 14 Pro Max 256GB Deep Purple - excellent condition, barely used");
-        product1.setPrice(new BigDecimal("18500000"));
-        product1.setCondition(Product.ProductCondition.LIKE_NEW);
-        product1.setLocation("Ho Chi Minh City");
-        product1.setStatus(Product.ProductStatus.AVAILABLE);
-        product1.setViewCount(45);
-        product1.setCategoryName("Electronics");
-
-        List<String> images1 = new ArrayList<>();
-        product1.setImageUrls(images1);
-
-        myProducts.add(product1);
-
-        // Mock listing 2
-        Product product2 = new Product();
-        product2.setId(2L);
-        product2.setTitle("MacBook Air M1");
-        product2.setDescription("MacBook Air M1 2020, 8GB/256GB - well maintained, comes with original box");
-        product2.setPrice(new BigDecimal("22000000"));
-        product2.setCondition(Product.ProductCondition.GOOD);
-        product2.setLocation("Ho Chi Minh City");
-        product2.setStatus(Product.ProductStatus.SOLD);
-        product2.setViewCount(78);
-        product2.setCategoryName("Electronics");
-
-        List<String> images2 = new ArrayList<>();
-        product2.setImageUrls(images2);
-
-        myProducts.add(product2);
-
-        // Mock listing 3
-        Product product3 = new Product();
-        product3.setId(3L);
-        product3.setTitle("Gaming Chair");
-        product3.setDescription("Ergonomic gaming chair with lumbar support - very comfortable");
-        product3.setPrice(new BigDecimal("3500000"));
-        product3.setCondition(Product.ProductCondition.FAIR);
-        product3.setLocation("Ho Chi Minh City");
-        product3.setStatus(Product.ProductStatus.AVAILABLE);
-        product3.setViewCount(23);
-        product3.setCategoryName("Home & Garden");
-
-        List<String> images3 = new ArrayList<>();
-        product3.setImageUrls(images3);
-
-        myProducts.add(product3);
-
-        updateUI();
-    }
 
     private void updateUI() {
         if (swipeRefresh != null) {
