@@ -23,7 +23,7 @@
             android:gravity="center"
             android:layout_marginBottom="24dp" />
 
-        <!-- Image Selection Area -->
+        <!-- ✅ ENHANCED: Image Selection Area - Multi Images Support -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="200dp"
@@ -38,6 +38,7 @@
                 android:layout_height="match_parent"
                 android:background="#F9FAFB">
 
+                <!-- ✅ KEEP: Single ImageView for backward compatibility -->
                 <ImageView
                     android:id="@+id/iv_selected_image"
                     android:layout_width="match_parent"
@@ -45,6 +46,18 @@
                     android:scaleType="centerCrop"
                     android:visibility="gone" />
 
+                <!-- ✅ NEW: Multiple Images RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_selected_images"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:visibility="gone"
+                    android:clipToPadding="false"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp" />
+
+                <!-- ✅ ENHANCED: Improved placeholder -->
                 <LinearLayout
                     android:id="@+id/layout_image_placeholder"
                     android:layout_width="match_parent"
@@ -62,12 +75,22 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Tap to add photo"
+                        android:text="Add up to 10 photos"
                         android:textColor="#6B7280"
-                        android:textSize="14sp" />
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tap to add your first photo"
+                        android:textColor="#9CA3AF"
+                        android:textSize="12sp"
+                        android:layout_marginTop="4dp" />
 
                 </LinearLayout>
 
+                <!-- ✅ KEEP: Original button for compatibility -->
                 <Button
                     android:id="@+id/btn_select_image"
                     android:layout_width="match_parent"
@@ -79,7 +102,19 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Title Field -->
+        <!-- ✅ NEW: Add More Images Button -->
+        <Button
+            android:id="@+id/btn_add_more_images"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:text="+ Add More Photos"
+            android:visibility="gone"
+            android:drawableStart="@drawable/ic_add_photo"
+            android:drawablePadding="8dp"
+            style="@style/Widget.Material3.Button.TextButton" />
+
+        <!-- ✅ KEEP: All original form fields exactly the same -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -98,7 +133,6 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Description Field -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -119,7 +153,6 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Price Field -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -138,7 +171,6 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Category Spinner -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -158,7 +190,6 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Condition Spinner -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -178,7 +209,6 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Location Field with GPS Button -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -215,7 +245,6 @@
 
         </LinearLayout>
 
-        <!-- Tags Field -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -234,7 +263,6 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Checkboxes -->
         <com.google.android.material.checkbox.MaterialCheckBox
             android:id="@+id/cb_negotiable"
             android:layout_width="match_parent"
@@ -262,7 +290,7 @@
             android:textSize="16sp"
             android:textColor="#374151" />
 
-        <!-- Action Buttons -->
+        <!-- ✅ KEEP: Original action buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

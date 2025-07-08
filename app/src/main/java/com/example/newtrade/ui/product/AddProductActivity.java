@@ -99,13 +99,14 @@ public class AddProductActivity extends AppCompatActivity {
     }
 
     private void setupSpinners() {
-        // Category spinner
+        // ✅ FIXED: Sync with Fragment categories
         List<String> categories = new ArrayList<>();
         categories.add("Electronics");
         categories.add("Fashion");
         categories.add("Home & Garden");
         categories.add("Sports");
         categories.add("Books");
+        categories.add("Automotive");  // ✅ ADDED: Match with Fragment
         categories.add("Other");
 
         ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this,
@@ -113,7 +114,7 @@ public class AddProductActivity extends AppCompatActivity {
         categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spCategory.setAdapter(categoryAdapter);
 
-        // Condition spinner
+        // ✅ KEEP: Condition spinner unchanged
         List<String> conditions = new ArrayList<>();
         conditions.add("New");
         conditions.add("Like New");
@@ -204,10 +205,18 @@ public class AddProductActivity extends AppCompatActivity {
             MultipartBody.Part imagePart = MultipartBody.Part.createFormData(
                     "file", imageFile.getName(), requestFile);
 
-            // Upload to server
+            // ✅ FIXED: Get userId and add to upload request
+            Long userId = prefsManager.getUserId();
+            if (userId == null || userId <= 0) {
+                setLoading(false);
+                showError("Please login to upload images");
+                return;
+            }
+
+            // Upload to server with User-ID header
             ApiService apiService = ApiClient.getApiService();
             Call<StandardResponse<Map<String, String>>> call =
-                    apiService.uploadProductImage(imagePart);
+                    apiService.uploadProductImageWithUserId(imagePart, userId);
 
             call.enqueue(new Callback<StandardResponse<Map<String, String>>>() {
                 @Override
@@ -232,7 +241,14 @@ public class AddProductActivity extends AppCompatActivity {
                         }
                     } else {
                         setLoading(false);
-                        showError("Failed to upload image to server");
+                        // ✅ FIXED: Better error logging
+                        try {
+                            String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown error";
+                            Log.e(TAG, "❌ Image upload HTTP " + response.code() + " Error: " + errorBody);
+                            showError("Failed to upload image (HTTP " + response.code() + ")");
+                        } catch (Exception e) {
+                            showError("Failed to upload image to server");
+                        }
                     }
                 }
 
@@ -240,7 +256,7 @@ public class AddProductActivity extends AppCompatActivity {
                 public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
                     setLoading(false);
                     Log.e(TAG, "❌ Image upload failed", t);
-                    showError("Network error while uploading image");
+                    showError("Network error while uploading image: " + t.getMessage());
                 }
             });
 
@@ -287,6 +303,9 @@ public class AddProductActivity extends AppCompatActivity {
 
         productRequest.put("location", etLocation.getText().toString().trim());
 
+        // ✅ FIXED: Add sellerId field
+        productRequest.put("sellerId", userId);
+
         // Image URLs
         List<String> imageUrls = new ArrayList<>();
         if (uploadedImageUrl != null) {
@@ -296,10 +315,10 @@ public class AddProductActivity extends AppCompatActivity {
 
         Log.d(TAG, "Product request: " + productRequest);
 
-        // Call API to create product
+        // ✅ FIXED: Call API with User-ID header
         ApiService apiService = ApiClient.getApiService();
         Call<StandardResponse<Map<String, Object>>> call =
-                apiService.createProduct(productRequest);
+                apiService.createProductWithUserId(productRequest, userId);
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
@@ -321,7 +340,15 @@ public class AddProductActivity extends AppCompatActivity {
                         showError("Failed to create product: " + standardResponse.getMessage());
                     }
                 } else {
-                    showError("Failed to create product on server");
+                    // ✅ FIXED: Better error logging
+                    try {
+                        String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown error";
+                        Log.e(TAG, "❌ Product creation HTTP " + response.code() + " Error: " + errorBody);
+                        showError("Failed to create product (HTTP " + response.code() + "): " + errorBody);
+                    } catch (Exception e) {
+                        Log.e(TAG, "❌ Error reading error body", e);
+                        showError("Failed to create product on server (HTTP " + response.code() + ")");
+                    }
                 }
             }
 
@@ -329,7 +356,7 @@ public class AddProductActivity extends AppCompatActivity {
             public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                 setLoading(false);
                 Log.e(TAG, "❌ Product creation failed", t);
-                showError("Network error while creating product");
+                showError("Network error while creating product: " + t.getMessage());
             }
         });
     }

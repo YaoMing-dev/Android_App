@@ -209,4 +209,17 @@ public interface ApiService {
 
     @GET("api/files/info")
     Call<StandardResponse<Map<String, Object>>> getFileUploadInfo();
+
+    @Multipart
+    @POST("api/files/upload/product")
+    Call<StandardResponse<Map<String, String>>> uploadProductImageWithUserId(
+            @Part MultipartBody.Part image,
+            @retrofit2.http.Header("User-ID") Long userId
+    );
+
+    @POST("api/products")
+    Call<StandardResponse<Map<String, Object>>> createProductWithUserId(
+            @Body Map<String, Object> productData,
+            @retrofit2.http.Header("User-ID") Long userId
+    );
 }
