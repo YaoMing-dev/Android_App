@@ -473,15 +473,7 @@ public class LoginActivity extends AppCompatActivity {
                 Log.d(TAG, "🔍 Email Verified: " + isEmailVerified);
 
                 // ❌ CRITICAL EMAIL CHECK
-                if (email != null && !email.equals("miyamoth129@gmail.com")) {
-                    Log.e(TAG, "❌❌❌ BACKEND RETURNED WRONG USER!");
-                    Log.e(TAG, "❌ Expected: miyamoth129@gmail.com");
-                    Log.e(TAG, "❌ Backend returned: " + email);
-                    Log.e(TAG, "❌ This means backend createUserFromGoogle() FAILED!");
 
-                    showError("❌ Backend lỗi: Trả về email " + email + " thay vì miyamoth129@gmail.com");
-                    return;
-                }
 
                 if (userId != null && email != null && displayName != null) {
                     // Save user session (existing logic)

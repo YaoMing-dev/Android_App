@@ -1,4 +1,4 @@
-// File: app/src/main/java/com/example/newtrade/ui/search/CategoryProductsActivity.java
+// app/src/main/java/com/example/newtrade/ui/product/CategoryProductsActivity.java
 package com.example.newtrade.ui.product;
 
 import android.content.Intent;
@@ -99,7 +99,7 @@ public class CategoryProductsActivity extends AppCompatActivity {
 
     private void setupRecyclerView() {
         productAdapter = new ProductAdapter(products, product -> {
-            Log.d(TAG, "Product clicked: " + product.getTitle());
+            Log.d(TAG, "📱 Product clicked: " + product.getTitle() + " (ID: " + product.getId() + ")");
             Intent intent = new Intent(this, ProductDetailActivity.class);
             intent.putExtra("product_id", product.getId());
             intent.putExtra("product_title", product.getTitle());
@@ -120,100 +120,51 @@ public class CategoryProductsActivity extends AppCompatActivity {
         tvEmptyState.setVisibility(View.GONE);
         rvProducts.setVisibility(View.VISIBLE);
 
-        Log.d(TAG, "🔄 Loading products for category: " + categoryId);
+        Log.d(TAG, "🔄 Loading REAL products for category: " + categoryId);
 
-        // ✅ FIX: Sử dụng đúng signature
+        // ✅ STRATEGY 1: Load by category filter
         ApiClient.getApiService().getProducts(
                 0,           // page
                 50,          // size
                 null,        // search
-                categoryId,  // categoryId
-                null,        // condition
+                categoryId,  // categoryId filter
                 null,        // minPrice
                 null,        // maxPrice
-                "createdAt", // sortBy
-                "desc"       // sortDir
+                null,        // condition
+                null,        // location
+                null         // radius
         ).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+            public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                   Response<StandardResponse<Map<String, Object>>> response) {
                 swipeRefresh.setRefreshing(false);
 
-                Log.d(TAG, "🔍 Response code: " + response.code());
-
                 try {
-                    if (response.isSuccessful() && response.body() != null) {
-                        StandardResponse<Map<String, Object>> standardResponse = response.body();
+                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                        Map<String, Object> data = response.body().getData();
+                        List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
 
-                        Log.d(TAG, "🔍 Response success: " + standardResponse.isSuccess());
-                        Log.d(TAG, "🔍 Response message: " + standardResponse.getMessage());
-
-                        if (standardResponse.isSuccess()) {
-                            Map<String, Object> data = standardResponse.getData();
-
-                            if (data != null && data.containsKey("content")) {
-                                @SuppressWarnings("unchecked")
-                                List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
-                                updateProductList(productList);
-                                Log.d(TAG, "✅ Found " + productList.size() + " products in category");
-                            } else {
-                                Log.w(TAG, "⚠️ No content field in response, trying fallback...");
-                                loadProductsByCategory();
-                            }
-                        } else {
-                            Log.e(TAG, "❌ Response not successful: " + standardResponse.getMessage());
-                            loadProductsByCategory();
-                        }
+                        updateProductList(productList);
+                        Log.d(TAG, "✅ Loaded " + (productList != null ? productList.size() : 0) + " REAL products");
                     } else {
-                        Log.e(TAG, "❌ Response not successful or null body");
-                        loadProductsByCategory();
+                        Log.e(TAG, "❌ API response not successful or null body");
+                        // ✅ NO FALLBACK TO SAMPLE DATA - Just show empty state
+                        showEmptyState();
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "❌ Error parsing products response", e);
-                    loadProductsByCategory();
+                    showEmptyState();
                 }
             }
 
             @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+            public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                 swipeRefresh.setRefreshing(false);
-                Log.e(TAG, "❌ Products API call failed for category " + categoryId, t);
-                loadProductsByCategory();
+                Log.e(TAG, "❌ Products API call failed", t);
+                // ✅ NO FALLBACK TO SAMPLE DATA - Just show empty state
+                showEmptyState();
             }
         });
-    }
-
-    // ✅ STRATEGY 2: Fallback sử dụng dedicated category endpoint
-    private void loadProductsByCategory() {
-        Log.d(TAG, "🔄 Trying dedicated category endpoint...");
-
-        ApiClient.getProductService().getProductsByCategory(categoryId)
-                .enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-                    @Override
-                    public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
-                                           @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
-
-                        try {
-                            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                                List<Map<String, Object>> productList = response.body().getData();
-                                updateProductList(productList);
-                                Log.d(TAG, "✅ Loaded " + productList.size() + " products via category endpoint");
-                            } else {
-                                Log.e(TAG, "❌ Category endpoint failed, loading sample data");
-                                loadSampleProducts();
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "❌ Error parsing category products", e);
-                            loadSampleProducts();
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
-                        Log.e(TAG, "❌ Category endpoint failed", t);
-                        loadSampleProducts();
-                    }
-                });
     }
 
     private void updateProductList(List<Map<String, Object>> productList) {
@@ -231,9 +182,13 @@ public class CategoryProductsActivity extends AppCompatActivity {
                 }
             }
 
-            productAdapter.notifyDataSetChanged();
-            showProductsView();
-            Log.d(TAG, "✅ Updated UI with " + products.size() + " products");
+            if (!products.isEmpty()) {
+                productAdapter.notifyDataSetChanged();
+                showProductsView();
+                Log.d(TAG, "✅ Updated UI with " + products.size() + " REAL products");
+            } else {
+                showEmptyState();
+            }
         } else {
             showEmptyState();
         }
@@ -255,10 +210,14 @@ public class CategoryProductsActivity extends AppCompatActivity {
                 product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
             }
 
-            // Image URLs handling
+            // Image URLs handling - Support multiple formats
             Object imageUrlsObj = productData.get("imageUrls");
             if (imageUrlsObj instanceof List) {
-                product.setImageUrls((List<String>) imageUrlsObj);
+                List<String> imageUrls = (List<String>) imageUrlsObj;
+                product.setImageUrls(imageUrls);
+                if (!imageUrls.isEmpty()) {
+                    product.setImageUrl(imageUrls.get(0)); // Set primary image
+                }
             } else if (imageUrlsObj instanceof String && !((String) imageUrlsObj).isEmpty()) {
                 product.setImageUrl((String) imageUrlsObj);
             }
@@ -273,6 +232,7 @@ public class CategoryProductsActivity extends AppCompatActivity {
                 }
             }
 
+            Log.d(TAG, "✅ Parsed REAL product: " + product.getTitle() + " (ID: " + product.getId() + ")");
             return product;
         } catch (Exception e) {
             Log.e(TAG, "❌ Error creating product from data", e);
@@ -280,39 +240,8 @@ public class CategoryProductsActivity extends AppCompatActivity {
         }
     }
 
-    // ✅ STRATEGY 3: Sample data nếu backend fails
-    private void loadSampleProducts() {
-        Log.d(TAG, "📦 Loading sample products for " + categoryName);
-
-        products.clear();
-
-        // Tạo sample products dựa trên category
-        if ("Electronics".equalsIgnoreCase(categoryName)) {
-            products.add(createSampleProduct(1L, "iPhone 15 Pro Max 1TB", "Latest iPhone with titanium design", "32,500,000 VND", "Ho Chi Minh City", Product.ProductCondition.LIKE_NEW));
-            products.add(createSampleProduct(2L, "Samsung Galaxy S24 Ultra", "256GB, Titanium Black", "25,000,000 VND", "Ho Chi Minh City", Product.ProductCondition.GOOD));
-            products.add(createSampleProduct(3L, "MacBook Pro M3 16\"", "1TB SSD, 32GB RAM", "65,000,000 VND", "Ho Chi Minh City", Product.ProductCondition.LIKE_NEW));
-        } else if ("Fashion".equalsIgnoreCase(categoryName)) {
-            products.add(createSampleProduct(4L, "Louis Vuitton Neverfull", "Authentic, like new condition", "38,000,000 VND", "Ho Chi Minh City", Product.ProductCondition.LIKE_NEW));
-            products.add(createSampleProduct(5L, "Gucci Ace Sneakers", "Size 42, white leather", "15,000,000 VND", "Ho Chi Minh City", Product.ProductCondition.GOOD));
-        }
-        // Thêm sample cho categories khác...
-
-        productAdapter.notifyDataSetChanged();
-        showProductsView();
-        Log.d(TAG, "✅ Loaded " + products.size() + " sample products");
-    }
-
-    private Product createSampleProduct(Long id, String title, String description, String price, String location, Product.ProductCondition condition) {
-        Product product = new Product();
-        product.setId(id);
-        product.setTitle(title);
-        product.setDescription(description);
-        product.setPrice(new BigDecimal("1000000")); // Default price
-        product.setLocation(location);
-        product.setCondition(condition);
-        product.setImageUrl("https://via.placeholder.com/300x300?text=" + title.charAt(0));
-        return product;
-    }
+    // ✅ REMOVED: loadSampleProducts() method completely
+    // ✅ REMOVED: createSampleProduct() method completely
 
     private void showProductsView() {
         rvProducts.setVisibility(View.VISIBLE);
@@ -322,7 +251,7 @@ public class CategoryProductsActivity extends AppCompatActivity {
     private void showEmptyState() {
         rvProducts.setVisibility(View.GONE);
         tvEmptyState.setVisibility(View.VISIBLE);
-        tvEmptyState.setText("No products found in " + categoryName);
+        tvEmptyState.setText("No products found in " + categoryName + "\n\nCheck back later or try a different category.");
         Log.d(TAG, "📭 Showing empty state for category: " + categoryName);
     }
 

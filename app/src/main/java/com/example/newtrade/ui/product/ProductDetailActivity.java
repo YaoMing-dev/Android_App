@@ -17,9 +17,12 @@ import com.example.newtrade.ui.offer.MakeOfferBottomSheetDialogFragment;
 import com.example.newtrade.ui.profile.UserProfileActivity;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.viewpager2.widget.ViewPager2;
+
 // Thêm imports này nếu chưa có:
 import com.example.newtrade.ui.profile.SavedItemsActivity;
 import com.example.newtrade.R;
+import com.example.newtrade.adapters.ProductImageAdapter;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.chat.ChatActivity;
@@ -30,9 +33,12 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.example.newtrade.utils.NavigationUtils;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -49,12 +55,21 @@ public class ProductDetailActivity extends AppCompatActivity {
     // UI Components
     private MaterialToolbar toolbar;
 
-
+    // ✅ Image Gallery Components
+    private ViewPager2 vpProductImages;
+    private TabLayout tabImageIndicators;
+    private TextView tvImageCounter;
     private ImageView ivProductImage;
+
+    // Product Info Components
     private TextView tvTitle, tvPrice, tvDescription, tvLocation, tvCondition;
     private TextView tvSellerName, tvSellerRating, tvMemberSince;
     private Button btnContact, btnMakeOffer, btnViewProfile;
     private FloatingActionButton fabShare, fabSave;
+
+    // ✅ Image Gallery Data
+    private ProductImageAdapter imageAdapter;
+    private List<String> productImages = new ArrayList<>();
 
     // Data
     private Long productId;
@@ -78,6 +93,10 @@ public class ProductDetailActivity extends AppCompatActivity {
         // Initialize views
         initViews();
         setupToolbar();
+
+        // ✅ THÊM: Setup image gallery
+        setupImageGallery();
+
         setupListeners();
 
         // Load product details
@@ -90,27 +109,37 @@ public class ProductDetailActivity extends AppCompatActivity {
         productTitle = intent.getStringExtra("product_title");
         productPrice = intent.getStringExtra("product_price");
 
-        Log.d(TAG, "Product ID: " + productId + ", Title: " + productTitle);
+        Log.d(TAG, "📱 Product ID: " + productId + ", Title: " + productTitle);
     }
 
     private void initViews() {
         toolbar = findViewById(R.id.toolbar);
+
+        // ✅ Image Gallery Views
+        vpProductImages = findViewById(R.id.vp_product_images);
+        tabImageIndicators = findViewById(R.id.tab_image_indicators);
+        tvImageCounter = findViewById(R.id.tv_image_counter);
         ivProductImage = findViewById(R.id.iv_product_image);
+
+        // Product Info Views
         tvTitle = findViewById(R.id.tv_title);
         tvPrice = findViewById(R.id.tv_price);
         tvDescription = findViewById(R.id.tv_description);
         tvLocation = findViewById(R.id.tv_location);
         tvCondition = findViewById(R.id.tv_condition);
+
+        // Seller Info Views
         tvSellerName = findViewById(R.id.tv_seller_name);
         tvSellerRating = findViewById(R.id.tv_seller_rating);
         tvMemberSince = findViewById(R.id.tv_member_since);
+
+        // Action Buttons
         btnContact = findViewById(R.id.btn_contact);
         btnMakeOffer = findViewById(R.id.btn_make_offer);
         btnViewProfile = findViewById(R.id.btn_view_profile);
         fabShare = findViewById(R.id.fab_share);
-        Button btnSave = findViewById(R.id.btn_save);
 
-
+        Log.d(TAG, "✅ Views initialized");
     }
 
     private void setupToolbar() {
@@ -121,11 +150,46 @@ public class ProductDetailActivity extends AppCompatActivity {
         }
     }
 
+    // ✅ NEW: Setup image gallery
+    private void setupImageGallery() {
+        // Initialize image adapter
+        imageAdapter = new ProductImageAdapter(this, productImages);
+        vpProductImages.setAdapter(imageAdapter);
+
+        // Setup indicators with TabLayoutMediator
+        new TabLayoutMediator(tabImageIndicators, vpProductImages, (tab, position) -> {
+            // Empty implementation - just shows dots
+        }).attach();
+
+        // Setup page change listener for counter
+        vpProductImages.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                super.onPageSelected(position);
+                updateImageCounter(position + 1, productImages.size());
+            }
+        });
+
+        Log.d(TAG, "✅ Image gallery setup complete");
+    }
+
+    // ✅ NEW: Update image counter
+    private void updateImageCounter(int current, int total) {
+        if (tvImageCounter != null && total > 1) {
+            tvImageCounter.setText(current + "/" + total);
+            tvImageCounter.setVisibility(View.VISIBLE);
+        } else if (tvImageCounter != null) {
+            tvImageCounter.setVisibility(View.GONE);
+        }
+    }
+
     private void setupListeners() {
         Button btnSave = findViewById(R.id.btn_save);
 
         // ✅ SAVE BUTTON LISTENER
-        btnSave.setOnClickListener(v -> toggleSaveItem());
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> toggleSaveItem());
+        }
 
         // Existing listeners
         btnContact.setOnClickListener(v -> showContactOptions());
@@ -137,23 +201,24 @@ public class ProductDetailActivity extends AppCompatActivity {
     private void checkSaveStatus() {
         if (productId == null || productId <= 0) return;
 
-        ApiClient.getSavedItemsService().isItemSaved(productId)
+        ApiClient.getProductService().isProductSaved(productId)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                            Response<StandardResponse<Map<String, Object>>> response) {
                         if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                             Map<String, Object> data = response.body().getData();
-                            if (data != null && data.containsKey("isSaved")) {
-                                isItemSaved = (Boolean) data.get("isSaved");
+                            if (data != null && data.containsKey("saved")) {
+                                isItemSaved = (Boolean) data.get("saved");
                                 updateSaveButton();
+                                Log.d(TAG, "✅ Save status checked: " + isItemSaved);
                             }
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        Log.e(TAG, "Error checking save status", t);
+                        Log.e(TAG, "❌ Error checking save status", t);
                     }
                 });
     }
@@ -161,23 +226,24 @@ public class ProductDetailActivity extends AppCompatActivity {
     private void toggleSaveItem() {
         if (productId == null || productId <= 0) return;
 
-        Call<StandardResponse<String>> call;
+        Call<StandardResponse<Void>> call;
         if (isItemSaved) {
-            call = ApiClient.getSavedItemsService().removeSavedItem(productId);
+            call = ApiClient.getProductService().unsaveProduct(productId);
         } else {
-            call = ApiClient.getSavedItemsService().saveItem(productId);
+            call = ApiClient.getProductService().saveProduct(productId);
         }
 
-        call.enqueue(new Callback<StandardResponse<String>>() {
+        call.enqueue(new Callback<StandardResponse<Void>>() {
             @Override
-            public void onResponse(Call<StandardResponse<String>> call,
-                                   Response<StandardResponse<String>> response) {
+            public void onResponse(Call<StandardResponse<Void>> call,
+                                   Response<StandardResponse<Void>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                     isItemSaved = !isItemSaved;
                     updateSaveButton();
 
-                    String message = isItemSaved ? "Item saved" : "Item removed from saved";
+                    String message = isItemSaved ? "Product saved!" : "Product removed from saved";
                     Toast.makeText(ProductDetailActivity.this, message, Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "✅ Save toggled: " + isItemSaved);
                 } else {
                     String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to update save status";
                     Toast.makeText(ProductDetailActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
@@ -185,8 +251,8 @@ public class ProductDetailActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
-                Log.e(TAG, "Error toggling save status", t);
+            public void onFailure(Call<StandardResponse<Void>> call, Throwable t) {
+                Log.e(TAG, "❌ Error toggling save status", t);
                 Toast.makeText(ProductDetailActivity.this, "Network error. Please try again.", Toast.LENGTH_SHORT).show();
             }
         });
@@ -212,9 +278,9 @@ public class ProductDetailActivity extends AppCompatActivity {
             return;
         }
 
-        Log.d(TAG, "Loading product details for ID: " + productId);
+        Log.d(TAG, "🔄 Loading product details for ID: " + productId);
 
-        // ✅ THÊM: Show loading state
+        // Show loading state
         showLoadingState(true);
 
         ApiClient.getApiService().getProductDetail(productId)
@@ -223,7 +289,7 @@ public class ProductDetailActivity extends AppCompatActivity {
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                            Response<StandardResponse<Map<String, Object>>> response) {
 
-                        // ✅ Hide loading state
+                        // Hide loading state
                         showLoadingState(false);
 
                         if (response.isSuccessful() && response.body() != null) {
@@ -232,22 +298,22 @@ public class ProductDetailActivity extends AppCompatActivity {
                             if (standardResponse.isSuccess()) {
                                 productData = standardResponse.getData();
 
-                                // ✅ Display product data
+                                // Display product data
                                 displayProductData(productData);
 
-                                // ✅ THÊM: Show FABs after data loaded
+                                // Show FABs after data loaded
                                 showFABs();
 
-                                // ✅ THÊM: Check save status
+                                // Check save status
                                 checkSaveStatus();
 
-                                Log.d(TAG, "Product details loaded successfully");
+                                Log.d(TAG, "✅ Product details loaded successfully");
 
                             } else {
                                 showError("Failed to load product: " + standardResponse.getMessage());
                             }
                         } else {
-                            // ✅ IMPROVED: Better error handling
+                            // Better error handling
                             String errorMsg = "Failed to load product details";
                             if (response.code() == 404) {
                                 errorMsg = "Product not found";
@@ -262,10 +328,10 @@ public class ProductDetailActivity extends AppCompatActivity {
 
                     @Override
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        // ✅ Hide loading state
+                        // Hide loading state
                         showLoadingState(false);
 
-                        // ✅ IMPROVED: Better network error handling
+                        // Better network error handling
                         String errorMsg = "Network error";
                         if (t.getMessage() != null) {
                             if (t.getMessage().contains("timeout")) {
@@ -278,7 +344,7 @@ public class ProductDetailActivity extends AppCompatActivity {
                         }
 
                         showError(errorMsg);
-                        Log.e(TAG, "Failed to load product details", t);
+                        Log.e(TAG, "❌ Failed to load product details", t);
                     }
                 });
     }
@@ -292,26 +358,26 @@ public class ProductDetailActivity extends AppCompatActivity {
             if (btnContact != null) btnContact.setEnabled(false);
             if (btnMakeOffer != null) btnMakeOffer.setEnabled(false);
 
-            Log.d(TAG, "Showing loading state");
+            Log.d(TAG, "🔄 Showing loading state");
         } else {
             // Enable all buttons after loading
             if (btnSave != null) btnSave.setEnabled(true);
             if (btnContact != null) btnContact.setEnabled(true);
             if (btnMakeOffer != null) btnMakeOffer.setEnabled(true);
 
-            Log.d(TAG, "Hiding loading state");
+            Log.d(TAG, "✅ Hiding loading state");
         }
     }
+
     private void showFABs() {
         if (fabShare != null) {
             fabShare.setVisibility(View.VISIBLE);
             fabShare.show();
-            Log.d(TAG, "FAB Share shown");
+            Log.d(TAG, "✅ FAB Share shown");
         }
     }
 
-
-    // ✅ THÊM: Retry dialog for network errors
+    // Retry dialog for network errors
     private void showRetryDialog(String errorMessage) {
         new AlertDialog.Builder(this)
                 .setTitle("Connection Error")
@@ -357,8 +423,8 @@ public class ProductDetailActivity extends AppCompatActivity {
                 }
             }
 
-            // ✅ SETUP PRODUCT IMAGE USING ImageUtils
-            setupProductImage(data);
+            // ✅ SETUP PRODUCT IMAGES - Support multiple images
+            setupProductImages(data);
 
             // Seller information
             if (data.get("seller") != null || data.get("user") != null) {
@@ -379,45 +445,121 @@ public class ProductDetailActivity extends AppCompatActivity {
                 }
             }
 
-            // ✅ THÊM: Check save status sau khi load xong product
-            checkSaveStatus();
+            Log.d(TAG, "✅ Product data displayed successfully");
 
         } catch (Exception e) {
-            Log.e(TAG, "Error displaying product data", e);
+            Log.e(TAG, "❌ Error displaying product data", e);
         }
     }
 
-    // ✅ THÊM METHOD setupProductImage
-    private void setupProductImage(Map<String, Object> productData) {
-        if (ivProductImage == null || productData == null) return;
+    // ✅ ENHANCED: Setup product images with gallery support
+    private void setupProductImages(Map<String, Object> productData) {
+        if (productData == null) return;
 
         try {
-            String imageUrl = null;
+            productImages.clear();
 
-            // Try different ways to get image URL from backend response
-            if (productData.get("primaryImageUrl") != null) {
-                imageUrl = productData.get("primaryImageUrl").toString();
-            } else if (productData.get("imageUrl") != null) {
-                imageUrl = productData.get("imageUrl").toString();
-            } else if (productData.get("imageUrls") != null) {
-                Object imageUrlsObj = productData.get("imageUrls");
-                if (imageUrlsObj instanceof List) {
-                    List<String> imageUrls = (List<String>) imageUrlsObj;
-                    if (!imageUrls.isEmpty()) {
-                        imageUrl = imageUrls.get(0);
+            // ✅ TRY TO GET MULTIPLE IMAGES FIRST
+            if (productData.get("images") != null) {
+                Object imagesObj = productData.get("images");
+                if (imagesObj instanceof List) {
+                    List<String> images = (List<String>) imagesObj;
+                    if (!images.isEmpty()) {
+                        productImages.addAll(images);
+                        Log.d(TAG, "✅ Found " + images.size() + " images in 'images' field");
                     }
                 }
             }
 
-            // Use ImageUtils to load the image
-            ImageUtils.loadProductImage(this, imageUrl, ivProductImage);
+            // ✅ FALLBACK TO imageUrls array
+            if (productImages.isEmpty() && productData.get("imageUrls") != null) {
+                Object imageUrlsObj = productData.get("imageUrls");
+                if (imageUrlsObj instanceof List) {
+                    List<String> imageUrls = (List<String>) imageUrlsObj;
+                    if (!imageUrls.isEmpty()) {
+                        productImages.addAll(imageUrls);
+                        Log.d(TAG, "✅ Found " + imageUrls.size() + " images in 'imageUrls' field");
+                    }
+                }
+            }
 
-            Log.d(TAG, "Product image setup complete. URL: " + imageUrl);
+            // ✅ FALLBACK TO SINGLE IMAGE
+            if (productImages.isEmpty()) {
+                String singleImageUrl = null;
+                if (productData.get("primaryImageUrl") != null) {
+                    singleImageUrl = productData.get("primaryImageUrl").toString();
+                } else if (productData.get("imageUrl") != null) {
+                    singleImageUrl = productData.get("imageUrl").toString();
+                }
+
+                if (singleImageUrl != null && !singleImageUrl.isEmpty()) {
+                    productImages.add(singleImageUrl);
+                    Log.d(TAG, "✅ Found single image: " + singleImageUrl);
+                }
+            }
+
+            // ✅ DISPLAY IMAGES BASED ON COUNT
+            if (productImages.size() > 1) {
+                // Multiple images - show ViewPager2 gallery
+                showImageGallery();
+                Log.d(TAG, "✅ Displaying " + productImages.size() + " images in gallery");
+
+            } else if (productImages.size() == 1) {
+                // Single image - show in ImageView
+                showSingleImage();
+                Log.d(TAG, "✅ Displaying single image");
+
+            } else {
+                // No images - show placeholder
+                showPlaceholderImage();
+                Log.d(TAG, "📷 No product images available, showing placeholder");
+            }
 
         } catch (Exception e) {
-            Log.e(TAG, "Error setting up product image", e);
-            ivProductImage.setImageResource(R.drawable.ic_image_placeholder);
+            Log.e(TAG, "❌ Error setting up product images", e);
+            showPlaceholderImage();
         }
+    }
+
+    // ✅ NEW: Show image gallery (multiple images)
+    private void showImageGallery() {
+        vpProductImages.setVisibility(View.VISIBLE);
+        ivProductImage.setVisibility(View.GONE);
+        tabImageIndicators.setVisibility(View.VISIBLE);
+
+        // Update adapter with new images
+        imageAdapter.updateImages(productImages);
+
+        // Update counter
+        updateImageCounter(1, productImages.size());
+
+        Log.d(TAG, "✅ Image gallery visible with " + productImages.size() + " images");
+    }
+
+    // ✅ NEW: Show single image
+    private void showSingleImage() {
+        vpProductImages.setVisibility(View.GONE);
+        ivProductImage.setVisibility(View.VISIBLE);
+        tabImageIndicators.setVisibility(View.GONE);
+        if (tvImageCounter != null) tvImageCounter.setVisibility(View.GONE);
+
+        // Load single image using ImageUtils
+        String imageUrl = productImages.get(0);
+        ImageUtils.loadProductImage(this, imageUrl, ivProductImage);
+
+        Log.d(TAG, "✅ Single image displayed: " + imageUrl);
+    }
+
+    // ✅ NEW: Show placeholder
+    private void showPlaceholderImage() {
+        vpProductImages.setVisibility(View.GONE);
+        ivProductImage.setVisibility(View.VISIBLE);
+        tabImageIndicators.setVisibility(View.GONE);
+        if (tvImageCounter != null) tvImageCounter.setVisibility(View.GONE);
+
+        ivProductImage.setImageResource(R.drawable.ic_image_placeholder);
+
+        Log.d(TAG, "📷 Placeholder image displayed");
     }
 
     private String formatPrice(BigDecimal price) {
@@ -426,7 +568,7 @@ public class ProductDetailActivity extends AppCompatActivity {
         return formatter.format(price) + " VNĐ";
     }
 
-    // ✅ FIXED: showContactOptions với safe ID parsing
+    // Contact seller with safe ID parsing
     private void showContactOptions() {
         if (productData == null) return;
 
@@ -440,7 +582,7 @@ public class ProductDetailActivity extends AppCompatActivity {
                 return;
             }
 
-            // ✅ FIX: Parse ID an toàn cho cả Integer và Double
+            // Parse ID safely for both Integer and Double
             Long sellerId = parseToLong(seller.get("id"));
             String sellerName = seller.get("displayName") != null ? seller.get("displayName").toString() : "Seller";
 
@@ -449,7 +591,7 @@ public class ProductDetailActivity extends AppCompatActivity {
                 return;
             }
 
-            Log.d(TAG, "Starting chat with seller ID: " + sellerId + ", name: " + sellerName);
+            Log.d(TAG, "🎯 Starting chat with seller ID: " + sellerId + ", name: " + sellerName);
 
             // Start chat
             Intent chatIntent = new Intent(this, ChatActivity.class);
@@ -459,33 +601,33 @@ public class ProductDetailActivity extends AppCompatActivity {
             startActivity(chatIntent);
 
         } catch (Exception e) {
-            Log.e(TAG, "Error starting chat", e);
+            Log.e(TAG, "❌ Error starting chat", e);
             Toast.makeText(this, "Unable to start conversation", Toast.LENGTH_SHORT).show();
         }
     }
 
-    // ✅ THÊM HELPER METHOD để parse ID an toàn
+    // Helper method to parse ID safely
     private Long parseToLong(Object value) {
         if (value == null) return null;
 
         try {
             String valueStr = value.toString();
 
-            // Nếu là số thập phân, chuyển thành số nguyên
+            // If decimal number, convert to integer
             if (valueStr.contains(".")) {
                 return Math.round(Double.parseDouble(valueStr));
             }
 
-            // Nếu là số nguyên
+            // If integer
             return Long.parseLong(valueStr);
 
         } catch (NumberFormatException e) {
-            Log.e(TAG, "Error parsing ID: " + value, e);
+            Log.e(TAG, "❌ Error parsing ID: " + value, e);
             return null;
         }
     }
 
-    // ✅ FIXED: makeOffer với đơn giản hóa
+    // Make offer with simplified approach
     private void makeOffer() {
         MakeOfferBottomSheetDialogFragment bottomSheet =
                 MakeOfferBottomSheetDialogFragment.newInstance(productId, productPrice);
@@ -494,21 +636,16 @@ public class ProductDetailActivity extends AppCompatActivity {
             @Override
             public void onOfferSubmitted(boolean success, String message) {
                 if (success) {
-                    Log.d(TAG, "Offer submitted successfully: " + message);
+                    Log.d(TAG, "✅ Offer submitted successfully: " + message);
                     // Optional: Refresh product data or show some indication
                 } else {
-                    Log.e(TAG, "Offer submission failed: " + message);
+                    Log.e(TAG, "❌ Offer submission failed: " + message);
                 }
             }
         });
 
         bottomSheet.show(getSupportFragmentManager(), "make_offer");
     }
-
-// ✅ XÓA method submitOffer cũ vì đã move vào Fragment
-
-// ✅ THÊM import cần thiết vào đầu file
-
 
     private void submitOffer(String amount, String message) {
         Map<String, Object> offerData = new HashMap<>();
@@ -520,7 +657,7 @@ public class ProductDetailActivity extends AppCompatActivity {
         Toast.makeText(this, "Offer submitted: " + amount + " VNĐ", Toast.LENGTH_SHORT).show();
     }
 
-    // ✅ FIXED: viewSellerProfile với safe ID parsing
+    // View seller profile with safe ID parsing
     private void viewSellerProfile() {
         if (productData == null) return;
 
@@ -529,7 +666,7 @@ public class ProductDetailActivity extends AppCompatActivity {
                     (productData.get("seller") != null ? productData.get("seller") : productData.get("user"));
 
             if (seller != null && seller.get("id") != null) {
-                // ✅ FIX: Parse ID an toàn
+                // Parse ID safely
                 Long sellerId = parseToLong(seller.get("id"));
 
                 if (sellerId != null && sellerId > 0) {
@@ -537,7 +674,7 @@ public class ProductDetailActivity extends AppCompatActivity {
                     intent.putExtra("user_id", sellerId);
                     startActivity(intent);
 
-                    Log.d(TAG, "Opening seller profile for ID: " + sellerId);
+                    Log.d(TAG, "🎯 Opening seller profile for ID: " + sellerId);
                 } else {
                     Toast.makeText(this, "Invalid seller ID", Toast.LENGTH_SHORT).show();
                 }
@@ -545,7 +682,7 @@ public class ProductDetailActivity extends AppCompatActivity {
                 Toast.makeText(this, "Seller information not available", Toast.LENGTH_SHORT).show();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error viewing seller profile", e);
+            Log.e(TAG, "❌ Error viewing seller profile", e);
             Toast.makeText(this, "Unable to view seller profile", Toast.LENGTH_SHORT).show();
         }
     }
@@ -564,16 +701,11 @@ public class ProductDetailActivity extends AppCompatActivity {
         startActivity(Intent.createChooser(shareIntent, "Share Product"));
     }
 
-    private void saveProduct() {
-        // TODO: Implement save product functionality
-        Toast.makeText(this, "Product saved to favorites", Toast.LENGTH_SHORT).show();
-    }
-
     private void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-        Log.e(TAG, "Error: " + message);
+        Log.e(TAG, "❌ Error: " + message);
 
-        // ✅ THÊM: Show retry option for network errors
+        // Show retry option for network errors
         if (message.contains("Network") || message.contains("timeout") || message.contains("internet")) {
             showRetryDialog(message);
         }
