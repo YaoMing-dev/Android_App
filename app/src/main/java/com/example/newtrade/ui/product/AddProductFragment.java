@@ -624,10 +624,20 @@ public class AddProductFragment extends Fragment implements SelectedImageAdapter
             return;
         }
 
-        productRequest.put("category", spinnerCategory.getText().toString());
-        productRequest.put("condition", spinnerCondition.getText().toString());
+        // ✅ FIXED: Category - Convert to categoryId like backend expects
+        String categoryText = spinnerCategory.getText().toString();
+        int categoryIndex = getCategoryIndex(categoryText);
+        productRequest.put("categoryId", (long) (categoryIndex + 1)); // Categories start from 1
+
+        // ✅ FIXED: Condition - Convert to backend enum format
+        String conditionText = spinnerCondition.getText().toString();
+        String condition = conditionText.toUpperCase().replace(" ", "_");
+        productRequest.put("condition", condition);
+
         productRequest.put("location", getTextFromEditText(etLocation));
         productRequest.put("negotiable", cbNegotiable.isChecked());
+
+        // ✅ FIXED: Add sellerId field
         productRequest.put("sellerId", userId);
 
         String tags = getTextFromEditText(etTags);
@@ -638,10 +648,11 @@ public class AddProductFragment extends Fragment implements SelectedImageAdapter
         // ✅ ENHANCED: Include all uploaded image URLs
         if (!uploadedImageUrls.isEmpty()) {
             productRequest.put("imageUrls", uploadedImageUrls);
-
             // ✅ BACKWARD COMPATIBLE: Also set single imageUrl for compatibility
             productRequest.put("imageUrl", uploadedImageUrls.get(0));
         }
+
+        Log.d(TAG, "Product request: " + productRequest);
 
         ApiService apiService = ApiClient.getApiService();
         Call<StandardResponse<Map<String, Object>>> call = apiService.createProduct(productRequest);
@@ -677,8 +688,15 @@ public class AddProductFragment extends Fragment implements SelectedImageAdapter
                         showError("Failed to create product: " + standardResponse.getMessage());
                     }
                 } else {
-                    showError("Failed to create product on server (HTTP " + response.code() + ")");
-                    Log.e(TAG, "Product creation response not successful: " + response.code());
+                    // ✅ FIXED: Better error logging
+                    try {
+                        String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown error";
+                        Log.e(TAG, "❌ Product creation HTTP " + response.code() + " Error: " + errorBody);
+                        showError("Failed to create product (HTTP " + response.code() + "): " + errorBody);
+                    } catch (Exception e) {
+                        Log.e(TAG, "❌ Error reading error body", e);
+                        showError("Failed to create product on server (HTTP " + response.code() + ")");
+                    }
                 }
             }
 
@@ -689,6 +707,20 @@ public class AddProductFragment extends Fragment implements SelectedImageAdapter
                 showError("Network error while creating product: " + t.getMessage());
             }
         });
+    }
+
+    private int getCategoryIndex(String categoryText) {
+        String[] categories = {
+                "Electronics", "Fashion", "Home & Garden",
+                "Sports", "Books", "Automotive", "Other"
+        };
+
+        for (int i = 0; i < categories.length; i++) {
+            if (categories[i].equals(categoryText)) {
+                return i;
+            }
+        }
+        return 0; // Default to Electronics
     }
 
     // ✅ ENHANCED: Clear form including all images

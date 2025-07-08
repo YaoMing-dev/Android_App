@@ -30,253 +30,271 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:orientation="vertical">
 
-            <!-- Product Image -->
-            <ImageView
-                android:id="@+id/iv_product_image"
+            <!-- ✅ ENHANCED: Image Gallery Section -->
+            <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="250dp"
-                android:scaleType="centerCrop"
-                android:background="@color/gray_200"
-                android:layout_marginBottom="16dp" />
+                android:layout_height="300dp"
+                android:background="@color/white">
 
-            <!-- Product Info Card -->
-            <com.google.android.material.card.MaterialCardView
+                <!-- ✅ NEW: ViewPager2 for multiple images -->
+                <androidx.viewpager2.widget.ViewPager2
+                    android:id="@+id/vp_product_images"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+
+                <!-- ✅ KEEP: Original ImageView for backward compatibility -->
+                <ImageView
+                    android:id="@+id/iv_product_image"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:background="@color/gray_200" />
+
+                <!-- ✅ NEW: Image counter overlay -->
+                <TextView
+                    android:id="@+id/tv_image_counter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_alignParentTop="true"
+                    android:layout_margin="12dp"
+                    android:background="@drawable/bg_image_counter"
+                    android:padding="8dp"
+                    android:text="1/5"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:visibility="gone" />
+
+            </RelativeLayout>
+
+            <!-- ✅ NEW: Tab indicators for multiple images -->
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/tab_image_indicators"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                android:background="@color/white"
+                app:tabBackground="@drawable/tab_indicator_selector"
+                app:tabGravity="center"
+                app:tabIndicatorHeight="0dp"
+                app:tabMinWidth="12dp"
+                app:tabPaddingStart="4dp"
+                app:tabPaddingEnd="4dp"
+                android:visibility="gone" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:id="@+id/tv_title"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Product Title"
-                        android:textSize="20sp"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="8dp" />
-
-                    <TextView
-                        android:id="@+id/tv_price"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="500.000 VNĐ"
-                        android:textSize="18sp"
-                        android:textColor="@color/primary_color"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="8dp" />
-
-                    <TextView
-                        android:id="@+id/tv_location"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Quận 7, TP.HCM"
-                        android:textSize="14sp"
-                        android:layout_marginBottom="8dp" />
-
-                    <TextView
-                        android:id="@+id/tv_condition"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="NEW"
-                        android:textSize="12sp"
-                        android:background="@color/green_500"
-                        android:textColor="@android:color/white"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="4dp" />
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Description -->
-            <com.google.android.material.card.MaterialCardView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                android:orientation="vertical"
+                android:padding="16dp">
 
-                <LinearLayout
+                <!-- Product Info Card -->
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Description"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="8dp" />
-
-                    <TextView
-                        android:id="@+id/tv_description"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Product description here..."
-                        android:textSize="14sp"
-                        android:lineSpacingExtra="4dp" />
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Seller Information -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="32dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Seller Information"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="12dp" />
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="2dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:orientation="vertical"
+                        android:padding="16dp">
 
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_person"
-                            android:background="@drawable/circle_gray"
-                            android:padding="8dp"
-                            android:layout_marginEnd="12dp" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
+                        <TextView
+                            android:id="@+id/tv_title"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="8dp"
+                            tools:text="iPhone 13 Pro Max" />
 
-                            <TextView
-                                android:id="@+id/tv_seller_name"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Seller Name"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/tv_price"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="24sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary_color"
+                            android:layout_marginBottom="8dp"
+                            tools:text="25,000,000 VND" />
 
-                            <TextView
-                                android:id="@+id/tv_seller_rating"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="★ 4.75"
-                                android:textSize="12sp"
-                                android:textColor="@color/orange_500" />
-
-                            <TextView
-                                android:id="@+id/tv_member_since"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Member since Dec 2022"
-                                android:textSize="12sp"
-                                android:textColor="@color/text_secondary" />
-
-                        </LinearLayout>
-
-                        <Button
-                            android:id="@+id/btn_view_profile"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
+                        <TextView
+                            android:id="@+id/tv_condition"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="View Profile"
-                            android:textSize="12sp" />
+                            android:background="@drawable/bg_condition_chip"
+                            android:padding="6dp"
+                            android:textSize="12sp"
+                            android:layout_marginBottom="16dp"
+                            tools:text="Like New" />
+
+                        <TextView
+                            android:id="@+id/tv_description"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="14sp"
+                            android:lineSpacingExtra="2dp"
+                            android:layout_marginBottom="12dp"
+                            tools:text="iPhone 13 Pro Max in excellent condition..." />
+
+                        <TextView
+                            android:id="@+id/tv_location"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="14sp"
+                            android:textColor="@color/text_secondary"
+                            android:drawableStart="@drawable/ic_location"
+                            android:drawablePadding="8dp"
+                            tools:text="District 1, Ho Chi Minh City" />
 
                     </LinearLayout>
 
-                </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-            </com.google.android.material.card.MaterialCardView>
+                <!-- Seller Info Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="2dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Seller Information"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="12dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <de.hdodenhof.circleimageview.CircleImageView
+                                android:id="@+id/iv_seller_avatar"
+                                android:layout_width="50dp"
+                                android:layout_height="50dp"
+                                android:layout_marginEnd="12dp"
+                                android:src="@drawable/ic_person_placeholder" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tv_seller_name"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"
+                                    tools:text="John Doe" />
+
+                                <TextView
+                                    android:id="@+id/tv_seller_rating"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="14sp"
+                                    android:textColor="@color/text_secondary"
+                                    tools:text="⭐ 4.8 rating" />
+
+                                <TextView
+                                    android:id="@+id/tv_member_since"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textSize="12sp"
+                                    android:textColor="@color/text_secondary"
+                                    tools:text="Member since 2022" />
+
+                            </LinearLayout>
+
+                            <Button
+                                android:id="@+id/btn_view_profile"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:text="View Profile"
+                                android:textSize="12sp"
+                                style="@style/Widget.Material3.Button.TextButton" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
 
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Bottom Action Buttons -->
-    <!-- Bottom Action Buttons - 3 BUTTONS -->
+    <!-- Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="horizontal"
-        android:padding="12dp"
-        android:background="@android:color/white"
+        android:padding="16dp"
+        android:background="@color/white"
         android:elevation="8dp">
 
-        <!-- ✅ SAVE BUTTON - ĐỎ -->
         <Button
             android:id="@+id/btn_save"
-            style="@style/Widget.Material3.Button"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
+            android:layout_marginEnd="8dp"
             android:text="❤️ Save"
-            android:textSize="14sp"
-            android:backgroundTint="@android:color/holo_red_light"
-            android:layout_marginEnd="6dp" />
+            style="@style/Widget.Material3.Button.OutlinedButton" />
 
-        <!-- CONTACT BUTTON - OUTLINE -->
         <Button
             android:id="@+id/btn_contact"
-            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:text="💬 Contact"
-            android:textSize="14sp"
-            android:layout_marginHorizontal="6dp" />
+            android:layout_marginEnd="8dp"
+            android:layout_marginStart="8dp"
+            android:text="Contact"
+            style="@style/Widget.Material3.Button.OutlinedButton" />
 
-        <!-- MAKE OFFER BUTTON - PRIMARY -->
         <Button
             android:id="@+id/btn_make_offer"
-            style="@style/Widget.Material3.Button"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:text="🤝 Offer"
-            android:textSize="14sp"
-            android:layout_marginStart="6dp" />
+            android:layout_marginStart="8dp"
+            android:text="Make Offer"
+            style="@style/Widget.Material3.Button" />
 
     </LinearLayout>
 
-    <!-- ✅ CHỈ GIỮ LẠI SHARE FAB -->
+    <!-- Floating Action Buttons -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_share"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
-        android:layout_margin="16dp"
         android:layout_marginTop="80dp"
-        android:src="@android:drawable/ic_menu_share"
-        android:contentDescription="Share Product"
-        app:fabSize="mini"
-        app:backgroundTint="@color/primary_color"
-        app:tint="@android:color/white" />
+        android:layout_marginEnd="16dp"
+        android:src="@drawable/ic_share"
+        android:contentDescription="Share"
+        app:tint="@color/white"
+        android:visibility="gone" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
