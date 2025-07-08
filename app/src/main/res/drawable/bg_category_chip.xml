@@ -1,0 +1,15 @@
+<!-- res/drawable/bg_category_chip.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- Bo góc -->
+    <corners android:radius="16dp" />
+
+    <!-- Màu nền -->
+    <solid android:color="#FFE0B2" /> <!-- Màu cam nhạt -->
+
+    <!-- Viền nếu cần -->
+    <stroke
+        android:width="1dp"
+        android:color="#FF9800" /> <!-- Màu cam đậm -->
+</shape>

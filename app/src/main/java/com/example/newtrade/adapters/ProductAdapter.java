@@ -63,6 +63,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         private final TextView tvPrice;
         private final TextView tvLocation;
         private final TextView tvCondition;
+        private final TextView tvCategory;
 
         public ProductViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -71,6 +72,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
             tvPrice = itemView.findViewById(R.id.tv_price);
             tvLocation = itemView.findViewById(R.id.tv_location);
             tvCondition = itemView.findViewById(R.id.tv_condition);
+            tvCategory = itemView.findViewById(R.id.tv_category);
         }
 
         void bind(Product product, OnProductClickListener listener) {
@@ -99,47 +101,56 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
                     tvCondition.setVisibility(View.GONE);
                 }
             }
+            if (tvCategory != null) {
+                String categoryName = product.getCategoryName();
+                if (categoryName != null && !categoryName.isEmpty()) {
+                    tvCategory.setText(categoryName);
+                    tvCategory.setVisibility(View.VISIBLE);
+                } else {
+                    tvCategory.setVisibility(View.GONE);
+                }
 
-            // Load product image
-            if (ivProduct != null) {
-                String imageUrl = product.getPrimaryImageUrl();
+                // Load product image
+                if (ivProduct != null) {
+                    String imageUrl = product.getPrimaryImageUrl();
 
-                try {
-                    if (!TextUtils.isEmpty(imageUrl)) {
-                        String fullImageUrl = imageUrl;
-                        if (imageUrl.startsWith("/")) {
-                            fullImageUrl = Constants.BASE_URL + imageUrl.substring(1);
+                    try {
+                        if (!TextUtils.isEmpty(imageUrl)) {
+                            String fullImageUrl = imageUrl;
+                            if (imageUrl.startsWith("/")) {
+                                fullImageUrl = Constants.BASE_URL + imageUrl.substring(1);
+                            }
+
+                            Glide.with(itemView.getContext())
+                                    .load(fullImageUrl)
+                                    .placeholder(R.drawable.ic_image_placeholder)
+                                    .error(R.drawable.ic_image_placeholder)
+                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                    .centerCrop()
+                                    .into(ivProduct);
+                        } else {
+                            ivProduct.setImageResource(R.drawable.ic_image_placeholder);
                         }
-
-                        Glide.with(itemView.getContext())
-                                .load(fullImageUrl)
-                                .placeholder(R.drawable.ic_image_placeholder)
-                                .error(R.drawable.ic_image_placeholder)
-                                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                                .centerCrop()
-                                .into(ivProduct);
-                    } else {
+                    } catch (Exception e) {
                         ivProduct.setImageResource(R.drawable.ic_image_placeholder);
                     }
-                } catch (Exception e) {
-                    ivProduct.setImageResource(R.drawable.ic_image_placeholder);
                 }
+
+                // Set click listeners
+                itemView.setOnClickListener(v -> {
+                    if (listener != null) {
+                        listener.onProductClick(product);
+                    }
+                });
+
+                itemView.setOnLongClickListener(v -> {
+                    if (listener != null) {
+                        listener.onProductLongClick(product);
+                        return true;
+                    }
+                    return false;
+                });
             }
-
-            // Set click listeners
-            itemView.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onProductClick(product);
-                }
-            });
-
-            itemView.setOnLongClickListener(v -> {
-                if (listener != null) {
-                    listener.onProductLongClick(product);
-                    return true;
-                }
-                return false;
-            });
         }
     }
 }
