@@ -1,6 +1,7 @@
 // app/src/main/java/com/example/newtrade/ui/chat/ChatActivity.java
 package com.example.newtrade.ui.chat;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
@@ -20,13 +21,14 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.newtrade.R;
 import com.example.newtrade.models.Message;
 import com.example.newtrade.adapters.MessageAdapter;
+import com.example.newtrade.api.ApiClient;
+import com.example.newtrade.api.ApiService;
+import com.example.newtrade.api.NotificationService;
+import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.ChatNotificationManager;
 import com.example.newtrade.utils.NavigationUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.websocket.ChatWebSocketManager;
-import com.example.newtrade.api.ApiClient;
-import com.example.newtrade.api.ApiService;
-import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.utils.Constants;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.gson.JsonObject;
 
@@ -60,17 +62,21 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
     private MessageAdapter messageAdapter;
     private List<Message> messages;
 
-    // Chat data
-    private Long conversationId;
-    private String otherUserName;
-    private String productTitle;
-    private Long currentUserId;
-    private Long productId;
+    // Chat data - ✅ FIXED: Khởi tạo default values
+    private Long conversationId = 0L;
+    private String otherUserName = "";
+    private String productTitle = "";
+    private Long currentUserId = 0L;
+    private Long productId = 0L;
+    private Long receiverId = 0L;
 
     // Typing indicator
     private Handler typingHandler = new Handler();
     private Runnable stopTypingRunnable;
     private boolean isTyping = false;
+
+    // ✅ THÊM: Notification manager
+    private ChatNotificationManager chatNotificationManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,6 +91,9 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         initWebSocket();
         loadOrCreateConversation();
 
+        // ✅ THÊM: Initialize notification manager
+        chatNotificationManager = new ChatNotificationManager(this);
+
         Log.d(TAG, "✅ ChatActivity created for conversation: " + conversationId);
     }
 
@@ -98,25 +107,43 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         prefsManager = SharedPrefsManager.getInstance(this);
         currentUserId = prefsManager.getUserId();
         messages = new ArrayList<>();
+
+        // ✅ THÊM: Null safety
+        if (currentUserId == null) {
+            currentUserId = 0L;
+        }
     }
 
     private void getIntentData() {
-        conversationId = getIntent().getLongExtra("conversation_id", -1);
-        otherUserName = getIntent().getStringExtra("other_user_name");
-        productTitle = getIntent().getStringExtra("product_title");
-        productId = getIntent().getLongExtra("product_id", -1);
+        Intent intent = getIntent();
+        if (intent != null) {
+            conversationId = intent.getLongExtra("conversation_id", 0L);
+            otherUserName = intent.getStringExtra("other_user_name");
+            productTitle = intent.getStringExtra("product_title");
+            productId = intent.getLongExtra("product_id", 0L);
+            receiverId = intent.getLongExtra("receiverId", 0L);
 
-        // ✅ NEW: If no conversationId but has productId, we'll create conversation
-        if (conversationId == -1 && productId != -1) {
-            Log.d(TAG, "No conversation ID, will create for product: " + productId);
+            // ✅ THÊM: Null safety và default values
+            if (otherUserName == null) {
+                otherUserName = "Unknown User";
+            }
+            if (productTitle == null) {
+                productTitle = "Product";
+            }
+            if (conversationId <= 0) {
+                conversationId = 1L; // Default conversation ID
+            }
         }
 
-        Log.d(TAG, "Chat data - ConversationID: " + conversationId + ", ProductID: " + productId + ", Other user: " + otherUserName);
+        Log.d(TAG, "Chat data - ConversationID: " + conversationId +
+                ", ProductID: " + productId +
+                ", Other user: " + otherUserName +
+                ", ReceiverID: " + receiverId);
     }
 
     private void setupToolbar() {
-        String title = otherUserName != null ? otherUserName : "Chat";
-        String subtitle = productTitle != null ? productTitle : "";
+        String title = !otherUserName.isEmpty() ? otherUserName : "Chat";
+        String subtitle = !productTitle.isEmpty() ? productTitle : "";
 
         NavigationUtils.setupToolbarWithBackButton(this, toolbar, title);
         toolbar.setSubtitle(subtitle);
@@ -149,16 +176,13 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
     }
 
     private void initWebSocket() {
-        // ✅ ENABLE WebSocket with fixed backend
         chatWebSocketManager = ChatWebSocketManager.getInstance();
         chatWebSocketManager.addChatListener(this);
 
-        // Connect if not already connected
         if (currentUserId != null && currentUserId > 0) {
             if (!chatWebSocketManager.isConnected()) {
                 chatWebSocketManager.connect(currentUserId);
             } else {
-                // Already connected, join conversation immediately if we have one
                 if (conversationId != null && conversationId > 0) {
                     joinConversation();
                 }
@@ -175,23 +199,17 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         }
     }
 
-    // ✅ NEW: Load existing conversation or create new one
     private void loadOrCreateConversation() {
         if (conversationId != null && conversationId > 0) {
-            // Load existing conversation
             loadMessages();
         } else if (productId != null && productId > 0) {
-            // Create new conversation for product
             createConversation();
         } else {
-            // Fallback to mock messages
             addMockMessages();
         }
     }
 
-    // ✅ NEW: Create conversation via API
     private void createConversation() {
-        // Validate user login
         if (currentUserId == null || currentUserId <= 0) {
             Log.e(TAG, "❌ User not logged in, currentUserId: " + currentUserId);
             Toast.makeText(this, "Bạn cần đăng nhập để chat", Toast.LENGTH_SHORT).show();
@@ -199,7 +217,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             return;
         }
 
-        // Validate product ID
         if (productId == null || productId <= 0) {
             Log.e(TAG, "❌ Invalid product ID: " + productId);
             addMockMessages();
@@ -209,13 +226,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         Log.d(TAG, "🔍 Creating conversation - UserID: " + currentUserId + ", ProductID: " + productId);
 
         ApiService apiService = ApiClient.getApiService();
-
-        // ❌ CŨ:
-        // Map<String, Object> conversationData = new HashMap<>();
-        // conversationData.put("productId", productId);
-        // Call<StandardResponse<Map<String, Object>>> call = apiService.findOrCreateConversation(conversationData);
-
-        // ✅ MỚI: Query Parameters
         Call<StandardResponse<Map<String, Object>>> call = apiService.findOrCreateConversation(productId);
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
@@ -235,41 +245,30 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
                         Log.d(TAG, "✅ Conversation created/found: " + conversationId);
 
-                        // Join WebSocket conversation
                         if (chatWebSocketManager.isConnected()) {
                             joinConversation();
                         }
 
-                        // Load messages
                         loadMessages();
 
                     } else {
                         Log.e(TAG, "❌ Failed to create conversation: " + standardResponse.getMessage());
-                        addMockMessages(); // Fallback
+                        addMockMessages();
                     }
                 } else {
                     Log.e(TAG, "❌ HTTP Error " + response.code() + ": " + response.message());
-                    try {
-                        if (response.errorBody() != null) {
-                            String errorBody = response.errorBody().string();
-                            Log.e(TAG, "❌ Error body: " + errorBody);
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error reading error body", e);
-                    }
-                    addMockMessages(); // Fallback
+                    addMockMessages();
                 }
             }
 
             @Override
             public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                 Log.e(TAG, "❌ Network error creating conversation", t);
-                addMockMessages(); // Fallback
+                addMockMessages();
             }
         });
     }
 
-    // ✅ NEW: Load messages from API
     private void loadMessages() {
         if (conversationId == null || conversationId <= 0) {
             addMockMessages();
@@ -309,81 +308,67 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
                     } else {
                         Log.e(TAG, "Failed to load messages: " + standardResponse.getMessage());
-                        addMockMessages(); // Fallback
+                        addMockMessages();
                     }
                 } else {
                     Log.e(TAG, "Failed to load messages: HTTP " + response.code());
-                    addMockMessages(); // Fallback
+                    addMockMessages();
                 }
             }
 
             @Override
             public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
                 Log.e(TAG, "Error loading messages", t);
-                addMockMessages(); // Fallback
+                addMockMessages();
             }
         });
     }
 
-    // ✅ NEW: Parse message from API response
     private Message parseMessageFromApi(Map<String, Object> messageData) {
         try {
             Message message = new Message();
 
-            Log.d(TAG, "🔍 Raw message data: " + messageData.toString());
-
-            // Parse ID
             if (messageData.get("id") != null) {
                 message.setId(((Number) messageData.get("id")).longValue());
             }
 
-            // ✅ FIX: Parse sender từ nested sender object
             if (messageData.get("sender") != null) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> sender = (Map<String, Object>) messageData.get("sender");
                 if (sender.get("id") != null) {
                     message.setSenderId(((Number) sender.get("id")).longValue());
                 }
-                Log.d(TAG, "✅ Sender ID: " + message.getSenderId());
             }
 
-            // ✅ FIX: messageText thay vì content
             if (messageData.get("messageText") != null) {
                 message.setContent(messageData.get("messageText").toString());
-                Log.d(TAG, "✅ Message text: " + message.getContent());
             }
 
-            // Parse message type
             if (messageData.get("messageType") != null) {
                 message.setMessageType(messageData.get("messageType").toString());
             } else {
-                message.setMessageType("TEXT"); // Default
+                message.setMessageType("TEXT");
             }
 
-            // Parse timestamp
             if (messageData.get("createdAt") != null) {
                 String timestamp = messageData.get("createdAt").toString();
                 message.setCreatedAt(formatTimestampString(timestamp));
-                Log.d(TAG, "✅ Message time: " + message.getCreatedAt());
             }
 
-            Log.d(TAG, "✅ Successfully parsed message from user " + message.getSenderId() + ": " + message.getContent());
             return message;
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Error parsing message from API", e);
-            Log.e(TAG, "❌ Message data was: " + messageData.toString());
             return null;
         }
     }
 
     private void addMockMessages() {
-        // Mock messages for testing
         messages.clear();
 
         Message msg1 = new Message();
         msg1.setId(1L);
-        msg1.setSenderId(2L); // Other user
+        msg1.setSenderId(2L);
         msg1.setContent("Hello! Is this item still available?");
         msg1.setCreatedAt("10:30 AM");
         msg1.setMessageType("TEXT");
@@ -391,7 +376,7 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
         Message msg2 = new Message();
         msg2.setId(2L);
-        msg2.setSenderId(currentUserId); // Current user
+        msg2.setSenderId(currentUserId);
         msg2.setContent("Yes, it's still available! Would you like to know more details?");
         msg2.setCreatedAt("10:32 AM");
         msg2.setMessageType("TEXT");
@@ -403,13 +388,24 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         Log.d(TAG, "✅ Mock messages loaded");
     }
 
+    // ✅ CẬP NHẬT: sendMessage() method với notification
     private void sendMessage() {
         String messageText = etMessage.getText().toString().trim();
-        if (messageText.isEmpty()) return;
+        if (messageText.isEmpty()) {
+            Log.w(TAG, "Message text is empty");
+            return;
+        }
+
+        // ✅ THÊM: Validation
+        if (currentUserId == null || currentUserId <= 0) {
+            Log.e(TAG, "Current user ID is invalid");
+            Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         // Add message to UI immediately for better UX
         Message newMessage = new Message();
-        newMessage.setId(System.currentTimeMillis()); // Temporary ID
+        newMessage.setId(System.currentTimeMillis());
         newMessage.setSenderId(currentUserId);
         newMessage.setContent(messageText);
         newMessage.setCreatedAt("Sending...");
@@ -426,17 +422,18 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         sendMessageViaWebSocket(messageText);
         sendMessageViaApi(messageText);
 
+        // ✅ THÊM: Send notification to receiver
+        sendNotificationToReceiver(messageText);
+
         Log.d(TAG, "📤 Sent message: " + messageText);
     }
 
-    // ✅ NEW: Send via WebSocket (real-time)
     private void sendMessageViaWebSocket(String messageText) {
         if (chatWebSocketManager != null && chatWebSocketManager.isConnected()) {
             chatWebSocketManager.sendChatMessage(messageText);
         }
     }
 
-    // ✅ FIXED: Send via API (persistence)
     private void sendMessageViaApi(String messageText) {
         if (conversationId == null || conversationId <= 0) {
             Log.w(TAG, "No conversation ID, cannot send via API");
@@ -445,7 +442,7 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("conversationId", conversationId);
-        messageData.put("messageText", messageText); // ❌ Đổi từ "content" → "messageText"
+        messageData.put("messageText", messageText);
         messageData.put("messageType", "TEXT");
 
         ApiService apiService = ApiClient.getApiService();
@@ -460,7 +457,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                     StandardResponse<Map<String, Object>> standardResponse = response.body();
 
                     if (standardResponse.isSuccess()) {
-                        // Update last message status to "Sent"
                         updateLastMessageStatus("✅ Sent");
                         Log.d(TAG, "✅ Message sent via API");
                     } else {
@@ -481,6 +477,56 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         });
     }
 
+    // ✅ THÊM: Method để gửi notification cho người nhận
+    private void sendNotificationToReceiver(String messageText) {
+        if (receiverId == null || receiverId <= 0) {
+            Log.w(TAG, "No receiver ID, cannot send notification");
+            return;
+        }
+
+        try {
+            // Get sender name
+            String senderName = prefsManager.getUserName();
+            if (senderName == null || senderName.isEmpty()) {
+                senderName = "Someone";
+            }
+
+            // ✅ CALL BACKEND NOTIFICATION API
+            NotificationService notificationService = ApiClient.getNotificationService();
+
+            // Create notification request
+            Map<String, Object> notificationRequest = new HashMap<>();
+            notificationRequest.put("receiverId", receiverId);
+            notificationRequest.put("senderName", senderName);
+            notificationRequest.put("message", messageText);
+            notificationRequest.put("conversationId", conversationId);
+            notificationRequest.put("productTitle", productTitle);
+
+            // Call backend để gửi push notification
+            Call<StandardResponse<String>> call = notificationService.sendMessageNotification(notificationRequest);
+
+            call.enqueue(new Callback<StandardResponse<String>>() {
+                @Override
+                public void onResponse(Call<StandardResponse<String>> call,
+                                       Response<StandardResponse<String>> response) {
+                    if (response.isSuccessful()) {
+                        Log.d(TAG, "✅ Notification sent to receiver: " + receiverId);
+                    } else {
+                        Log.e(TAG, "❌ Failed to send notification: " + response.code());
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
+                    Log.e(TAG, "❌ Error sending notification", t);
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error in sendNotificationToReceiver", e);
+        }
+    }
+
     private void updateLastMessageStatus(String status) {
         if (!messages.isEmpty()) {
             Message lastMessage = messages.get(messages.size() - 1);
@@ -492,27 +538,41 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
     private void handleTyping() {
         if (!isTyping) {
             isTyping = true;
-            // TODO: Send typing indicator via WebSocket
         }
 
-        // Cancel previous stop typing task
         if (stopTypingRunnable != null) {
             typingHandler.removeCallbacks(stopTypingRunnable);
         }
 
-        // Schedule stop typing
         stopTypingRunnable = () -> {
             if (isTyping) {
                 isTyping = false;
-                // TODO: Send stop typing via WebSocket
             }
         };
-        typingHandler.postDelayed(stopTypingRunnable, 1000); // Stop typing after 1 second
+        typingHandler.postDelayed(stopTypingRunnable, 1000);
     }
 
     private void scrollToBottom() {
         if (messages.size() > 0) {
             rvMessages.smoothScrollToPosition(messages.size() - 1);
+        }
+    }
+
+    private String formatTimestampString(String timestampStr) {
+        try {
+            SimpleDateFormat inputFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+            String cleanTimestamp = timestampStr.split("\\.")[0];
+            Date dateTime = inputFormatter.parse(cleanTimestamp);
+
+            if (dateTime != null) {
+                SimpleDateFormat outputFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                return outputFormatter.format(dateTime);
+            }
+
+            return "Now";
+        } catch (Exception e) {
+            Log.w(TAG, "Could not parse timestamp: " + timestampStr, e);
+            return "Now";
         }
     }
 
@@ -532,7 +592,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
     public void onDisconnected() {
         runOnUiThread(() -> {
             Log.d(TAG, "❌ Chat WebSocket disconnected");
-            // Don't show toast, might reconnect automatically
         });
     }
 
@@ -549,11 +608,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                 newMessage.setMessageType(messageJson.has("messageType") ?
                         messageJson.get("messageType").getAsString() : "TEXT");
 
-                // ❌ CŨ:
-                // newMessage.setCreatedAt(messageJson.has("timestamp") ?
-                //         formatTimestamp(messageJson.get("timestamp").getAsLong()) : "Now");
-
-                // ✅ MỚI: Parse string timestamp
                 if (messageJson.has("timestamp")) {
                     String timestampStr = messageJson.get("timestamp").getAsString();
                     newMessage.setCreatedAt(formatTimestampString(timestampStr));
@@ -561,7 +615,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                     newMessage.setCreatedAt("Now");
                 }
 
-                // Only add if it's from someone else (avoid duplicates)
                 if (!newMessage.getSenderId().equals(currentUserId)) {
                     messages.add(newMessage);
                     messageAdapter.notifyItemInserted(messages.size() - 1);
@@ -573,32 +626,11 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             }
         });
     }
-    private String formatTimestampString(String timestampStr) {
-        try {
-            // Parse ISO timestamp: "2025-07-03T14:19:39.6632698"
-            SimpleDateFormat inputFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
-
-            // Remove microseconds if present (.6632698)
-            String cleanTimestamp = timestampStr.split("\\.")[0];
-
-            Date dateTime = inputFormatter.parse(cleanTimestamp);
-
-            if (dateTime != null) {
-                SimpleDateFormat outputFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                return outputFormatter.format(dateTime);
-            }
-
-            return "Now";
-        } catch (Exception e) {
-            Log.w(TAG, "Could not parse timestamp: " + timestampStr, e);
-            return "Now";
-        }
-    }
 
     @Override
     public void onTypingIndicator(Long userId, boolean isTyping) {
         runOnUiThread(() -> {
-            if (!userId.equals(currentUserId)) { // Not from current user
+            if (!userId.equals(currentUserId)) {
                 if (isTyping) {
                     tvTypingIndicator.setText(otherUserName + " is typing...");
                     tvTypingIndicator.setVisibility(View.VISIBLE);
@@ -613,22 +645,16 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
     public void onError(String error) {
         runOnUiThread(() -> {
             Log.e(TAG, "❌ WebSocket error: " + error);
-            // Don't show toast for every error, might be temporary
         });
     }
 
-    // ===== UTILITY METHODS - FIXED API LEVEL =====
-
-    // ✅ FIXED: Use SimpleDateFormat instead of java.time
     private String formatTimestamp(long timestamp) {
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
         return sdf.format(new Date(timestamp));
     }
 
-    // ✅ FIXED: Use SimpleDateFormat instead of java.time
     private String formatTimestamp(String timestamp) {
         try {
-            // Parse ISO timestamp and convert to HH:mm
             SimpleDateFormat inputFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
             Date dateTime = inputFormatter.parse(timestamp);
 
@@ -637,19 +663,31 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                 return outputFormatter.format(dateTime);
             }
 
-            return timestamp; // Return as-is if parsing fails
+            return timestamp;
         } catch (ParseException e) {
-            return timestamp; // Return as-is if parsing fails
+            return timestamp;
         }
     }
 
     // ===== LIFECYCLE METHODS =====
 
+    // ✅ CẬP NHẬT: Clear notifications when chat is active
     @Override
     protected void onResume() {
         super.onResume();
+
         if (chatWebSocketManager != null && chatWebSocketManager.isConnected() && conversationId != null) {
             joinConversation();
+        }
+
+        // ✅ THÊM: Clear notifications when chat is active
+        if (conversationId != null && conversationId > 0) {
+            try {
+                chatNotificationManager.clearNotifications(conversationId);
+                Log.d(TAG, "✅ Cleared notifications for conversation: " + conversationId);
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error clearing notifications", e);
+            }
         }
     }
 
@@ -660,10 +698,8 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             chatWebSocketManager.leaveConversation();
         }
 
-        // Stop typing indicator
         if (isTyping) {
             isTyping = false;
-            // TODO: Send stop typing via WebSocket
         }
     }
 
@@ -676,6 +712,17 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
         if (typingHandler != null && stopTypingRunnable != null) {
             typingHandler.removeCallbacks(stopTypingRunnable);
+        }
+
+        // ✅ THÊM: Cleanup notification manager
+        if (chatNotificationManager != null) {
+            if (conversationId != null && conversationId > 0) {
+                try {
+                    chatNotificationManager.clearNotifications(conversationId);
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Error clearing notifications on destroy", e);
+                }
+            }
         }
     }
 

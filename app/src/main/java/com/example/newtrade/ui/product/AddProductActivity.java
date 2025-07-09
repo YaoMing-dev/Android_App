@@ -2,6 +2,8 @@
 package com.example.newtrade.ui.product;
 
 import android.app.Activity;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,14 +20,17 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
 
 import com.bumptech.glide.Glide;
+import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.api.ApiService;
+import com.example.newtrade.api.NotificationService;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.NavigationUtils;
+import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 
 import java.io.File;
@@ -60,7 +65,7 @@ public class AddProductActivity extends AppCompatActivity {
     private SharedPrefsManager prefsManager;
     private Uri selectedImageUri;
     private boolean isLoading = false;
-    private String uploadedImageUrl = null; // Store uploaded image URL
+    private String uploadedImageUrl = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,14 +104,13 @@ public class AddProductActivity extends AppCompatActivity {
     }
 
     private void setupSpinners() {
-        // ✅ FIXED: Sync with Fragment categories
         List<String> categories = new ArrayList<>();
         categories.add("Electronics");
         categories.add("Fashion");
         categories.add("Home & Garden");
         categories.add("Sports");
         categories.add("Books");
-        categories.add("Automotive");  // ✅ ADDED: Match with Fragment
+        categories.add("Automotive");
         categories.add("Other");
 
         ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(this,
@@ -114,7 +118,6 @@ public class AddProductActivity extends AppCompatActivity {
         categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spCategory.setAdapter(categoryAdapter);
 
-        // ✅ KEEP: Condition spinner unchanged
         List<String> conditions = new ArrayList<>();
         conditions.add("New");
         conditions.add("Like New");
@@ -132,7 +135,6 @@ public class AddProductActivity extends AppCompatActivity {
         btnSelectImage.setOnClickListener(v -> selectImage());
         btnPublish.setOnClickListener(v -> publishProduct());
 
-        // Form validation
         TextWatcher formWatcher = new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -168,7 +170,6 @@ public class AddProductActivity extends AppCompatActivity {
                         .centerCrop()
                         .into(ivProductImage);
 
-                // Reset uploaded image URL when new image selected
                 uploadedImageUrl = null;
                 updatePublishButton();
             }
@@ -182,11 +183,9 @@ public class AddProductActivity extends AppCompatActivity {
 
         setLoading(true);
 
-        // Step 1: Upload image first if selected
         if (selectedImageUri != null && uploadedImageUrl == null) {
             uploadImageToServer();
         } else {
-            // Step 2: Create product with uploaded image URL
             createProductOnServer();
         }
     }
@@ -195,17 +194,10 @@ public class AddProductActivity extends AppCompatActivity {
         Log.d(TAG, "Uploading image to server...");
 
         try {
-            // Convert URI to File
             File imageFile = createTempFileFromUri(selectedImageUri);
+            RequestBody requestFile = RequestBody.create(MediaType.parse("image/*"), imageFile);
+            MultipartBody.Part imagePart = MultipartBody.Part.createFormData("file", imageFile.getName(), requestFile);
 
-            // Create RequestBody
-            RequestBody requestFile = RequestBody.create(
-                    MediaType.parse("image/*"), imageFile);
-
-            MultipartBody.Part imagePart = MultipartBody.Part.createFormData(
-                    "file", imageFile.getName(), requestFile);
-
-            // ✅ FIXED: Get userId and add to upload request
             Long userId = prefsManager.getUserId();
             if (userId == null || userId <= 0) {
                 setLoading(false);
@@ -213,10 +205,8 @@ public class AddProductActivity extends AppCompatActivity {
                 return;
             }
 
-            // Upload to server with User-ID header
             ApiService apiService = ApiClient.getApiService();
-            Call<StandardResponse<Map<String, String>>> call =
-                    apiService.uploadProductImageWithUserId(imagePart, userId);
+            Call<StandardResponse<Map<String, String>>> call = apiService.uploadProductImageWithUserId(imagePart, userId);
 
             call.enqueue(new Callback<StandardResponse<Map<String, String>>>() {
                 @Override
@@ -229,19 +219,14 @@ public class AddProductActivity extends AppCompatActivity {
                         if (standardResponse.isSuccess()) {
                             Map<String, String> data = standardResponse.getData();
                             uploadedImageUrl = data.get("imageUrl");
-
                             Log.d(TAG, "✅ Image uploaded successfully: " + uploadedImageUrl);
-
-                            // Now create product with uploaded image URL
                             createProductOnServer();
-
                         } else {
                             setLoading(false);
                             showError("Failed to upload image: " + standardResponse.getMessage());
                         }
                     } else {
                         setLoading(false);
-                        // ✅ FIXED: Better error logging
                         try {
                             String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown error";
                             Log.e(TAG, "❌ Image upload HTTP " + response.code() + " Error: " + errorBody);
@@ -270,7 +255,6 @@ public class AddProductActivity extends AppCompatActivity {
     private void createProductOnServer() {
         Log.d(TAG, "Creating product on server...");
 
-        // Check if user is logged in
         Long userId = prefsManager.getUserId();
         if (userId == null || userId <= 0) {
             setLoading(false);
@@ -278,7 +262,6 @@ public class AddProductActivity extends AppCompatActivity {
             return;
         }
 
-        // Prepare product data
         Map<String, Object> productRequest = new HashMap<>();
         productRequest.put("title", etTitle.getText().toString().trim());
         productRequest.put("description", etDescription.getText().toString().trim());
@@ -292,21 +275,16 @@ public class AddProductActivity extends AppCompatActivity {
             return;
         }
 
-        // Category
         int categoryIndex = spCategory.getSelectedItemPosition();
-        productRequest.put("categoryId", (long) (categoryIndex + 1)); // Categories start from 1
+        productRequest.put("categoryId", (long) (categoryIndex + 1));
 
-        // Condition - Convert to backend enum format
         String conditionText = spCondition.getSelectedItem().toString();
         String condition = conditionText.toUpperCase().replace(" ", "_");
         productRequest.put("condition", condition);
 
         productRequest.put("location", etLocation.getText().toString().trim());
-
-        // ✅ FIXED: Add sellerId field
         productRequest.put("sellerId", userId);
 
-        // Image URLs
         List<String> imageUrls = new ArrayList<>();
         if (uploadedImageUrl != null) {
             imageUrls.add(uploadedImageUrl);
@@ -315,10 +293,8 @@ public class AddProductActivity extends AppCompatActivity {
 
         Log.d(TAG, "Product request: " + productRequest);
 
-        // ✅ FIXED: Call API with User-ID header
         ApiService apiService = ApiClient.getApiService();
-        Call<StandardResponse<Map<String, Object>>> call =
-                apiService.createProductWithUserId(productRequest, userId);
+        Call<StandardResponse<Map<String, Object>>> call = apiService.createProductWithUserId(productRequest, userId);
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
@@ -332,6 +308,15 @@ public class AddProductActivity extends AppCompatActivity {
 
                     if (standardResponse.isSuccess()) {
                         Log.d(TAG, "✅ Product created successfully");
+
+                        String productTitle = etTitle.getText().toString().trim();
+
+                        // ✅ THÊM: Show push notification cho product upload success
+                        showProductUploadSuccessNotification(productTitle);
+
+                        // ✅ THÊM: Send notification via backend API
+                        sendProductUploadNotificationToBackend(productTitle, standardResponse.getData());
+
                         Toast.makeText(AddProductActivity.this,
                                 "🎉 Product published successfully!", Toast.LENGTH_LONG).show();
                         finish();
@@ -340,7 +325,6 @@ public class AddProductActivity extends AppCompatActivity {
                         showError("Failed to create product: " + standardResponse.getMessage());
                     }
                 } else {
-                    // ✅ FIXED: Better error logging
                     try {
                         String errorBody = response.errorBody() != null ? response.errorBody().string() : "Unknown error";
                         Log.e(TAG, "❌ Product creation HTTP " + response.code() + " Error: " + errorBody);
@@ -359,6 +343,80 @@ public class AddProductActivity extends AppCompatActivity {
                 showError("Network error while creating product: " + t.getMessage());
             }
         });
+    }
+
+    // ✅ THÊM: Method để show local push notification
+    private void showProductUploadSuccessNotification(String productTitle) {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "tradeup_general")
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("🎉 Product Published!")
+                .setContentText("Your product \"" + productTitle + "\" is now live!")
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setStyle(new NotificationCompat.BigTextStyle()
+                        .bigText("Your product \"" + productTitle + "\" has been published successfully and is now live for other users to see!"));
+
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (notificationManager != null) {
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+            Log.d(TAG, "✅ Local product upload notification shown");
+        }
+    }
+
+    // ✅ THÊM: Method để send notification via backend API
+    private void sendProductUploadNotificationToBackend(String productTitle, Map<String, Object> productData) {
+        try {
+            Long userId = prefsManager.getUserId();
+            if (userId == null || userId <= 0) {
+                Log.w(TAG, "Cannot send backend notification - user not logged in");
+                return;
+            }
+
+            // Extract product ID from response
+            Long productId = null;
+            if (productData != null && productData.get("id") != null) {
+                productId = ((Number) productData.get("id")).longValue();
+            }
+
+            NotificationService notificationService = ApiClient.getNotificationService();
+
+            // Create notification request
+            Map<String, Object> notificationRequest = new HashMap<>();
+            notificationRequest.put("sellerId", userId);
+            notificationRequest.put("productTitle", productTitle);
+            notificationRequest.put("productId", productId);
+            notificationRequest.put("message", "Your product \"" + productTitle + "\" has been published successfully!");
+
+            // Call backend để gửi push notification
+            Call<StandardResponse<String>> call = notificationService.sendProductUploadNotification(notificationRequest);
+
+            call.enqueue(new Callback<StandardResponse<String>>() {
+                @Override
+                public void onResponse(Call<StandardResponse<String>> call,
+                                       Response<StandardResponse<String>> response) {
+                    if (response.isSuccessful()) {
+                        Log.d(TAG, "✅ Backend product upload notification sent successfully");
+                    } else {
+                        Log.e(TAG, "❌ Failed to send backend notification: " + response.code());
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
+                    Log.e(TAG, "❌ Error sending backend notification", t);
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error in sendProductUploadNotificationToBackend", e);
+        }
     }
 
     private File createTempFileFromUri(Uri uri) throws Exception {

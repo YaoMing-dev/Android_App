@@ -15,9 +15,19 @@ import androidx.core.app.NotificationCompat;
 import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.activities.NotificationActivity;
+import com.example.newtrade.api.ApiClient;
+import com.example.newtrade.api.UserService;
+import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
 
@@ -72,7 +82,38 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
 
         // TODO: Send token to server
         // You should send this token to your server for sending notifications
-        Log.d(TAG, "🎯 FCM Token should be sent to server: " + token);
+        sendTokenToServer(token);
+    }
+
+    private void sendTokenToServer(String token) {
+        try {
+            UserService userService = ApiClient.getUserService();
+
+            Map<String, String> tokenRequest = new HashMap<>();
+            tokenRequest.put("fcmToken", token);
+
+            Call<StandardResponse<String>> call = userService.updateFcmToken(tokenRequest);
+
+            call.enqueue(new Callback<StandardResponse<String>>() {
+                @Override
+                public void onResponse(Call<StandardResponse<String>> call,
+                                       Response<StandardResponse<String>> response) {
+                    if (response.isSuccessful()) {
+                        Log.d(TAG, "✅ FCM token sent to server from service");
+                    } else {
+                        Log.e(TAG, "❌ Failed to send FCM token from service: " + response.code());
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
+                    Log.e(TAG, "❌ Error sending FCM token from service", t);
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error in sendTokenToServer from service", e);
+        }
     }
 
     private void handleDataMessage(RemoteMessage remoteMessage) {

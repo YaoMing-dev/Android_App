@@ -27,6 +27,8 @@ import androidx.navigation.ui.NavigationUI;
 import com.example.newtrade.activities.NotificationActivity;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.api.ApiService;
+import com.example.newtrade.api.NotificationService;
+import com.example.newtrade.api.UserService;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.auth.LoginActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
@@ -188,25 +190,21 @@ public class MainActivity extends AppCompatActivity {
 
         switch (fabClickCount % 4) {
             case 1:
-                // First click: Create Test Product + Show Message Notification
                 createTestProductAndNotification();
                 testFab.setImageResource(android.R.drawable.ic_menu_add);
                 break;
 
             case 2:
-                // Second click: Show Offer Notification
                 showOfferNotification();
                 testFab.setImageResource(android.R.drawable.ic_menu_view);
                 break;
 
             case 3:
-                // Third click: Show General Notification
                 showGeneralNotification();
                 testFab.setImageResource(android.R.drawable.ic_menu_info_details);
                 break;
 
             case 0:
-                // Fourth click: View Notifications
                 openNotificationActivity();
                 testFab.setImageResource(android.R.drawable.ic_dialog_email);
                 break;
@@ -244,8 +242,6 @@ public class MainActivity extends AppCompatActivity {
 
                             if (productId != null) {
                                 Log.d(TAG, "✅ Test product created with ID: " + productId);
-
-                                // Save product ID
                                 prefsManager.saveTestProductId(productId);
 
                                 // ✅ SHOW MESSAGE NOTIFICATION POPUP
@@ -289,7 +285,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID_MESSAGES)
-                .setSmallIcon(R.drawable.ic_notification) // Make sure this exists
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -465,34 +461,73 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
+    // ✅ FIXED: sendTokenToServer() method
     private void sendTokenToServer(String token) {
         try {
-            ApiService apiService = ApiClient.getApiService();
+            // ✅ FIXED: Dùng UserService.updateFcmToken() thay vì updateUserProfile()
+            UserService userService = ApiClient.getUserService();
 
-            Map<String, Object> profileData = new HashMap<>();
-            profileData.put("fcmToken", token);
+            Map<String, String> tokenRequest = new HashMap<>();
+            tokenRequest.put("fcmToken", token);
 
-            Call<StandardResponse<Map<String, Object>>> call = apiService.updateUserProfile(profileData);
+            Call<StandardResponse<String>> call = userService.updateFcmToken(tokenRequest);
 
-            call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            call.enqueue(new Callback<StandardResponse<String>>() {
                 @Override
-                public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                       Response<StandardResponse<Map<String, Object>>> response) {
+                public void onResponse(Call<StandardResponse<String>> call,
+                                       Response<StandardResponse<String>> response) {
                     if (response.isSuccessful()) {
                         Log.d(TAG, "✅ FCM token sent to server successfully");
+                        // ✅ THÊM: Show notification confirmation
+                        showGeneralNotificationForTokenSuccess();
                     } else {
                         Log.e(TAG, "❌ Failed to send FCM token: " + response.code());
                     }
                 }
 
                 @Override
-                public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
                     Log.e(TAG, "❌ Error sending FCM token", t);
                 }
             });
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Error in sendTokenToServer", e);
+        }
+    }
+
+    // ✅ THÊM: Show notification confirmation when FCM token is registered
+    private void showGeneralNotificationForTokenSuccess() {
+        try {
+            // ✅ THÊM: Also send notification via backend API
+            NotificationService notificationService = ApiClient.getNotificationService();
+
+            Map<String, Object> notificationRequest = new HashMap<>();
+            notificationRequest.put("title", "🔔 Notifications Enabled");
+            notificationRequest.put("message", "Push notifications are now active for your account");
+            notificationRequest.put("userId", prefsManager.getUserId());
+
+            Call<StandardResponse<String>> call = notificationService.sendGeneralNotification(notificationRequest);
+
+            call.enqueue(new Callback<StandardResponse<String>>() {
+                @Override
+                public void onResponse(Call<StandardResponse<String>> call,
+                                       Response<StandardResponse<String>> response) {
+                    if (response.isSuccessful()) {
+                        Log.d(TAG, "✅ Backend notification sent for FCM token success");
+                    } else {
+                        Log.e(TAG, "❌ Failed to send backend notification: " + response.code());
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<StandardResponse<String>> call, Throwable t) {
+                    Log.e(TAG, "❌ Error sending backend notification", t);
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error in showGeneralNotificationForTokenSuccess", e);
         }
     }
 
