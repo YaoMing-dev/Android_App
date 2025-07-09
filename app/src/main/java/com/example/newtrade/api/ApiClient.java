@@ -33,11 +33,12 @@ public class ApiClient {
     private static UserService userService;
     private static ProductService productService;
     private static ApiService apiService;
-    private static ReviewService reviewService;           // ✅ ĐÚNG VỊ TRÍ
-    private static TransactionService transactionService; // ✅ ĐÚNG VỊ TRÍ
+    private static ReviewService reviewService;
+    private static TransactionService transactionService;
     private static SavedItemsService savedItemsService;
     private static OfferService offerService;
     private static AnalyticsService analyticsService;
+    private static NotificationService notificationService; // ✅ THÊM NOTIFICATION SERVICE
 
     // ===== DYNAMIC INITIALIZATION =====
 
@@ -127,11 +128,12 @@ public class ApiClient {
             userService = retrofit.create(UserService.class);
             productService = retrofit.create(ProductService.class);
             apiService = retrofit.create(ApiService.class);
-            reviewService = retrofit.create(ReviewService.class);           // ✅ THÊM
-            transactionService = retrofit.create(TransactionService.class); // ✅ THÊM
+            reviewService = retrofit.create(ReviewService.class);
+            transactionService = retrofit.create(TransactionService.class);
             savedItemsService = retrofit.create(SavedItemsService.class);
             offerService = retrofit.create(OfferService.class);
             analyticsService = retrofit.create(AnalyticsService.class);
+            notificationService = retrofit.create(NotificationService.class); // ✅ THÊM NOTIFICATION SERVICE
 
             Log.d(TAG, "✅ ApiClient initialized successfully with base URL: " + baseUrl);
 
@@ -146,27 +148,6 @@ public class ApiClient {
             }
         }
     }
-
-    public static AnalyticsService getAnalyticsService() {
-        if (analyticsService == null) {
-            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
-        }
-        return analyticsService;
-    }
-    public static SavedItemsService getSavedItemsService() {
-        if (savedItemsService == null) {
-            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
-        }
-        return savedItemsService;
-    }
-
-    public static OfferService getOfferService() {
-        if (offerService == null) {
-            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
-        }
-        return offerService;
-    }
-
 
     private static Retrofit createRetrofit(Context context, String baseUrl) {
         // Gson configuration
@@ -296,7 +277,6 @@ public class ApiClient {
         return apiService;
     }
 
-    // ✅ SỬA LẠI: REVIEW SERVICE - ĐÚNG VỊ TRÍ VÀ LOGIC
     public static ReviewService getReviewService() {
         if (reviewService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
@@ -304,12 +284,40 @@ public class ApiClient {
         return reviewService;
     }
 
-    // ✅ SỬA LẠI: TRANSACTION SERVICE - ĐÚNG VỊ TRÍ VÀ LOGIC
     public static TransactionService getTransactionService() {
         if (transactionService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
         }
         return transactionService;
+    }
+
+    public static AnalyticsService getAnalyticsService() {
+        if (analyticsService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return analyticsService;
+    }
+
+    public static SavedItemsService getSavedItemsService() {
+        if (savedItemsService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return savedItemsService;
+    }
+
+    public static OfferService getOfferService() {
+        if (offerService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return offerService;
+    }
+
+    // ✅ THÊM NOTIFICATION SERVICE GETTER
+    public static NotificationService getNotificationService() {
+        if (notificationService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return notificationService;
     }
 
     // ===== UTILITY METHODS =====
@@ -328,12 +336,13 @@ public class ApiClient {
         userService = null;
         productService = null;
         apiService = null;
-        reviewService = null;        // ✅ THÊM RESET
+        reviewService = null;
         transactionService = null;
-        savedItemsService = null;// ✅ THÊM RESET
-        currentBaseUrl = null;
-        analyticsService = null;
+        savedItemsService = null;
         offerService = null;
+        analyticsService = null;
+        notificationService = null; // ✅ THÊM RESET NOTIFICATION SERVICE
+        currentBaseUrl = null;
         Log.d(TAG, "🧹 ApiClient reset");
     }
 
@@ -341,7 +350,6 @@ public class ApiClient {
         resetClient();
         init(context, callback);
     }
-
 
     // ===== IP MANAGEMENT UTILITIES =====
 

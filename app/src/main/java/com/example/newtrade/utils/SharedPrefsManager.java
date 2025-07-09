@@ -171,4 +171,17 @@ public class SharedPrefsManager {
         Log.d(TAG, "FCM Token: " + (getFcmToken().isEmpty() ? "Not set" : "Set"));
         Log.d(TAG, "===========================");
     }
+    public SharedPreferences getPrefs() {
+        return prefs;
+    }
+    public void saveTestProductId(Long productId) {
+        prefs.edit().putLong("test_product_id", productId != null ? productId : 0L).apply();
+        Log.d(TAG, "✅ Test product ID saved: " + productId);
+    }
+
+    public Long getTestProductId() {
+        long id = prefs.getLong("test_product_id", 0L);
+        return id > 0 ? id : null;
+    }
+
 }

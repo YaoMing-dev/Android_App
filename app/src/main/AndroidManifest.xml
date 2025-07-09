@@ -102,7 +102,11 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
-
+        <activity
+            android:name=".activities.NotificationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".MainActivity" />
 
         <activity
             android:name=".ui.profile.SettingsActivity"
@@ -191,6 +195,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <service
+            android:name=".services.TradeUpFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
     </application>
 

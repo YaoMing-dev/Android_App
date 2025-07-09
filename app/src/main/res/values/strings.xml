@@ -444,6 +444,15 @@
     <string name="submit_offer">Submit Offer</string>
 
 
+
+    <string name="new_offer">New offer</string>
+    <string name="listing_update">Listing update</string>
+    <string name="promotion">Promotion</string>
+
+    <string name="notification_messages">Message Notifications</string>
+    <string name="notification_offers">Offer Notifications</string>
+    <string name="notification_transactions">Transaction Notifications</string>
+
     <!-- ProductDetail FAB save -->
 
 </resources>
