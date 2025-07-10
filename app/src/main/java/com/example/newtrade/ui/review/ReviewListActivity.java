@@ -7,6 +7,11 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
+// Thêm vào imports
+import android.app.AlertDialog;
+import android.widget.Toast;
+import java.util.HashMap;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -17,6 +22,7 @@ import com.example.newtrade.adapters.ReviewAdapter;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Review;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.models.UserSummary;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -98,11 +104,12 @@ public class ReviewListActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
-        reviewAdapter = new ReviewAdapter(reviews);
+        // ✅ UPDATE: Use constructor with long click listener
+        reviewAdapter = new ReviewAdapter(reviews, this::onReviewLongClick);
         rvReviews.setLayoutManager(new LinearLayoutManager(this));
         rvReviews.setAdapter(reviewAdapter);
 
-        // Add pagination
+        // Add pagination (keep existing code)
         rvReviews.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
@@ -122,6 +129,80 @@ public class ReviewListActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+    private void onReviewLongClick(Review review) {
+        Long currentUserId = prefsManager.getUserId();
+
+        // Only allow reporting reviews that are not from current user
+        if (review.getReviewerId() != null && !review.getReviewerId().equals(currentUserId)) {
+            showReviewActionMenu(review);
+        } else {
+            // Show message that user can't report own review
+            Toast.makeText(this, "You cannot report your own review", Toast.LENGTH_SHORT).show();
+        }
+    }
+    private void showReviewActionMenu(Review review) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Review Actions");
+
+        String[] options = {"Report Review", "Cancel"};
+
+        builder.setItems(options, (dialog, which) -> {
+            switch (which) {
+                case 0: // Report Review
+                    showReportReviewDialog(review);
+                    break;
+                case 1: // Cancel
+                    dialog.dismiss();
+                    break;
+            }
+        });
+
+        builder.show();
+    }
+    private void showReportReviewDialog(Review review) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Report Review");
+        builder.setMessage("Why are you reporting this review?");
+
+        String[] reasons = {
+                "Inappropriate content",
+                "Spam or fake review",
+                "Abusive language",
+                "Misleading information",
+                "Harassment",
+                "Other"
+        };
+
+        builder.setItems(reasons, (dialog, which) -> {
+            String reason = reasons[which];
+            submitReviewReport(review.getId(), reason, review.getReviewerName());
+        });
+
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    private void submitReviewReport(Long reviewId, String reason, String reviewerName) {
+        // Create report data
+        Map<String, Object> reportData = new HashMap<>();
+        reportData.put("reviewId", reviewId);
+        reportData.put("reason", reason);
+        reportData.put("reporterId", prefsManager.getUserId());
+        reportData.put("reviewerName", reviewerName);
+        reportData.put("timestamp", System.currentTimeMillis());
+
+        Log.d(TAG, "📝 Reporting review: ID=" + reviewId + ", Reason=" + reason);
+
+        // TODO: When backend API is ready, implement real API call:
+        // ApiClient.getReviewService().reportReview(reportData).enqueue(...)
+
+        // For now, show success message
+        Toast.makeText(this,
+                "Review reported successfully. Thank you for helping maintain our community standards.",
+                Toast.LENGTH_LONG).show();
+
+        Log.d(TAG, "✅ Review report submitted (simulated): " + reportData.toString());
     }
 
     private void setupListeners() {
@@ -220,5 +301,71 @@ public class ReviewListActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private Review parseReviewFromBackend(Map<String, Object> reviewData) {
+        try {
+            Review review = new Review();
+
+            // Basic fields
+            if (reviewData.get("id") instanceof Number) {
+                review.setId(((Number) reviewData.get("id")).longValue());
+            }
+
+            if (reviewData.get("rating") instanceof Number) {
+                review.setRating(((Number) reviewData.get("rating")).intValue());
+            }
+
+            review.setComment((String) reviewData.get("comment"));
+            review.setCreatedAt((String) reviewData.get("createdAt"));
+
+            if (reviewData.get("transactionId") instanceof Number) {
+                review.setTransactionId(((Number) reviewData.get("transactionId")).longValue());
+            }
+
+            // ✅ Parse reviewer UserSummary
+            if (reviewData.get("reviewer") instanceof Map) {
+                Map<String, Object> reviewerData = (Map<String, Object>) reviewData.get("reviewer");
+                UserSummary reviewer = parseUserSummary(reviewerData);
+                review.setReviewer(reviewer);
+            }
+
+            // ✅ Parse reviewee UserSummary
+            if (reviewData.get("reviewee") instanceof Map) {
+                Map<String, Object> revieweeData = (Map<String, Object>) reviewData.get("reviewee");
+                UserSummary reviewee = parseUserSummary(revieweeData);
+                review.setReviewee(reviewee);
+            }
+
+            Log.d(TAG, "✅ Parsed review: " + review.toString());
+            return review;
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error parsing review from backend", e);
+            return null;
+        }
+    }
+
+    // ✅ NEW: Helper method để parse UserSummary
+    private UserSummary parseUserSummary(Map<String, Object> userData) {
+        if (userData == null) return null;
+
+        try {
+            UserSummary user = new UserSummary();
+
+            if (userData.get("id") instanceof Number) {
+                user.setId(((Number) userData.get("id")).longValue());
+            }
+
+            user.setDisplayName((String) userData.get("displayName"));
+            user.setEmail((String) userData.get("email"));
+            user.setProfilePicture((String) userData.get("profilePicture"));
+
+            return user;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing UserSummary", e);
+            return null;
+        }
     }
 }

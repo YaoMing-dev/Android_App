@@ -19,6 +19,13 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import androidx.core.app.ActivityCompat;
+import com.example.newtrade.utils.LocationUtils;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.CategoryAdapter;
@@ -30,6 +37,7 @@ import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.CategoryProductsActivity;
 import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.ui.search.AllProductsActivity;
+import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.math.BigDecimal;
@@ -57,6 +65,10 @@ public class HomeFragment extends Fragment {
     // Adapters
     private CategoryAdapter categoryAdapter;
     private ProductAdapter productAdapter;
+
+    private Double userLatitude = null;
+    private Double userLongitude = null;
+    private FusedLocationProviderClient fusedLocationClient;
 
     // Data
     private final List<Category> categories = new ArrayList<>();
@@ -88,6 +100,7 @@ public class HomeFragment extends Fragment {
             tvViewAllProducts = view.findViewById(R.id.tv_view_all_products);
             fabQuickAdd = view.findViewById(R.id.fab_quick_add);
             emptyView = view.findViewById(R.id.empty_view);
+            fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
 
             Log.d(TAG, "✅ HomeFragment views initialized");
         } catch (Exception e) {
@@ -186,7 +199,7 @@ public class HomeFragment extends Fragment {
             if (swipeRefresh != null) {
                 swipeRefresh.setRefreshing(true);
             }
-
+            getCurrentLocationForFeed();
             loadCategoriesFromBackend();
             loadProductsFromBackend();
 
@@ -196,6 +209,40 @@ public class HomeFragment extends Fragment {
             if (swipeRefresh != null) {
                 swipeRefresh.setRefreshing(false);
             }
+        }
+    }
+    private void getCurrentLocationForFeed() {
+        if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+
+            try {
+                fusedLocationClient.getCurrentLocation(
+                                com.google.android.gms.location.LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY,
+                                null
+                        )
+                        .addOnSuccessListener(location -> {
+                            if (location != null) {
+                                userLatitude = location.getLatitude();
+                                userLongitude = location.getLongitude();
+                                Log.d(TAG, "📍 User location for feed: " + userLatitude + ", " + userLongitude);
+
+                                // Re-sort products if already loaded
+                                if (!products.isEmpty()) {
+                                    prioritizeNearbyProducts();
+                                    if (productAdapter != null) {
+                                        productAdapter.notifyDataSetChanged();
+                                    }
+                                }
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.w(TAG, "Could not get location for feed prioritization", e);
+                        });
+            } catch (SecurityException e) {
+                Log.e(TAG, "Location permission denied", e);
+            }
+        } else {
+            Log.d(TAG, "Location permission not granted, skipping nearby prioritization");
         }
     }
 
@@ -284,6 +331,9 @@ public class HomeFragment extends Fragment {
                                 }
                             }
 
+                            // ✅ THÊM: Prioritize nearby products after loading
+                            prioritizeNearbyProducts();
+
                             if (productAdapter != null) {
                                 productAdapter.notifyDataSetChanged();
                             }
@@ -291,15 +341,12 @@ public class HomeFragment extends Fragment {
                             Log.d(TAG, "✅ Loaded " + products.size() + " REAL products");
                         } else {
                             Log.e(TAG, "❌ Products API failed - NO FALLBACK TO SAMPLE DATA");
-                            // ✅ NO FALLBACK - Just empty list
                         }
                     } else {
                         Log.e(TAG, "❌ Products response not successful - NO FALLBACK TO SAMPLE DATA");
-                        // ✅ NO FALLBACK - Just empty list
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "❌ Error parsing products", e);
-                    // ✅ NO FALLBACK - Just empty list
                 }
             }
 
@@ -309,7 +356,6 @@ public class HomeFragment extends Fragment {
                     swipeRefresh.setRefreshing(false);
                 }
                 Log.e(TAG, "❌ Products network error - NO FALLBACK TO SAMPLE DATA", t);
-                // ✅ NO FALLBACK - Just empty list
             }
         });
     }
@@ -323,6 +369,14 @@ public class HomeFragment extends Fragment {
             product.setTitle((String) productData.get("title"));
             product.setDescription((String) productData.get("description"));
             product.setLocation((String) productData.get("location"));
+
+            // ✅ THÊM: Location coordinates parsing
+            if (productData.get("latitude") instanceof Number) {
+                product.setLatitude(((Number) productData.get("latitude")).doubleValue());
+            }
+            if (productData.get("longitude") instanceof Number) {
+                product.setLongitude(((Number) productData.get("longitude")).doubleValue());
+            }
 
             // Price handling
             Object priceObj = productData.get("price");
@@ -369,6 +423,50 @@ public class HomeFragment extends Fragment {
             Log.e(TAG, "❌ Error navigating to categories", e);
             Toast.makeText(getContext(), "Unable to navigate", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void prioritizeNearbyProducts() {
+        if (userLatitude != null && userLongitude != null && !products.isEmpty()) {
+
+            // Sort products by distance from user location
+            products.sort((p1, p2) -> {
+                Double distance1 = calculateProductDistance(p1);
+                Double distance2 = calculateProductDistance(p2);
+
+                // Products without location go to end
+                if (distance1 == null && distance2 == null) return 0;
+                if (distance1 == null) return 1;
+                if (distance2 == null) return -1;
+
+                // Closer products first
+                return distance1.compareTo(distance2);
+            });
+
+            Log.d(TAG, "✅ Products sorted by distance from user location (" +
+                    userLatitude + ", " + userLongitude + ")");
+
+            // Log first few products with distances for debugging
+            for (int i = 0; i < Math.min(3, products.size()); i++) {
+                Product p = products.get(i);
+                Double distance = calculateProductDistance(p);
+                Log.d(TAG, "  Product " + (i+1) + ": " + p.getTitle() +
+                        " - Distance: " + (distance != null ? String.format("%.1fkm", distance) : "Unknown"));
+            }
+        } else {
+            Log.d(TAG, "⚠️ Cannot prioritize nearby products - User location: " +
+                    userLatitude + ", " + userLongitude + " | Products count: " + products.size());
+        }
+    }
+    private Double calculateProductDistance(Product product) {
+        if (product.getLatitude() != null && product.getLongitude() != null
+                && userLatitude != null && userLongitude != null) {
+
+            return LocationUtils.calculateDistance(
+                    userLatitude, userLongitude,
+                    product.getLatitude(), product.getLongitude()
+            );
+        }
+        return null;
     }
 
     private void navigateToAllProducts() {

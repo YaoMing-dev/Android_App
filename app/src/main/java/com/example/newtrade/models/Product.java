@@ -22,6 +22,10 @@ public class Product {
     private List<String> imageUrls;
     private String createdAt;
 
+    // ✅ ADD: Location coordinates
+    private Double latitude;
+    private Double longitude;
+
     // ✅ FIX: Implement getImageUrl() method properly
     public String getImageUrl() {
         if (imageUrls != null && !imageUrls.isEmpty()) {
@@ -55,6 +59,7 @@ public class Product {
     public String getDisplayPrice() {
         return getFormattedPrice();
     }
+
     public enum ProductStatus {
         AVAILABLE("Có sẵn"),
         SOLD("Đã bán"),
@@ -149,6 +154,23 @@ public class Product {
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 
+    // ✅ ADD: Location coordinates getter/setter
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
     // ✅ FIX: setPrimaryImageUrl method
     public void setPrimaryImageUrl(String primaryImageUrl) {
         if (this.imageUrls == null) {
@@ -219,6 +241,23 @@ public class Product {
         }
     }
 
+    // ✅ ADD: Location utility methods
+    public boolean hasLocation() {
+        return latitude != null && longitude != null;
+    }
+
+    public String getLocationCoordinates() {
+        if (hasLocation()) {
+            return String.format("%.6f, %.6f", latitude, longitude);
+        }
+        return null;
+    }
+
+    public void setLocationCoordinates(Double latitude, Double longitude) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+    }
+
     // ✅ ADD: toString method for debugging
     @Override
     public String toString() {
@@ -227,6 +266,8 @@ public class Product {
                 ", title='" + title + '\'' +
                 ", price=" + price +
                 ", location='" + location + '\'' +
+                ", latitude=" + latitude +
+                ", longitude=" + longitude +
                 ", condition=" + condition +
                 ", status=" + status +
                 ", imageCount=" + getImageCount() +

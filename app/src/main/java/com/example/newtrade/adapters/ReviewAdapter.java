@@ -28,6 +28,14 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.ReviewView
     private Context context;
     private List<Review> reviews;
 
+    // ✅ ADD: Long click listener interface and field
+    public interface OnReviewLongClickListener {
+        void onReviewLongClick(Review review);
+    }
+
+    private OnReviewLongClickListener longClickListener;
+
+    // ✅ KEEP: Original constructors
     public ReviewAdapter(List<Review> reviews) {
         this.reviews = reviews;
     }
@@ -35,6 +43,18 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.ReviewView
     public ReviewAdapter(Context context, List<Review> reviews) {
         this.context = context;
         this.reviews = reviews;
+    }
+
+    // ✅ ADD: New constructor with long click listener
+    public ReviewAdapter(List<Review> reviews, OnReviewLongClickListener longClickListener) {
+        this.reviews = reviews;
+        this.longClickListener = longClickListener;
+    }
+
+    public ReviewAdapter(Context context, List<Review> reviews, OnReviewLongClickListener longClickListener) {
+        this.context = context;
+        this.reviews = reviews;
+        this.longClickListener = longClickListener;
     }
 
     @NonNull
@@ -51,6 +71,14 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.ReviewView
     public void onBindViewHolder(@NonNull ReviewViewHolder holder, int position) {
         Review review = reviews.get(position);
         holder.bind(review);
+
+        // ✅ ADD: Set long click listener
+        if (longClickListener != null) {
+            holder.itemView.setOnLongClickListener(v -> {
+                longClickListener.onReviewLongClick(review);
+                return true;
+            });
+        }
     }
 
     @Override
@@ -58,6 +86,7 @@ public class ReviewAdapter extends RecyclerView.Adapter<ReviewAdapter.ReviewView
         return reviews.size();
     }
 
+    // ✅ KEEP: Existing ViewHolder class unchanged
     class ReviewViewHolder extends RecyclerView.ViewHolder {
         private CircleImageView ivReviewerAvatar;
         private TextView tvReviewerName;

@@ -55,6 +55,9 @@ public class ProfileFragment extends Fragment {
     private LinearLayout llReviews, llAccountSettings, llHelpSupport, llAbout, llLogout;
     private FloatingActionButton fabEditProfile;
 
+    private LinearLayout llRatingSection;
+    private TextView tvUserRating, tvReviewCount;
+
     // Data
     private SharedPrefsManager prefsManager;
     private Map<String, Object> userProfile;
@@ -96,6 +99,9 @@ public class ProfileFragment extends Fragment {
         tvMemberSince = view.findViewById(R.id.tv_member_since);
 
         // Stats
+        llRatingSection = view.findViewById(R.id.ll_rating_section);
+        tvUserRating = view.findViewById(R.id.tv_user_rating);
+        tvReviewCount = view.findViewById(R.id.tv_review_count);
         tvListingsCount = view.findViewById(R.id.tv_listings_count);
         tvSoldCount = view.findViewById(R.id.tv_sold_count);
         tvBoughtCount = view.findViewById(R.id.tv_bought_count);
@@ -182,9 +188,128 @@ public class ProfileFragment extends Fragment {
             // Load detailed profile from server
             loadProfileFromServer();
 
+            loadUserRatingData();
+
         } catch (Exception e) {
             Log.e(TAG, "Error loading user profile", e);
         }
+    }
+
+    private void loadUserRatingData() {
+        Long userId = prefsManager.getUserId();
+        if (userId == null) return;
+
+        Log.d(TAG, "🔄 Loading rating data for user: " + userId);
+
+        // ✅ Backend tự động calculate rating, lấy từ user profile
+        ApiClient.getApiService().getCurrentUserProfile()
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            Map<String, Object> userData = response.body().getData();
+
+                            // ✅ Get backend calculated rating
+                            Double rating = null;
+                            if (userData.get("rating") instanceof Number) {
+                                rating = ((Number) userData.get("rating")).doubleValue();
+                            }
+
+                            Log.d(TAG, "📊 User rating from backend: " + rating);
+
+                            // ✅ Get review count từ reviews API
+                            loadReviewCountForDisplay(userId, rating);
+                        } else {
+                            Log.w(TAG, "Failed to load user profile for rating");
+                            llRatingSection.setVisibility(View.GONE);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.e(TAG, "Network error loading user profile for rating", t);
+                        llRatingSection.setVisibility(View.GONE);
+                    }
+                });
+    }
+    private void loadReviewCountForDisplay(Long userId, Double rating) {
+        // ✅ Get total review count từ backend paginated API
+        ApiClient.getReviewService().getUserReviews(userId, 0, 1)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+
+                        int reviewCount = 0;
+
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            Map<String, Object> data = response.body().getData();
+                            if (data.get("totalElements") instanceof Number) {
+                                reviewCount = ((Number) data.get("totalElements")).intValue();
+                            }
+                        }
+
+                        Log.d(TAG, "📊 Review count from backend: " + reviewCount);
+
+                        // ✅ Display rating info từ backend
+                        displayBackendRatingInfo(rating, reviewCount);
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.w(TAG, "Failed to load review count", t);
+                        displayBackendRatingInfo(rating, 0);
+                    }
+                });
+    }
+    private void displayBackendRatingInfo(Double rating, int reviewCount) {
+        if (rating != null && rating.doubleValue() > 0 && reviewCount > 0) {
+            tvUserRating.setText(String.format("%.1f", rating));
+            tvReviewCount.setText(String.format("(%d reviews)", reviewCount));
+            llRatingSection.setVisibility(View.VISIBLE);
+
+            Log.d(TAG, "✅ Displayed backend rating: " + rating + " with " + reviewCount + " reviews");
+        } else {
+            llRatingSection.setVisibility(View.GONE);
+            Log.d(TAG, "❌ No rating to display: rating=" + rating + ", reviewCount=" + reviewCount);
+        }
+    }
+
+    private void loadUserAverageRating(int reviewCount) {
+        Long userId = prefsManager.getUserId();
+
+        ApiClient.getApiService().getCurrentUserProfile()
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            Map<String, Object> userData = response.body().getData();
+
+                            Double rating = null;
+                            if (userData.get("rating") instanceof Number) {
+                                rating = ((Number) userData.get("rating")).doubleValue();
+                            }
+
+                            if (rating != null && rating > 0) {
+                                tvUserRating.setText(String.format("%.1f", rating));
+                                tvReviewCount.setText(String.format("(%d reviews)", reviewCount));
+                                llRatingSection.setVisibility(View.VISIBLE);
+
+                                Log.d(TAG, "✅ Displayed rating: " + rating + " with " + reviewCount + " reviews");
+                            } else {
+                                llRatingSection.setVisibility(View.GONE);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        Log.e(TAG, "Failed to load average rating", t);
+                        llRatingSection.setVisibility(View.GONE);
+                    }
+                });
     }
 
     private void openOfferHistory() {

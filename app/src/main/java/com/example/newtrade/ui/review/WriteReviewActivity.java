@@ -24,6 +24,8 @@ import com.example.newtrade.models.Transaction;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 
+import java.util.Map;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -169,33 +171,49 @@ public class WriteReviewActivity extends AppCompatActivity {
         isSubmitting = true;
         updateSubmitButton();
 
+        // ✅ Create request theo backend ReviewRequest format
         ReviewRequest request = new ReviewRequest(transactionId, rating,
                 TextUtils.isEmpty(comment) ? null : comment);
 
-        ApiClient.getReviewService().submitReview(request).enqueue(new Callback<StandardResponse<Review>>() {
-            @Override
-            public void onResponse(Call<StandardResponse<Review>> call, Response<StandardResponse<Review>> response) {
-                isSubmitting = false;
-                updateSubmitButton();
+        // ✅ Get current user ID for header
+        Long currentUserId = SharedPrefsManager.getInstance(this).getUserId();
 
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Toast.makeText(WriteReviewActivity.this, "Review submitted successfully", Toast.LENGTH_SHORT).show();
-                    setResult(RESULT_OK);
-                    finish();
-                } else {
-                    String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to submit review";
-                    Toast.makeText(WriteReviewActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
-                }
-            }
+        Log.d(TAG, "📝 Submitting review: transactionId=" + transactionId + ", rating=" + rating + ", userId=" + currentUserId);
 
-            @Override
-            public void onFailure(Call<StandardResponse<Review>> call, Throwable t) {
-                isSubmitting = false;
-                updateSubmitButton();
-                Log.e(TAG, "Error submitting review", t);
-                Toast.makeText(WriteReviewActivity.this, "Network error. Please try again.", Toast.LENGTH_SHORT).show();
-            }
-        });
+        // ✅ Call backend API với User-ID header
+        ApiClient.getReviewService().submitReview(currentUserId, request)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
+                                           Response<StandardResponse<Map<String, Object>>> response) {
+                        isSubmitting = false;
+                        updateSubmitButton();
+
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            // ✅ Use backend success message
+                            String successMsg = response.body().getMessage();
+                            Toast.makeText(WriteReviewActivity.this, successMsg, Toast.LENGTH_SHORT).show();
+
+                            Log.d(TAG, "✅ Review submitted successfully: " + successMsg);
+                            setResult(RESULT_OK);
+                            finish();
+                        } else {
+                            // ✅ Use backend error message
+                            String errorMsg = response.body() != null ?
+                                    response.body().getMessage() : "Failed to submit review";
+                            Toast.makeText(WriteReviewActivity.this, errorMsg, Toast.LENGTH_LONG).show();
+                            Log.e(TAG, "❌ Review submission failed: " + errorMsg);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        isSubmitting = false;
+                        updateSubmitButton();
+                        Toast.makeText(WriteReviewActivity.this, "Network error. Please try again.", Toast.LENGTH_SHORT).show();
+                        Log.e(TAG, "❌ Review submission network error", t);
+                    }
+                });
     }
 
     @Override
