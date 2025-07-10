@@ -97,6 +97,7 @@ public class Constants {
     // ===== SHARED PREFERENCES - UNCHANGED =====
     public static final String PREFS_NAME = "TradeUpPrefs";
     public static final String PREF_USER_ID = "user_id";
+    public static final int REQUEST_CODE_WRITE_REVIEW = 1003;
     public static final String PREF_USER_EMAIL = "user_email";
     public static final String PREF_USER_NAME = "user_name";
     public static final String PREF_USER_PROFILE_PICTURE = "user_profile_picture";

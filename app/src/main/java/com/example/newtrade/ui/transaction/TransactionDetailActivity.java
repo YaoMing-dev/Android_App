@@ -23,6 +23,8 @@ import com.example.newtrade.ui.review.WriteReviewActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 
+import java.util.Map;
+
 import de.hdodenhof.circleimageview.CircleImageView;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -122,10 +124,8 @@ public class TransactionDetailActivity extends AppCompatActivity {
     }
 
     private void loadTransactionDetail() {
-        // ✅ THÊM USER-ID
         String userId = String.valueOf(prefsManager.getUserId());
 
-        // ✅ SỬA API CALL
         ApiClient.getTransactionService().getTransactionWithAuth(userId, transactionId)
                 .enqueue(new Callback<StandardResponse<Transaction>>() {
                     @Override
@@ -211,36 +211,114 @@ public class TransactionDetailActivity extends AppCompatActivity {
         setupButtonStates();
     }
 
+    // ✅ ENHANCED: Sửa logic setup button states
     private void setupButtonStates() {
         if (transaction == null) return;
 
-        // Review button
-        if (transaction.isCompleted() && transaction.isCanReview() && !transaction.isHasReviewed()) {
-            btnWriteReview.setVisibility(View.VISIBLE);
-            btnWriteReview.setText("Write Review");
-            btnWriteReview.setEnabled(true);
-        } else if (transaction.isHasReviewed()) {
-            btnWriteReview.setVisibility(View.VISIBLE);
-            btnWriteReview.setText("Reviewed");
-            btnWriteReview.setEnabled(false);
+        Long currentUserId = prefsManager.getUserId();
+
+        // ✅ DEBUG: Log transaction state
+        Log.d(TAG, "🔍 Transaction Debug: " +
+                "id=" + transaction.getId() +
+                ", status=" + transaction.getPaymentStatus() +
+                ", completed=" + transaction.isCompleted() +
+                ", paid=" + transaction.isPaid() +
+                ", canReview=" + transaction.isCanReview() +
+                ", hasReviewed=" + transaction.isHasReviewed());
+
+        // ✅ ENHANCED: Review button logic - allow review for PAID or COMPLETED transactions
+        boolean transactionFinished = transaction.isCompleted() || transaction.isPaid();
+
+        if (transactionFinished) {
+            // Always check backend for review eligibility
+            checkCanReviewFromBackend();
         } else {
             btnWriteReview.setVisibility(View.GONE);
+            Log.d(TAG, "❌ Transaction not finished yet, hiding review button");
         }
 
-        // Contact button
+        // Contact button - always visible
         btnContact.setVisibility(View.VISIBLE);
 
-        // Complete transaction button (for sellers when paid)
-        Long currentUserId = prefsManager.getUserId();
-        if (transaction.isSeller(currentUserId) && transaction.isPaid()) {
+        // Complete transaction button - only for sellers when transaction is paid but not completed
+        if (transaction.isSeller(currentUserId) && transaction.isPaid() && !transaction.isCompleted()) {
             btnCompleteTransaction.setVisibility(View.VISIBLE);
+            btnCompleteTransaction.setText("Mark as Complete");
+            btnCompleteTransaction.setEnabled(true);
         } else {
             btnCompleteTransaction.setVisibility(View.GONE);
         }
     }
 
-    private void openWriteReview() {
+    // ✅ NEW: Check backend can-review API
+    private void checkCanReviewFromBackend() {
         if (transaction == null) return;
+
+        Long currentUserId = prefsManager.getUserId();
+
+        Log.d(TAG, "🔍 Checking review eligibility with backend...");
+
+        ApiClient.getReviewService().canReviewTransaction(transaction.getId(), currentUserId)
+                .enqueue(new Callback<StandardResponse<Map<String, Boolean>>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Map<String, Boolean>>> call,
+                                           Response<StandardResponse<Map<String, Boolean>>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            Map<String, Boolean> data = response.body().getData();
+                            boolean canReview = data != null && Boolean.TRUE.equals(data.get("canReview"));
+
+                            Log.d(TAG, "✅ Backend canReview response: " + canReview);
+
+                            if (canReview) {
+                                btnWriteReview.setVisibility(View.VISIBLE);
+                                btnWriteReview.setText("Write Review ⭐");
+                                btnWriteReview.setEnabled(true);
+                                btnWriteReview.setBackgroundTintList(getColorStateList(R.color.primary_color));
+                            } else {
+                                btnWriteReview.setVisibility(View.VISIBLE);
+                                btnWriteReview.setText("Already Reviewed ✓");
+                                btnWriteReview.setEnabled(false);
+                                btnWriteReview.setBackgroundTintList(getColorStateList(android.R.color.darker_gray));
+                            }
+                        } else {
+                            Log.e(TAG, "❌ Backend error checking review: " + response.message());
+                            // Fallback: show button anyway for user to try
+                            showReviewButtonFallback();
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Map<String, Boolean>>> call, Throwable t) {
+                        Log.e(TAG, "❌ Network error checking review eligibility", t);
+                        // Fallback: show button anyway
+                        showReviewButtonFallback();
+                    }
+                });
+    }
+
+    // ✅ NEW: Fallback method to show review button
+    private void showReviewButtonFallback() {
+        btnWriteReview.setVisibility(View.VISIBLE);
+        btnWriteReview.setText("Write Review");
+        btnWriteReview.setEnabled(true);
+        btnWriteReview.setBackgroundTintList(getColorStateList(R.color.primary_color));
+        Log.d(TAG, "✅ Showing review button as fallback");
+    }
+
+    // ✅ ENHANCED: openWriteReview with better validation
+    private void openWriteReview() {
+        if (transaction == null) {
+            Toast.makeText(this, "Transaction data not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // ✅ Allow review for both PAID and COMPLETED transactions
+        boolean canProceed = transaction.isCompleted() || transaction.isPaid();
+
+        if (!canProceed) {
+            Toast.makeText(this, "Transaction must be completed before writing a review", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         Intent intent = new Intent(this, WriteReviewActivity.class);
         intent.putExtra(WriteReviewActivity.EXTRA_TRANSACTION_ID, transaction.getId());
@@ -249,6 +327,9 @@ public class TransactionDetailActivity extends AppCompatActivity {
         String revieweeName = transaction.getOtherPartyName(currentUserId);
         intent.putExtra(WriteReviewActivity.EXTRA_REVIEWEE_NAME, revieweeName);
         intent.putExtra(WriteReviewActivity.EXTRA_PRODUCT_TITLE, transaction.getProductTitle());
+
+        Log.d(TAG, "🌟 Opening WriteReviewActivity for transaction: " + transaction.getId() +
+                ", reviewee: " + revieweeName);
 
         startActivityForResult(intent, REQUEST_WRITE_REVIEW);
     }
@@ -274,10 +355,8 @@ public class TransactionDetailActivity extends AppCompatActivity {
     private void completeTransaction() {
         if (transaction == null) return;
 
-        // ✅ THÊM USER-ID
         String userId = String.valueOf(prefsManager.getUserId());
 
-        // ✅ SỬA API CALL
         ApiClient.getTransactionService().completeTransactionWithAuth(userId, transaction.getId())
                 .enqueue(new Callback<StandardResponse<Transaction>>() {
                     @Override
@@ -286,7 +365,12 @@ public class TransactionDetailActivity extends AppCompatActivity {
                         if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                             transaction = response.body().getData();
                             displayTransactionDetails();
-                            Toast.makeText(TransactionDetailActivity.this, "Transaction completed successfully", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(TransactionDetailActivity.this, "Transaction completed successfully! 🎉", Toast.LENGTH_SHORT).show();
+
+                            // ✅ NEW: Auto-show review option after completing transaction
+                            if (transaction.isCompleted()) {
+                                Toast.makeText(TransactionDetailActivity.this, "You can now write a review!", Toast.LENGTH_LONG).show();
+                            }
                         } else {
                             String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to complete transaction";
                             Toast.makeText(TransactionDetailActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
@@ -306,8 +390,9 @@ public class TransactionDetailActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == REQUEST_WRITE_REVIEW && resultCode == RESULT_OK) {
-            // Reload transaction to update review status
-            loadTransactionDetail();
+            // ✅ ENHANCED: Show success message and reload
+            Toast.makeText(this, "Thank you for your review! ⭐", Toast.LENGTH_SHORT).show();
+            loadTransactionDetail(); // Reload to update review status
         }
     }
 

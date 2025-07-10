@@ -162,6 +162,8 @@ public interface ProductService {
     @POST("api/saved-items/{productId}")
     Call<StandardResponse<Void>> saveProduct(@Path("productId") Long productId);
 
+
+
     /**
      * Unsave a product
      */
@@ -171,7 +173,7 @@ public interface ProductService {
     /**
      * Check if product is saved
      */
-    @GET("api/saved-items/{productId}/check")
+    @GET("api/saved-items/{productId}/is-saved")  // ✅ Đúng backend endpoint
     Call<StandardResponse<Map<String, Object>>> isProductSaved(@Path("productId") Long productId);
 
 

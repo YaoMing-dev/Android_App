@@ -30,6 +30,8 @@ import com.example.newtrade.adapters.ProductImageAdapter;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.chat.ChatActivity;
+import com.example.newtrade.ui.review.WriteReviewActivity;
+import com.example.newtrade.ui.transaction.TransactionDetailActivity;
 import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.Constants;
@@ -317,17 +319,15 @@ public class ProductDetailActivity extends AppCompatActivity {
 
         if (requestCode == Constants.RC_PAYMENT) {
             if (resultCode == RESULT_OK) {
-                // Payment successful
                 Toast.makeText(this, "Payment successful! 🎉", Toast.LENGTH_LONG).show();
-
-                // Refresh product status (might be sold now)
                 loadProductDetails();
-
-                // Show success dialog with options
                 showPaymentSuccessDialog(data);
             } else {
-                // Payment cancelled or failed
                 Toast.makeText(this, "Payment was cancelled", Toast.LENGTH_SHORT).show();
+            }
+        } else if (requestCode == Constants.REQUEST_CODE_WRITE_REVIEW) {
+            if (resultCode == RESULT_OK) {
+                Toast.makeText(this, "Thank you for your review! ⭐", Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -336,28 +336,84 @@ public class ProductDetailActivity extends AppCompatActivity {
     private void showPaymentSuccessDialog(Intent data) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Payment Successful! 🎉");
-        builder.setMessage("Your payment has been processed successfully. You can now contact the seller to arrange pickup/delivery.");
+        builder.setMessage("Your payment has been processed successfully. You can now contact the seller and leave a review.");
 
-        builder.setPositiveButton("Contact Seller", (dialog, which) -> {
-            // Start chat with seller
-            showContactOptions();
-        });
-
-        builder.setNeutralButton("View Transaction", (dialog, which) -> {
-            // View transaction details
+        // ✅ THÊM: Write Review button
+        builder.setPositiveButton("Write Review", (dialog, which) -> {
             if (data != null) {
                 Long transactionId = data.getLongExtra("transaction_id", 0L);
                 if (transactionId > 0) {
-                    Intent intent = new Intent(this, com.example.newtrade.ui.transaction.TransactionDetailActivity.class);
-                    intent.putExtra("transaction_id", transactionId);
+                    // Ensure transaction is completed first
+                    completeTransactionAndOpenReview(transactionId);
+                } else {
+                    Toast.makeText(this, "Unable to find transaction", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+        builder.setNeutralButton("Contact Seller", (dialog, which) -> {
+            showContactOptions();
+        });
+
+        builder.setNegativeButton("View Transaction", (dialog, which) -> {
+            if (data != null) {
+                Long transactionId = data.getLongExtra("transaction_id", 0L);
+                if (transactionId > 0) {
+                    Intent intent = new Intent(this, TransactionDetailActivity.class);
+                    intent.putExtra(TransactionDetailActivity.EXTRA_TRANSACTION_ID, transactionId);
                     startActivity(intent);
                 }
             }
         });
 
-        builder.setNegativeButton("OK", null);
         builder.show();
     }
+
+    private void completeTransactionAndOpenReview(Long transactionId) {
+        String userId = String.valueOf(prefsManager.getUserId());
+
+        // First, complete the transaction
+        ApiClient.getTransactionService().completeTransactionWithAuth(userId, transactionId)
+                .enqueue(new Callback<StandardResponse<Transaction>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Transaction>> call,
+                                           Response<StandardResponse<Transaction>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            // Transaction completed, now open review
+                            openWriteReviewActivity(transactionId);
+                        } else {
+                            // Still allow review even if complete fails
+                            openWriteReviewActivity(transactionId);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Transaction>> call, Throwable t) {
+                        Log.e(TAG, "Error completing transaction", t);
+                        // Still allow review
+                        openWriteReviewActivity(transactionId);
+                    }
+                });
+    }
+    private void openWriteReviewActivity(Long transactionId) {
+        Intent intent = new Intent(this, WriteReviewActivity.class);
+        intent.putExtra(WriteReviewActivity.EXTRA_TRANSACTION_ID, transactionId);
+
+        // Get seller info for review
+        if (productData.get("seller") != null) {
+            Map<String, Object> seller = (Map<String, Object>) productData.get("seller");
+            String sellerName = seller.get("displayName") != null ? seller.get("displayName").toString() : "Seller";
+            intent.putExtra(WriteReviewActivity.EXTRA_REVIEWEE_NAME, sellerName);
+        }
+
+        String productTitle = productData.get("title") != null ? productData.get("title").toString() : "Product";
+        intent.putExtra(WriteReviewActivity.EXTRA_PRODUCT_TITLE, productTitle);
+
+        startActivityForResult(intent, Constants.REQUEST_CODE_WRITE_REVIEW);
+
+        Log.d(TAG, "🌟 Opened WriteReviewActivity for transaction: " + transactionId);
+    }
+
 
     private void checkSaveStatus() {
         if (productId == null || productId <= 0) return;
