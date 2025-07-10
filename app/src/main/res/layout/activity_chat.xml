@@ -3,15 +3,18 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@color/chat_background">
 
     <!-- Toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@color/white"
-        app:navigationIcon="@drawable/ic_arrow_back" />
+        android:background="@color/primary_color"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:navigationIcon="@drawable/ic_arrow_back"
+        app:titleTextColor="@color/white" />
 
     <!-- Connection Status (Optional) -->
     <TextView
@@ -27,15 +30,50 @@
         android:visibility="gone" />
 
     <!-- Product Info (Optional) -->
-    <TextView
-        android:id="@+id/tv_product_info"
+    <LinearLayout
+        android:id="@+id/ll_product_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/background_gray"
+        android:orientation="horizontal"
         android:padding="12dp"
-        android:text="📱 iPhone 13 Pro Max"
-        android:textSize="14sp"
-        android:visibility="gone" />
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/iv_product_thumbnail"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/rounded_background_gray"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_product_placeholder" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_product_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📱 iPhone 13 Pro Max"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_product_price"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="25,000,000 VND"
+                android:textColor="@color/primary_color"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
     <!-- Messages RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
@@ -43,49 +81,222 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="8dp" />
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp" />
 
     <!-- Typing Indicator (Optional) -->
-    <TextView
-        android:id="@+id/tv_typing_indicator"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="8dp"
-        android:text="John is typing..."
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp"
-        android:textStyle="italic"
-        android:visibility="gone" />
-
-    <!-- Message Input Section -->
     <LinearLayout
+        android:id="@+id/ll_typing_indicator"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="8dp"
-        android:background="@color/white"
-        android:elevation="4dp">
+        android:visibility="gone">
 
-        <EditText
-            android:id="@+id/et_message"
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/tv_typing_indicator"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="@drawable/rounded_background_gray"
-            android:hint="Type a message..."
-            android:maxLines="3"
-            android:padding="12dp"
-            android:textSize="16sp" />
+            android:text="John is typing..."
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:textStyle="italic" />
 
-        <ImageButton
-            android:id="@+id/btn_send"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/rounded_background_primary"
-            android:src="@drawable/ic_send"
-            android:enabled="false"
-            app:tint="@color/white" />
+        <!-- Typing animation dots -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="●●●"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp" />
+
+    </LinearLayout>
+
+    <!-- Message Input Section - ✅ UPGRADED -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/white"
+        android:elevation="8dp"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <!-- Main Input Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- ✅ NEW: Upload Image Button -->
+            <ImageButton
+                android:id="@+id/btn_upload_image"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Upload Image"
+                android:src="@drawable/ic_camera"
+                app:tint="@color/primary_color" />
+
+            <!-- ✅ NEW: Emoji Button -->
+            <ImageButton
+                android:id="@+id/btn_emoji"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Add Emoji"
+                android:src="@drawable/ic_emoji"
+                app:tint="@color/primary_color" />
+
+            <!-- Message Input Field -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_message_input"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <EditText
+                    android:id="@+id/et_message"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent"
+                    android:hint="Type a message..."
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:maxLines="4"
+                    android:minHeight="40dp"
+                    android:padding="8dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="16sp" />
+
+                <!-- ✅ NEW: Attachment Menu Button -->
+                <ImageButton
+                    android:id="@+id/btn_attachment"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginEnd="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="More Options"
+                    android:src="@drawable/ic_attach_file"
+                    android:visibility="gone"
+                    app:tint="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <!-- Send Button -->
+            <Button
+                android:id="@+id/btn_send"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:text="Send"
+                android:textSize="12sp"
+                android:enabled="false"
+                style="@style/Widget.Material3.Button" />
+
+
+        </LinearLayout>
+
+        <!-- ✅ NEW: Quick Emoji Row (Optional) -->
+        <HorizontalScrollView
+            android:id="@+id/hsv_quick_emojis"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <TextView
+                    android:id="@+id/emoji_1"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:text="😀"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/emoji_2"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:text="😂"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/emoji_3"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:text="😍"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/emoji_4"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:text="👍"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/emoji_5"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:text="❤️"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/emoji_6"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:text="😢"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/emoji_7"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:text="🙏"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/emoji_8"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:text="👏"
+                    android:textSize="20sp" />
+
+            </LinearLayout>
+
+        </HorizontalScrollView>
 
     </LinearLayout>
 

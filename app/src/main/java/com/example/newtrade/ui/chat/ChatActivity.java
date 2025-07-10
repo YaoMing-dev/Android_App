@@ -2,6 +2,7 @@
 package com.example.newtrade.ui.chat;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
@@ -9,11 +10,15 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -32,7 +37,8 @@ import com.example.newtrade.websocket.ChatWebSocketManager;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.gson.JsonObject;
 
-import java.text.ParseException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -41,6 +47,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -48,21 +57,27 @@ import retrofit2.Response;
 public class ChatActivity extends AppCompatActivity implements ChatWebSocketManager.ChatListener {
 
     private static final String TAG = "ChatActivity";
+    private static final int PICK_IMAGE_REQUEST = 1001;
 
     // UI Components
     private MaterialToolbar toolbar;
     private RecyclerView rvMessages;
     private EditText etMessage;
-    private ImageButton btnSend;
+    private Button btnSend;
+    private ImageButton btnUploadImage, btnEmoji;
     private TextView tvTypingIndicator;
+    private LinearLayout llProductInfo;
+    private ImageView ivProductThumbnail;
+    private TextView tvProductTitle, tvProductPrice;
 
     // Data
     private SharedPrefsManager prefsManager;
     private ChatWebSocketManager chatWebSocketManager;
     private MessageAdapter messageAdapter;
     private List<Message> messages;
+    private ChatNotificationManager chatNotificationManager;
 
-    // Chat data - ✅ FIXED: Khởi tạo default values
+    // Chat data
     private Long conversationId = 0L;
     private String otherUserName = "";
     private String productTitle = "";
@@ -74,9 +89,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
     private Handler typingHandler = new Handler();
     private Runnable stopTypingRunnable;
     private boolean isTyping = false;
-
-    // ✅ THÊM: Notification manager
-    private ChatNotificationManager chatNotificationManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -91,7 +103,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         initWebSocket();
         loadOrCreateConversation();
 
-        // ✅ THÊM: Initialize notification manager
         chatNotificationManager = new ChatNotificationManager(this);
 
         Log.d(TAG, "✅ ChatActivity created for conversation: " + conversationId);
@@ -102,13 +113,18 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         rvMessages = findViewById(R.id.rv_messages);
         etMessage = findViewById(R.id.et_message);
         btnSend = findViewById(R.id.btn_send);
+        btnUploadImage = findViewById(R.id.btn_upload_image);
+        btnEmoji = findViewById(R.id.btn_emoji);
         tvTypingIndicator = findViewById(R.id.tv_typing_indicator);
+        llProductInfo = findViewById(R.id.ll_product_info);
+        ivProductThumbnail = findViewById(R.id.iv_product_thumbnail);
+        tvProductTitle = findViewById(R.id.tv_product_title);
+        tvProductPrice = findViewById(R.id.tv_product_price);
 
         prefsManager = SharedPrefsManager.getInstance(this);
         currentUserId = prefsManager.getUserId();
         messages = new ArrayList<>();
 
-        // ✅ THÊM: Null safety
         if (currentUserId == null) {
             currentUserId = 0L;
         }
@@ -123,7 +139,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             productId = intent.getLongExtra("product_id", 0L);
             receiverId = intent.getLongExtra("receiverId", 0L);
 
-            // ✅ THÊM: Null safety và default values
             if (otherUserName == null) {
                 otherUserName = "Unknown User";
             }
@@ -131,7 +146,7 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                 productTitle = "Product";
             }
             if (conversationId <= 0) {
-                conversationId = 1L; // Default conversation ID
+                conversationId = 1L;
             }
         }
 
@@ -147,18 +162,45 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
         NavigationUtils.setupToolbarWithBackButton(this, toolbar, title);
         toolbar.setSubtitle(subtitle);
+
+        // Show product info if available
+        if (productTitle != null && !productTitle.isEmpty()) {
+            if (llProductInfo != null) {
+                llProductInfo.setVisibility(View.VISIBLE);
+                if (tvProductTitle != null) {
+                    tvProductTitle.setText(productTitle);
+                }
+            }
+        }
     }
 
     private void setupRecyclerView() {
         messageAdapter = new MessageAdapter(this, messages, currentUserId);
-        rvMessages.setLayoutManager(new LinearLayoutManager(this));
+
+        // ✅ FIXED: Đảm bảo tin nhắn mới ở dưới cùng
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
+        // ✅ REMOVED: setStackFromEnd và setReverseLayout - để default
+
+        rvMessages.setLayoutManager(layoutManager);
         rvMessages.setAdapter(messageAdapter);
+
+        messageAdapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+            @Override
+            public void onItemRangeInserted(int positionStart, int itemCount) {
+                super.onItemRangeInserted(positionStart, itemCount);
+                // ✅ ALWAYS scroll to bottom when new message added
+                rvMessages.scrollToPosition(messages.size() - 1);
+            }
+        });
     }
 
     private void setupListeners() {
         btnSend.setOnClickListener(v -> sendMessage());
+        btnUploadImage.setOnClickListener(v -> openImagePicker());
+        btnEmoji.setOnClickListener(v -> toggleEmojiPicker());
 
-        // Typing indicator
+        // Typing indicator and send button enable/disable
         etMessage.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -170,9 +212,15 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
             @Override
             public void afterTextChanged(Editable s) {
-                btnSend.setEnabled(!s.toString().trim().isEmpty());
+                boolean hasText = !s.toString().trim().isEmpty();
+                btnSend.setEnabled(hasText);
+                btnSend.setAlpha(hasText ? 1.0f : 0.5f);
             }
         });
+
+        // Initially disable send button
+        btnSend.setEnabled(false);
+        btnSend.setAlpha(0.5f);
     }
 
     private void initWebSocket() {
@@ -293,17 +341,32 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
                         if (messageList != null) {
                             messages.clear();
+
+                            // ✅ FIXED: Parse all messages first
+                            List<Message> parsedMessages = new ArrayList<>();
                             for (Map<String, Object> messageData : messageList) {
                                 Message message = parseMessageFromApi(messageData);
                                 if (message != null) {
-                                    messages.add(message);
+                                    parsedMessages.add(message);
                                 }
                             }
 
-                            messageAdapter.notifyDataSetChanged();
-                            scrollToBottom();
+                            // ✅ FIXED: Sort by timestamp (oldest first, newest last)
+                            parsedMessages.sort((m1, m2) -> {
+                                // Compare by ID (assuming higher ID = newer message)
+                                return Long.compare(m1.getId() != null ? m1.getId() : 0L,
+                                        m2.getId() != null ? m2.getId() : 0L);
+                            });
 
-                            Log.d(TAG, "✅ Loaded " + messages.size() + " messages");
+                            messages.addAll(parsedMessages);
+                            messageAdapter.notifyDataSetChanged();
+
+                            // ✅ FIXED: Scroll to bottom to show newest messages
+                            if (messages.size() > 0) {
+                                rvMessages.scrollToPosition(messages.size() - 1);
+                            }
+
+                            Log.d(TAG, "✅ Loaded " + messages.size() + " messages in correct order");
                         }
 
                     } else {
@@ -341,13 +404,18 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             }
 
             if (messageData.get("messageText") != null) {
-                message.setContent(messageData.get("messageText").toString());
+                String messageText = messageData.get("messageText").toString();
+                message.setContent(messageText);
             }
 
-            if (messageData.get("messageType") != null) {
-                message.setMessageType(messageData.get("messageType").toString());
-            } else {
-                message.setMessageType("TEXT");
+            String messageType = messageData.get("messageType") != null ?
+                    messageData.get("messageType").toString() : "TEXT";
+            message.setMessageType(messageType);
+
+            // Handle image messages correctly
+            if ("IMAGE".equals(messageType) && message.getContent() != null) {
+                message.setImageUrl(message.getContent()); // Image URL is stored in content
+                Log.d(TAG, "📷 Parsed image message: " + message.getContent());
             }
 
             if (messageData.get("createdAt") != null) {
@@ -388,7 +456,8 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         Log.d(TAG, "✅ Mock messages loaded");
     }
 
-    // ✅ CẬP NHẬT: sendMessage() method với notification
+    // ===== TEXT MESSAGE SENDING =====
+
     private void sendMessage() {
         String messageText = etMessage.getText().toString().trim();
         if (messageText.isEmpty()) {
@@ -396,7 +465,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             return;
         }
 
-        // ✅ THÊM: Validation
         if (currentUserId == null || currentUserId <= 0) {
             Log.e(TAG, "Current user ID is invalid");
             Toast.makeText(this, "User not logged in", Toast.LENGTH_SHORT).show();
@@ -418,14 +486,14 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         // Clear input
         etMessage.setText("");
 
-        // ✅ Send via WebSocket AND API
+        // Send via WebSocket AND API
         sendMessageViaWebSocket(messageText);
-        sendMessageViaApi(messageText);
+        sendMessageViaApi(messageText, "TEXT");
 
-        // ✅ THÊM: Send notification to receiver
+        // Send notification to receiver
         sendNotificationToReceiver(messageText);
 
-        Log.d(TAG, "📤 Sent message: " + messageText);
+        Log.d(TAG, "📤 Sent text message: " + messageText);
     }
 
     private void sendMessageViaWebSocket(String messageText) {
@@ -434,16 +502,19 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         }
     }
 
-    private void sendMessageViaApi(String messageText) {
+    // ✅ FIXED: Handle both TEXT and IMAGE message types properly
+    private void sendMessageViaApi(String messageText, String messageType) {
         if (conversationId == null || conversationId <= 0) {
             Log.w(TAG, "No conversation ID, cannot send via API");
             return;
         }
 
+        Log.d(TAG, "🔍 Sending " + messageType + " message via API: " + messageText);
+
         Map<String, Object> messageData = new HashMap<>();
         messageData.put("conversationId", conversationId);
         messageData.put("messageText", messageText);
-        messageData.put("messageType", "TEXT");
+        messageData.put("messageType", messageType); // ✅ IMPORTANT: Use the parameter
 
         ApiService apiService = ApiClient.getApiService();
         Call<StandardResponse<Map<String, Object>>> call = apiService.sendMessage(messageData);
@@ -457,27 +528,42 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                     StandardResponse<Map<String, Object>> standardResponse = response.body();
 
                     if (standardResponse.isSuccess()) {
-                        updateLastMessageStatus("✅ Sent");
-                        Log.d(TAG, "✅ Message sent via API");
+                        if ("IMAGE".equals(messageType)) {
+                            updateLastImageMessageStatus("✅ Sent");
+                        } else {
+                            updateLastMessageStatus("✅ Sent");
+                        }
+                        Log.d(TAG, "✅ " + messageType + " message sent via API");
                     } else {
-                        updateLastMessageStatus("❌ Failed");
-                        Log.e(TAG, "Failed to send message via API: " + standardResponse.getMessage());
+                        if ("IMAGE".equals(messageType)) {
+                            updateLastImageMessageStatus("❌ Failed");
+                        } else {
+                            updateLastMessageStatus("❌ Failed");
+                        }
+                        Log.e(TAG, "Failed to send " + messageType + " message via API: " + standardResponse.getMessage());
                     }
                 } else {
-                    updateLastMessageStatus("❌ Failed");
-                    Log.e(TAG, "Failed to send message via API: HTTP " + response.code());
+                    if ("IMAGE".equals(messageType)) {
+                        updateLastImageMessageStatus("❌ Failed");
+                    } else {
+                        updateLastMessageStatus("❌ Failed");
+                    }
+                    Log.e(TAG, "Failed to send " + messageType + " message via API: HTTP " + response.code());
                 }
             }
 
             @Override
             public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                updateLastMessageStatus("❌ Network Error");
-                Log.e(TAG, "Error sending message via API", t);
+                if ("IMAGE".equals(messageType)) {
+                    updateLastImageMessageStatus("❌ Network Error");
+                } else {
+                    updateLastMessageStatus("❌ Network Error");
+                }
+                Log.e(TAG, "Error sending " + messageType + " message via API", t);
             }
         });
     }
 
-    // ✅ THÊM: Method để gửi notification cho người nhận
     private void sendNotificationToReceiver(String messageText) {
         if (receiverId == null || receiverId <= 0) {
             Log.w(TAG, "No receiver ID, cannot send notification");
@@ -485,16 +571,13 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         }
 
         try {
-            // Get sender name
             String senderName = prefsManager.getUserName();
             if (senderName == null || senderName.isEmpty()) {
                 senderName = "Someone";
             }
 
-            // ✅ CALL BACKEND NOTIFICATION API
             NotificationService notificationService = ApiClient.getNotificationService();
 
-            // Create notification request
             Map<String, Object> notificationRequest = new HashMap<>();
             notificationRequest.put("receiverId", receiverId);
             notificationRequest.put("senderName", senderName);
@@ -502,7 +585,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             notificationRequest.put("conversationId", conversationId);
             notificationRequest.put("productTitle", productTitle);
 
-            // Call backend để gửi push notification
             Call<StandardResponse<String>> call = notificationService.sendMessageNotification(notificationRequest);
 
             call.enqueue(new Callback<StandardResponse<String>>() {
@@ -527,11 +609,203 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         }
     }
 
+    // ===== IMAGE UPLOAD & SENDING =====
+
+    private void openImagePicker() {
+        Intent intent = new Intent();
+        intent.setType("image/*");
+        intent.setAction(Intent.ACTION_GET_CONTENT);
+        startActivityForResult(Intent.createChooser(intent, "Select Image"), PICK_IMAGE_REQUEST);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri imageUri = data.getData();
+            sendImageMessage(imageUri);
+        }
+    }
+
+    private void sendImageMessage(Uri imageUri) {
+        // Create image message for UI immediately
+        Message imageMessage = new Message();
+        imageMessage.setId(System.currentTimeMillis());
+        imageMessage.setSenderId(currentUserId);
+        imageMessage.setMessageType("IMAGE");
+        imageMessage.setImageUrl(imageUri.toString());
+        imageMessage.setCreatedAt("⬆️ Uploading...");
+
+        messages.add(imageMessage); // ✅ Add to end of list (newest)
+        messageAdapter.notifyItemInserted(messages.size() - 1);
+
+        // ✅ FIXED: Force scroll to bottom immediately
+        rvMessages.post(() -> {
+            rvMessages.scrollToPosition(messages.size() - 1);
+        });
+
+        // Upload to server
+        uploadImageToServer(imageUri);
+    }
+
+    // ✅ NO TEMP FILE: Upload directly from Uri
+    private void uploadImageToServer(Uri imageUri) {
+        Log.d(TAG, "🔄 Uploading image to server...");
+
+        try {
+            // Validate user ID
+            if (currentUserId == null || currentUserId <= 0) {
+                updateLastImageMessageStatus("❌ Login required");
+                Toast.makeText(this, "Please login to send images", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Create RequestBody directly from Uri
+            RequestBody requestFile = createRequestBodyFromUri(imageUri);
+            String fileName = "chat_image_" + System.currentTimeMillis() + ".jpg";
+            MultipartBody.Part imagePart = MultipartBody.Part.createFormData("file", fileName, requestFile);
+
+            ApiService apiService = ApiClient.getApiService();
+            Call<StandardResponse<Map<String, String>>> call = apiService.uploadProductImage(imagePart);
+
+            call.enqueue(new Callback<StandardResponse<Map<String, String>>>() {
+                @Override
+                public void onResponse(Call<StandardResponse<Map<String, String>>> call,
+                                       Response<StandardResponse<Map<String, String>>> response) {
+
+                    if (response.isSuccessful() && response.body() != null) {
+                        StandardResponse<Map<String, String>> standardResponse = response.body();
+
+                        if (standardResponse.isSuccess()) {
+                            Map<String, String> data = standardResponse.getData();
+                            String uploadedImageUrl = data.get("imageUrl");
+
+                            Log.d(TAG, "✅ Image uploaded successfully: " + uploadedImageUrl);
+
+                            // Update the last image message with the uploaded URL
+                            updateLastImageMessage(uploadedImageUrl);
+
+                            // Send image message via API
+                            sendImageMessageViaApi(uploadedImageUrl);
+
+                        } else {
+                            updateLastImageMessageStatus("❌ Upload failed");
+                            showError("Failed to upload image: " + standardResponse.getMessage());
+                        }
+                    } else {
+                        updateLastImageMessageStatus("❌ Upload failed");
+                        try {
+                            String errorBody = response.errorBody() != null ?
+                                    response.errorBody().string() : "Unknown error";
+                            Log.e(TAG, "❌ Upload failed: HTTP " + response.code() + " - " + errorBody);
+                            showError("Upload failed: HTTP " + response.code());
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error reading error body", e);
+                            showError("Upload failed");
+                        }
+                    }
+                }
+
+                @Override
+                public void onFailure(Call<StandardResponse<Map<String, String>>> call, Throwable t) {
+                    Log.e(TAG, "❌ Network error uploading image", t);
+                    updateLastImageMessageStatus("❌ Network error");
+                    showError("Network error while uploading image");
+                }
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error preparing image upload", e);
+            updateLastImageMessageStatus("❌ Preparation failed");
+            showError("Error preparing image");
+        }
+    }
+
+    // ✅ Create RequestBody directly from Uri (no temp file)
+    private RequestBody createRequestBodyFromUri(Uri uri) throws IOException {
+        return new RequestBody() {
+            @Override
+            public MediaType contentType() {
+                String mimeType = getContentResolver().getType(uri);
+                return MediaType.parse(mimeType != null ? mimeType : "image/*");
+            }
+
+            @Override
+            public void writeTo(okio.BufferedSink sink) throws IOException {
+                try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+                    if (inputStream == null) {
+                        throw new IOException("Could not open input stream for URI: " + uri);
+                    }
+                    sink.writeAll(okio.Okio.source(inputStream));
+                }
+            }
+
+            @Override
+            public long contentLength() throws IOException {
+                try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+                    if (inputStream == null) {
+                        return -1;
+                    }
+                    return inputStream.available();
+                }
+            }
+        };
+    }
+
+    private void updateLastImageMessage(String imageUrl) {
+        if (!messages.isEmpty()) {
+            Message lastMessage = messages.get(messages.size() - 1);
+            if ("IMAGE".equals(lastMessage.getMessageType())) {
+                lastMessage.setImageUrl(imageUrl);
+                lastMessage.setContent(imageUrl); // Set content to image URL for API
+                lastMessage.setCreatedAt("✅ Uploaded");
+                messageAdapter.notifyItemChanged(messages.size() - 1);
+            }
+        }
+    }
+
+    private void updateLastImageMessageStatus(String status) {
+        if (!messages.isEmpty()) {
+            Message lastMessage = messages.get(messages.size() - 1);
+            if ("IMAGE".equals(lastMessage.getMessageType())) {
+                lastMessage.setCreatedAt(status);
+                messageAdapter.notifyItemChanged(messages.size() - 1);
+            }
+        }
+    }
+
+    private void sendImageMessageViaApi(String imageUrl) {
+        Log.d(TAG, "🔍 Sending image message via API: " + imageUrl);
+        sendMessageViaApi(imageUrl, "IMAGE"); // ✅ IMPORTANT: messageType = "IMAGE"
+        sendNotificationToReceiver("📷 Sent an image");
+    }
+
+    // ===== EMOJI IMPLEMENTATION =====
+
+    private void toggleEmojiPicker() {
+        String[] emojis = {"😀", "😂", "😍", "👍", "❤️", "😢", "😮", "😡", "🙏", "👏", "🔥", "💯", "🎉", "💝", "🤔"};
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Choose Emoji");
+        builder.setItems(emojis, (dialog, which) -> {
+            String selectedEmoji = emojis[which];
+            String currentText = etMessage.getText().toString();
+            etMessage.setText(currentText + selectedEmoji);
+            etMessage.setSelection(etMessage.getText().length());
+        });
+        builder.show();
+    }
+
+    // ===== HELPER METHODS =====
+
     private void updateLastMessageStatus(String status) {
         if (!messages.isEmpty()) {
             Message lastMessage = messages.get(messages.size() - 1);
-            lastMessage.setCreatedAt(status);
-            messageAdapter.notifyItemChanged(messages.size() - 1);
+            if ("TEXT".equals(lastMessage.getMessageType())) {
+                lastMessage.setCreatedAt(status);
+                messageAdapter.notifyItemChanged(messages.size() - 1);
+            }
         }
     }
 
@@ -554,7 +828,11 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
 
     private void scrollToBottom() {
         if (messages.size() > 0) {
-            rvMessages.smoothScrollToPosition(messages.size() - 1);
+            // ✅ FIXED: Use scrollToPosition instead of smoothScrollToPosition for immediate scroll
+            rvMessages.post(() -> {
+                rvMessages.scrollToPosition(messages.size() - 1);
+            });
+            Log.d(TAG, "📍 Scrolled to bottom, total messages: " + messages.size());
         }
     }
 
@@ -574,6 +852,10 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             Log.w(TAG, "Could not parse timestamp: " + timestampStr, e);
             return "Now";
         }
+    }
+
+    private void showError(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     // ===== WEBSOCKET LISTENER IMPLEMENTATIONS =====
@@ -605,8 +887,17 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                         messageJson.get("id").getAsLong() : System.currentTimeMillis());
                 newMessage.setSenderId(messageJson.get("senderId").getAsLong());
                 newMessage.setContent(messageJson.get("content").getAsString());
-                newMessage.setMessageType(messageJson.has("messageType") ?
-                        messageJson.get("messageType").getAsString() : "TEXT");
+
+                // ✅ Get messageType from WebSocket
+                String messageType = messageJson.has("messageType") ?
+                        messageJson.get("messageType").getAsString() : "TEXT";
+                newMessage.setMessageType(messageType);
+
+                // ✅ Handle image messages from WebSocket
+                if ("IMAGE".equals(messageType)) {
+                    newMessage.setImageUrl(newMessage.getContent());
+                    Log.d(TAG, "📷 Received image via WebSocket: " + newMessage.getContent());
+                }
 
                 if (messageJson.has("timestamp")) {
                     String timestampStr = messageJson.get("timestamp").getAsString();
@@ -615,10 +906,12 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
                     newMessage.setCreatedAt("Now");
                 }
 
+                // Only add if it's not from current user (avoid duplicates)
                 if (!newMessage.getSenderId().equals(currentUserId)) {
                     messages.add(newMessage);
                     messageAdapter.notifyItemInserted(messages.size() - 1);
                     scrollToBottom();
+                    Log.d(TAG, "✅ Added received " + messageType + " message to UI");
                 }
 
             } catch (Exception e) {
@@ -648,30 +941,8 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
         });
     }
 
-    private String formatTimestamp(long timestamp) {
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        return sdf.format(new Date(timestamp));
-    }
-
-    private String formatTimestamp(String timestamp) {
-        try {
-            SimpleDateFormat inputFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
-            Date dateTime = inputFormatter.parse(timestamp);
-
-            if (dateTime != null) {
-                SimpleDateFormat outputFormatter = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                return outputFormatter.format(dateTime);
-            }
-
-            return timestamp;
-        } catch (ParseException e) {
-            return timestamp;
-        }
-    }
-
     // ===== LIFECYCLE METHODS =====
 
-    // ✅ CẬP NHẬT: Clear notifications when chat is active
     @Override
     protected void onResume() {
         super.onResume();
@@ -680,7 +951,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             joinConversation();
         }
 
-        // ✅ THÊM: Clear notifications when chat is active
         if (conversationId != null && conversationId > 0) {
             try {
                 chatNotificationManager.clearNotifications(conversationId);
@@ -714,7 +984,6 @@ public class ChatActivity extends AppCompatActivity implements ChatWebSocketMana
             typingHandler.removeCallbacks(stopTypingRunnable);
         }
 
-        // ✅ THÊM: Cleanup notification manager
         if (chatNotificationManager != null) {
             if (conversationId != null && conversationId > 0) {
                 try {

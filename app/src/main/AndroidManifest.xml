@@ -203,6 +203,11 @@
             </intent-filter>
         </service>
 
+        <activity
+            android:name=".ui.image.ImageViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+
     </application>
 
 </manifest>

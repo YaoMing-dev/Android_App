@@ -21,13 +21,16 @@ import com.example.newtrade.R;
 import com.example.newtrade.adapters.ConversationAdapter;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.api.ApiService;
+import com.example.newtrade.api.UserService;
 import com.example.newtrade.models.Conversation;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.models.User;
 import com.example.newtrade.utils.SharedPrefsManager;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -89,7 +92,7 @@ public class MessagesFragment extends Fragment {
         );
     }
 
-    // ✅ NEW: Load conversations from API
+    // ✅ IMPROVED: Load conversations from API with user info
     private void loadConversations() {
         if (isLoading) return;
 
@@ -123,6 +126,8 @@ public class MessagesFragment extends Fragment {
 
                         if (conversationList != null) {
                             conversations.clear();
+
+                            // ✅ SIMPLIFIED: Parse conversations directly (user info already included)
                             for (Map<String, Object> conversationData : conversationList) {
                                 Conversation conversation = parseConversationFromApi(conversationData, userId);
                                 if (conversation != null) {
@@ -130,6 +135,7 @@ public class MessagesFragment extends Fragment {
                                 }
                             }
 
+                            // ✅ DIRECT UPDATE: No need to fetch additional user info
                             updateUI();
                             Log.d(TAG, "✅ Loaded " + conversations.size() + " conversations");
 
@@ -158,52 +164,147 @@ public class MessagesFragment extends Fragment {
         });
     }
 
-    // ✅ NEW: Parse conversation from API response
+    // ✅ IMPROVED: Parse conversation from API response
     private Conversation parseConversationFromApi(Map<String, Object> conversationData, Long currentUserId) {
         try {
             Conversation conversation = new Conversation();
 
+            // Basic conversation info
             if (conversationData.get("id") != null) {
-                conversation.setId(((Number) conversationData.get("id")).longValue());
-            }
-            if (conversationData.get("productId") != null) {
-                conversation.setProductId(((Number) conversationData.get("productId")).longValue());
-            }
-            if (conversationData.get("productTitle") != null) {
-                conversation.setProductTitle(conversationData.get("productTitle").toString());
-            }
-            if (conversationData.get("buyerId") != null) {
-                conversation.setBuyerId(((Number) conversationData.get("buyerId")).longValue());
-            }
-            if (conversationData.get("sellerId") != null) {
-                conversation.setSellerId(((Number) conversationData.get("sellerId")).longValue());
-            }
-            if (conversationData.get("buyerName") != null) {
-                conversation.setBuyerName(conversationData.get("buyerName").toString());
-            }
-            if (conversationData.get("sellerName") != null) {
-                conversation.setSellerName(conversationData.get("sellerName").toString());
-            }
-            if (conversationData.get("lastMessage") != null) {
-                conversation.setLastMessage(conversationData.get("lastMessage").toString());
-            }
-            if (conversationData.get("lastMessageTime") != null) {
-                conversation.setLastMessageTime(conversationData.get("lastMessageTime").toString());
-            }
-            if (conversationData.get("unreadCount") != null) {
-                conversation.setUnreadCount(((Number) conversationData.get("unreadCount")).intValue());
+                Long id = ((Number) conversationData.get("id")).longValue();
+                conversation.setId(id);
+                Log.d(TAG, "✅ Conversation ID: " + id);
             }
 
-            // Setup other user info
+            // ✅ PARSE PRODUCT OBJECT
+            if (conversationData.get("product") != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> product = (Map<String, Object>) conversationData.get("product");
+
+                if (product.get("id") != null) {
+                    Long productId = ((Number) product.get("id")).longValue();
+                    conversation.setProductId(productId);
+                    Log.d(TAG, "✅ Product ID: " + productId);
+                }
+
+                if (product.get("title") != null) {
+                    String productTitle = product.get("title").toString();
+                    conversation.setProductTitle(productTitle);
+                    Log.d(TAG, "✅ Product Title: " + productTitle);
+                }
+            }
+
+            // ✅ PARSE BUYER OBJECT
+            if (conversationData.get("buyer") != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> buyer = (Map<String, Object>) conversationData.get("buyer");
+
+                if (buyer.get("id") != null) {
+                    Long buyerId = ((Number) buyer.get("id")).longValue();
+                    conversation.setBuyerId(buyerId);
+                    Log.d(TAG, "✅ Buyer ID: " + buyerId);
+                }
+
+                if (buyer.get("displayName") != null) {
+                    String buyerName = buyer.get("displayName").toString();
+                    conversation.setBuyerName(buyerName);
+                    Log.d(TAG, "✅ Buyer Name: " + buyerName);
+                }
+
+                if (buyer.get("profilePicture") != null) {
+                    String buyerAvatar = buyer.get("profilePicture").toString();
+                    conversation.setBuyerAvatar(buyerAvatar);
+                    Log.d(TAG, "✅ Buyer Avatar: " + buyerAvatar);
+                }
+            }
+
+            // ✅ PARSE SELLER OBJECT
+            if (conversationData.get("seller") != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> seller = (Map<String, Object>) conversationData.get("seller");
+
+                if (seller.get("id") != null) {
+                    Long sellerId = ((Number) seller.get("id")).longValue();
+                    conversation.setSellerId(sellerId);
+                    Log.d(TAG, "✅ Seller ID: " + sellerId);
+                }
+
+                if (seller.get("displayName") != null) {
+                    String sellerName = seller.get("displayName").toString();
+                    conversation.setSellerName(sellerName);
+                    Log.d(TAG, "✅ Seller Name: " + sellerName);
+                }
+
+                if (seller.get("profilePicture") != null) {
+                    String sellerAvatar = seller.get("profilePicture").toString();
+                    conversation.setSellerAvatar(sellerAvatar);
+                    Log.d(TAG, "✅ Seller Avatar: " + sellerAvatar);
+                }
+            }
+
+            // ✅ PARSE MESSAGE INFO
+            if (conversationData.get("lastMessage") != null) {
+                String lastMessage = conversationData.get("lastMessage").toString();
+                conversation.setLastMessage(lastMessage);
+                Log.d(TAG, "✅ Last Message: " + lastMessage);
+            }
+
+            // ✅ SETUP OTHER USER INFO
             conversation.setupOtherUserInfo(currentUserId);
+
+            Log.d(TAG, "✅ FINAL RESULT:");
+            Log.d(TAG, "Other User Name: " + conversation.getOtherUserName());
+            Log.d(TAG, "Other User Avatar: " + conversation.getOtherUserAvatar());
+            Log.d(TAG, "Other User ID: " + conversation.getOtherUserId());
 
             return conversation;
 
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing conversation from API", e);
+            Log.e(TAG, "❌ Error parsing conversation from API", e);
             return null;
         }
     }
+    private Long extractLong(Map<String, Object> data, String... keys) {
+        for (String key : keys) {
+            Object value = data.get(key);
+            if (value != null) {
+                try {
+                    return ((Number) value).longValue();
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to extract Long from key: " + key + ", value: " + value);
+                }
+            }
+        }
+        return null;
+    }
+    private String extractString(Map<String, Object> data, String... keys) {
+        for (String key : keys) {
+            Object value = data.get(key);
+            if (value != null) {
+                return value.toString();
+            }
+        }
+        return null;
+    }
+    private Integer extractInteger(Map<String, Object> data, String... keys) {
+        for (String key : keys) {
+            Object value = data.get(key);
+            if (value != null) {
+                try {
+                    return ((Number) value).intValue();
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to extract Integer from key: " + key + ", value: " + value);
+                }
+            }
+        }
+        return null;
+    }
+
+    // ✅ NEW: Fetch user info for all conversations
+
+
+    // ✅ NEW: Fetch other user info for a single conversation
+    
 
     private void createMockConversations() {
         conversations.clear();

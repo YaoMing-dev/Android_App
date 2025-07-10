@@ -5,6 +5,7 @@
     <color name="primary_dark">#1976D2</color>
     <color name="primary_light">#BBDEFB</color>
     <color name="primary_variant">#1565C0</color>
+    <color name="black_semi_transparent">#80000000</color>
 
 
     <!-- Secondary Colors -->
@@ -12,6 +13,7 @@
     <color name="secondary_dark">#F57C00</color>
     <color name="secondary_light">#FFE0B2</color>
     <color name="icon_tint">#FF9800</color> <!-- hoặc bất kỳ màu nào bạn muốn -->
+    <color name="chat_background">#F5F5F5</color>
 
 
     <!-- Background Colors -->

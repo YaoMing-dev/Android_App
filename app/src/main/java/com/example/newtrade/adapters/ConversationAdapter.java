@@ -99,8 +99,11 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
                 String lastMessage = conversation.getLastMessage();
                 if (!TextUtils.isEmpty(lastMessage)) {
                     tvLastMessage.setText(lastMessage);
+                    tvLastMessage.setVisibility(View.VISIBLE);
                 } else {
+                    // ✅ ONLY show "No messages yet" if there's truly no message
                     tvLastMessage.setText("No messages yet");
+                    tvLastMessage.setVisibility(View.VISIBLE);
                 }
             }
 
@@ -145,6 +148,7 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
 
             // Product image
             if (ivProductImage != null) {
+                ivProductImage.setVisibility(View.GONE);
                 String productImageUrl = conversation.getProductImageUrl();
                 if (!TextUtils.isEmpty(productImageUrl)) {
                     Glide.with(context)

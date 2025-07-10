@@ -65,6 +65,13 @@ dependencies {
 
     // Image Loading
     implementation(libs.glide)
+    annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
+
+    // ✅ NEW: PhotoView for image zoom and viewing
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
+
+    // ✅ NEW: Image Cropper (optional)
+    implementation("com.github.CanHub:Android-Image-Cropper:4.3.0")
 
     // Firebase BOM
     implementation(platform(libs.firebase.bom))
@@ -81,9 +88,18 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.1")
     implementation("androidx.camera:camera-view:1.3.1")
 
+    // ✅ NEW: Image Compression
+    implementation("id.zelory:compressor:3.0.1")
+
     // Additional UI components
     implementation("de.hdodenhof:circleimageview:3.1.0")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
+    // ✅ NEW: Loading Animation
+    implementation("com.airbnb.android:lottie:6.1.0")
+
+    // ✅ NEW: Shimmer Effect for loading
+    implementation("com.facebook.shimmer:shimmer:0.5.0")
 
     // Permissions
     implementation("com.karumi:dexter:6.2.3")
@@ -99,8 +115,62 @@ dependencies {
     // ✅ ADDED: OkHttp cho STOMP connection
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
 
+    // ✅ NEW: Emoji Support
+    implementation("androidx.emoji2:emoji2:1.4.0")
+    implementation("androidx.emoji2:emoji2-views:1.4.0")
+    implementation("androidx.emoji2:emoji2-views-helper:1.4.0")
+
+    // ✅ NEW: Date/Time formatting
+    implementation("org.ocpsoft.prettytime:prettytime:5.0.6.Final")
+
+    // ✅ NEW: JSON parsing utilities
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    // ✅ NEW: File utils
+    implementation("commons-io:commons-io:2.11.0")
+
+    // ✅ NEW: Security & Encryption (optional)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // ✅ NEW: Local Database (Room) - for offline message storage
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-rxjava2:2.6.1")
+    annotationProcessor("androidx.room:room-compiler:2.6.1")
+
+    // ✅ NEW: Work Manager for background tasks
+    implementation("androidx.work:work-runtime:2.9.0")
+
+    // ✅ NEW: Biometric authentication
+    implementation("androidx.biometric:biometric:1.1.0")
+
+    // ✅ NEW: QR Code scanning (for future features)
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+
+    // ✅ NEW: Better logging
+    implementation("com.jakewharton.timber:timber:5.0.1")
+
+    // ✅ NEW: Pull-to-refresh with better animation
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
+    // ✅ NEW: Material Design Components extended
+    implementation("com.google.android.material:material:1.11.0")
+
+    // ✅ NEW: Splash Screen API
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
+    // ✅ NEW: ViewBinding delegate
+    implementation("com.github.kirich1409:viewbindingpropertydelegate:1.5.9")
+
+    // ✅ NEW: Memory leak detection (debug only)
+    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.12")
+
     // Testing
     testImplementation(libs.junit)
+    testImplementation("org.mockito:mockito-core:5.1.1")
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
+
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation("androidx.test.espresso:espresso-intents:3.5.1")
+    androidTestImplementation("androidx.test:rules:1.5.0")
 }
