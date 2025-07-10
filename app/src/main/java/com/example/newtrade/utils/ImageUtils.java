@@ -138,4 +138,8 @@ public class ImageUtils {
             imageView.setImageResource(placeholderResId);
         }
     }
+
+    public static void loadImage(Context context, String imageUrl, ImageView imageView) {
+        loadProductImage(context, imageUrl, imageView);
+    }
 }

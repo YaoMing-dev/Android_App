@@ -10,6 +10,7 @@ public class Product {
     private Long id;
     private String title;
     private String description;
+    private User user;
     private BigDecimal price;
     private String location;
     private ProductCondition condition;
@@ -48,6 +49,12 @@ public class Product {
         }
     }
 
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public String getDisplayPrice() {
+        return getFormattedPrice();
+    }
     public enum ProductStatus {
         AVAILABLE("Có sẵn"),
         SOLD("Đã bán"),

@@ -122,7 +122,11 @@ public class TransactionDetailActivity extends AppCompatActivity {
     }
 
     private void loadTransactionDetail() {
-        ApiClient.getTransactionService().getTransaction(transactionId)
+        // ✅ THÊM USER-ID
+        String userId = String.valueOf(prefsManager.getUserId());
+
+        // ✅ SỬA API CALL
+        ApiClient.getTransactionService().getTransactionWithAuth(userId, transactionId)
                 .enqueue(new Callback<StandardResponse<Transaction>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Transaction>> call,
@@ -270,7 +274,11 @@ public class TransactionDetailActivity extends AppCompatActivity {
     private void completeTransaction() {
         if (transaction == null) return;
 
-        ApiClient.getTransactionService().completeTransaction(transaction.getId())
+        // ✅ THÊM USER-ID
+        String userId = String.valueOf(prefsManager.getUserId());
+
+        // ✅ SỬA API CALL
+        ApiClient.getTransactionService().completeTransactionWithAuth(userId, transaction.getId())
                 .enqueue(new Callback<StandardResponse<Transaction>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Transaction>> call,

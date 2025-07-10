@@ -59,7 +59,7 @@ public class Constants {
     public static final String GOOGLE_CLIENT_ID =
             "638175281882-lqsdj0iur1i079l0vlqni71gelshrdgj.apps.googleusercontent.com"; // ← SỬA THÀNH CỦA BẠN
 
-    // ===== API ENDPOINTS - UNCHANGED =====
+    // ===== API ENDPOINTS - UPDATED WITH PAYMENTS =====
     public static final String API_AUTH = "/api/auth";
     public static final String API_USERS = "/api/users";
     public static final String API_PRODUCTS = "/api/products";
@@ -73,6 +73,15 @@ public class Constants {
     public static final String API_REVIEWS = "/api/reviews";
     public static final String API_SAVED_ITEMS = "/api/saved-items";
     public static final String API_ANALYTICS = "/api/analytics";
+
+    // ===== 🆕 PAYMENT API ENDPOINTS =====
+    public static final String API_PAYMENTS = "/api/payments";
+    public static final String PAYMENT_CONFIG = "/config";
+    public static final String CREATE_PAYMENT_INTENT = "/create-payment-intent";
+    public static final String CONFIRM_PAYMENT = "/confirm-payment";
+    public static final String PAYMENT_STATUS = "/status";
+    public static final String MY_PAYMENTS = "/my-payments";
+    public static final String PROCESS_REFUND = "/refund";
 
     // ===== WEBSOCKET TOPICS - UNCHANGED =====
     public static final String TOPIC_NOTIFICATIONS = "/user/queue/notifications";
@@ -95,11 +104,12 @@ public class Constants {
     public static final String PREF_IS_LOGGED_IN = "is_logged_in";
     public static final String PREF_IS_EMAIL_VERIFIED = "is_email_verified";
 
-    // ===== REQUEST CODES - UNCHANGED =====
+    // ===== REQUEST CODES - UPDATED WITH PAYMENT =====
     public static final int RC_GOOGLE_SIGN_IN = 1001;
     public static final int RC_PICK_IMAGE = 1002;
     public static final int RC_CAMERA = 1003;
     public static final int RC_LOCATION_PICKER = 1004;
+    public static final int RC_PAYMENT = 1005; // 🆕 Payment request code
 
     // ===== HEADERS - UNCHANGED =====
     public static final String HEADER_USER_ID = "User-ID";
@@ -134,12 +144,57 @@ public class Constants {
     public static final int MESSAGE_POLLING_INTERVAL = 3000; // 3 seconds
     public static final int MAX_MESSAGE_LENGTH = 1000;
 
-    // ===== ERROR MESSAGES - UNCHANGED =====
+    // ===== 🆕 PAYMENT CONFIGURATION =====
+    // Stripe Configuration
+    public static final String STRIPE_PUBLISHABLE_KEY_TEST = "pk_test_51RcRCQRpMILatp67WGNGrZif5hI7ZrYMupx6rxrv5vpX3lrRpdtIQzck5V5yBfCHzTTwP7pIQfLb0NGvyQyiufG00o89zAvGq";
+
+    // Payment Methods
+    public static final String PAYMENT_METHOD_CARD = "CARD";
+    public static final String PAYMENT_METHOD_BANK_TRANSFER = "BANK_TRANSFER";
+    public static final String PAYMENT_METHOD_DIGITAL_WALLET = "DIGITAL_WALLET";
+    public static final String PAYMENT_METHOD_CASH = "CASH";
+
+    // Currency
+    public static final String CURRENCY_VND = "VND";
+    public static final String CURRENCY_USD = "USD";
+
+    // Payment Status
+    public static final String PAYMENT_STATUS_PENDING = "PENDING";
+    public static final String PAYMENT_STATUS_PROCESSING = "PROCESSING";
+    public static final String PAYMENT_STATUS_SUCCEEDED = "SUCCEEDED";
+    public static final String PAYMENT_STATUS_FAILED = "FAILED";
+    public static final String PAYMENT_STATUS_CANCELED = "CANCELED";
+    public static final String PAYMENT_STATUS_REFUNDED = "REFUNDED";
+    public static final String PAYMENT_STATUS_PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED";
+
+    // Payment Intent Status
+    public static final String PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD = "requires_payment_method";
+    public static final String PAYMENT_INTENT_STATUS_REQUIRES_CONFIRMATION = "requires_confirmation";
+    public static final String PAYMENT_INTENT_STATUS_REQUIRES_ACTION = "requires_action";
+    public static final String PAYMENT_INTENT_STATUS_PROCESSING = "processing";
+    public static final String PAYMENT_INTENT_STATUS_SUCCEEDED = "succeeded";
+    public static final String PAYMENT_INTENT_STATUS_CANCELED = "canceled";
+
+    // Payment Validation
+    public static final double MIN_PAYMENT_AMOUNT = 1.0; // $1 or ₫1
+    public static final double MAX_PAYMENT_AMOUNT = 10000.0; // $10,000 or ₫10,000
+    public static final int PAYMENT_TIMEOUT_MINUTES = 15; // Payment expires in 15 minutes
+
+    // ===== ERROR MESSAGES - UPDATED WITH PAYMENT =====
     public static final String ERROR_NETWORK = "Lỗi kết nối mạng";
     public static final String ERROR_TIMEOUT = "Kết nối quá chậm";
     public static final String ERROR_UNKNOWN = "Lỗi không xác định";
 
-    // ===== NEW METHODS FOR IP MANAGEMENT =====
+    // 🆕 Payment Error Messages
+    public static final String ERROR_PAYMENT_FAILED = "Thanh toán thất bại";
+    public static final String ERROR_PAYMENT_CANCELED = "Thanh toán bị hủy";
+    public static final String ERROR_PAYMENT_TIMEOUT = "Thanh toán hết hạn";
+    public static final String ERROR_PAYMENT_INSUFFICIENT_FUNDS = "Số dư không đủ";
+    public static final String ERROR_PAYMENT_CARD_DECLINED = "Thẻ bị từ chối";
+    public static final String ERROR_PAYMENT_NETWORK = "Lỗi kết nối thanh toán";
+    public static final String ERROR_STRIPE_NOT_INITIALIZED = "Stripe chưa được khởi tạo";
+
+    // ===== NEW METHODS FOR IP MANAGEMENT - UNCHANGED =====
 
     private static String getOptimalHostIP(Context context) {
         // 1. Check if user set custom IP
@@ -241,7 +296,7 @@ public class Constants {
         return LOCALHOST_IP;
     }
 
-    // ===== CUSTOM IP MANAGEMENT =====
+    // ===== CUSTOM IP MANAGEMENT - UNCHANGED =====
 
     public static void setCustomHostIP(Context context, String ip) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_IP_CONFIG, Context.MODE_PRIVATE);
@@ -270,7 +325,7 @@ public class Constants {
         Log.d(TAG, "🗑️ Cleared custom IP");
     }
 
-    // ===== CONNECTIVITY TESTING =====
+    // ===== CONNECTIVITY TESTING - UNCHANGED =====
 
     public static void testConnection(Context context, ConnectionTestCallback callback) {
         String baseUrl = getBaseURL(context);
@@ -313,7 +368,7 @@ public class Constants {
         void onFailure(String error);
     }
 
-    // ===== AUTO-SCAN MULTIPLE IPS =====
+    // ===== AUTO-SCAN MULTIPLE IPS - UNCHANGED =====
 
     public static void findWorkingIP(Context context, IPScanCallback callback) {
         new Thread(() -> {
@@ -369,6 +424,68 @@ public class Constants {
     public interface IPScanCallback {
         void onFound(String workingIP);
         void onNotFound();
+    }
+
+    // ===== 🆕 PAYMENT UTILITY METHODS =====
+
+    /**
+     * Format currency amount for display
+     */
+    public static String formatCurrency(double amount, String currency) {
+        if (CURRENCY_VND.equalsIgnoreCase(currency)) {
+            return String.format("₫%,.0f", amount);
+        } else {
+            return String.format("$%.2f", amount);
+        }
+    }
+
+    /**
+     * Validate payment amount
+     */
+    public static boolean isValidPaymentAmount(double amount) {
+        return amount >= MIN_PAYMENT_AMOUNT && amount <= MAX_PAYMENT_AMOUNT;
+    }
+
+    /**
+     * Get payment method display name
+     */
+    public static String getPaymentMethodDisplayName(String paymentMethod) {
+        switch (paymentMethod) {
+            case PAYMENT_METHOD_CARD:
+                return "Credit/Debit Card";
+            case PAYMENT_METHOD_BANK_TRANSFER:
+                return "Bank Transfer";
+            case PAYMENT_METHOD_DIGITAL_WALLET:
+                return "Digital Wallet";
+            case PAYMENT_METHOD_CASH:
+                return "Cash";
+            default:
+                return paymentMethod;
+        }
+    }
+
+    /**
+     * Get payment status display name
+     */
+    public static String getPaymentStatusDisplayName(String status) {
+        switch (status) {
+            case PAYMENT_STATUS_PENDING:
+                return "Pending";
+            case PAYMENT_STATUS_PROCESSING:
+                return "Processing";
+            case PAYMENT_STATUS_SUCCEEDED:
+                return "Completed";
+            case PAYMENT_STATUS_FAILED:
+                return "Failed";
+            case PAYMENT_STATUS_CANCELED:
+                return "Cancelled";
+            case PAYMENT_STATUS_REFUNDED:
+                return "Refunded";
+            case PAYMENT_STATUS_PARTIALLY_REFUNDED:
+                return "Partially Refunded";
+            default:
+                return status;
+        }
     }
 
     // ===== EXISTING UTILITY METHODS - UNCHANGED =====

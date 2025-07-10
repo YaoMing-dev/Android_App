@@ -82,7 +82,6 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
-
         <!-- ===== PROFILE ACTIVITIES ===== -->
         <activity
             android:name=".ui.profile.EditProfileActivity"
@@ -120,7 +119,7 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
-        <!-- ===== 🔥 THÊM MỚI: TRANSACTION ACTIVITIES ===== -->
+        <!-- ===== TRANSACTION ACTIVITIES ===== -->
         <activity
             android:name=".ui.transaction.TransactionHistoryActivity"
             android:exported="false"
@@ -132,6 +131,31 @@
             android:exported="false"
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".ui.transaction.TransactionHistoryActivity" />
+
+        <!-- ===== 💳 PAYMENT ACTIVITIES ===== -->
+        <activity
+            android:name=".ui.payment.PaymentActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.product.ProductDetailActivity" />
+
+        <activity
+            android:name=".ui.payment.PaymentHistoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.profile.UserProfileActivity" />
+
+        <activity
+            android:name=".ui.payment.PaymentDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.payment.PaymentHistoryActivity" />
+
+        <activity
+            android:name=".ui.payment.PaymentMethodSelectionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.payment.PaymentActivity" />
 
         <!-- ===== REVIEW ACTIVITIES ===== -->
         <activity
@@ -195,6 +219,7 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
         <service
             android:name=".services.TradeUpFirebaseMessagingService"
             android:exported="false">

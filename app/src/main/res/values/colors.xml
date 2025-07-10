@@ -46,6 +46,22 @@
     <color name="info_color">#2196F3</color>
     <color name="pending_color">#FFC107</color>
 
+
+        <color name="surface">#FAFAFA</color> <!-- Nền nhẹ -->
+        <color name="error">#B00020</color> <!-- Màu đỏ cảnh báo -->
+        <color name="warning">#FFA000</color> <!-- Màu vàng cảnh báo -->
+        <color name="info">#2196F3</color> <!-- Màu xanh thông báo -->
+        <color name="secondary">#03DAC6</color> <!-- Accent color (Material Design) -->
+
+
+    <color name="background">#FFFFFF</color>
+    <color name="primary">#6200EE</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="outline">#DDDDDD</color>
+    <color name="success">#4CAF50</color>
+    <color name="on_surface">#212121</color>
+    <color name="on_surface_variant">#757575</color>
+
     <!-- UI Colors -->
     <color name="divider_color">#E0E0E0</color>
     <color name="shadow_color">#1F000000</color>

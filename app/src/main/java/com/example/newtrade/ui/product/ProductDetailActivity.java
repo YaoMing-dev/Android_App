@@ -10,11 +10,15 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.newtrade.ui.offer.MakeOfferBottomSheetDialogFragment;
 import com.example.newtrade.ui.profile.UserProfileActivity;
+import com.example.newtrade.ui.payment.PaymentActivity;
+import com.example.newtrade.models.Transaction;
+import com.example.newtrade.api.TransactionService;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.viewpager2.widget.ViewPager2;
@@ -28,6 +32,7 @@ import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.chat.ChatActivity;
 import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
+import com.example.newtrade.utils.Constants;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -54,6 +59,7 @@ public class ProductDetailActivity extends AppCompatActivity {
 
     // UI Components
     private MaterialToolbar toolbar;
+    private ProgressBar progressBar;
 
     // ✅ Image Gallery Components
     private ViewPager2 vpProductImages;
@@ -64,7 +70,7 @@ public class ProductDetailActivity extends AppCompatActivity {
     // Product Info Components
     private TextView tvTitle, tvPrice, tvDescription, tvLocation, tvCondition;
     private TextView tvSellerName, tvSellerRating, tvMemberSince;
-    private Button btnContact, btnMakeOffer, btnViewProfile;
+    private Button btnContact, btnMakeOffer, btnViewProfile, btnBuyNow;
     private FloatingActionButton fabShare, fabSave;
 
     // ✅ Image Gallery Data
@@ -85,7 +91,7 @@ public class ProductDetailActivity extends AppCompatActivity {
         setContentView(R.layout.activity_product_detail);
 
         // Initialize
-        prefsManager = SharedPrefsManager.getInstance(this);
+        prefsManager = new SharedPrefsManager(this); // ✅ SỬA LẠI CONSTRUCTOR
 
         // Get product data from intent
         getIntentData();
@@ -114,6 +120,7 @@ public class ProductDetailActivity extends AppCompatActivity {
 
     private void initViews() {
         toolbar = findViewById(R.id.toolbar);
+        progressBar = findViewById(R.id.progress_bar);
 
         // ✅ Image Gallery Views
         vpProductImages = findViewById(R.id.vp_product_images);
@@ -137,6 +144,7 @@ public class ProductDetailActivity extends AppCompatActivity {
         btnContact = findViewById(R.id.btn_contact);
         btnMakeOffer = findViewById(R.id.btn_make_offer);
         btnViewProfile = findViewById(R.id.btn_view_profile);
+        btnBuyNow = findViewById(R.id.btn_buy_now); // ✅ THÊM BUY NOW BUTTON
         fabShare = findViewById(R.id.fab_share);
 
         Log.d(TAG, "✅ Views initialized");
@@ -196,6 +204,156 @@ public class ProductDetailActivity extends AppCompatActivity {
         btnMakeOffer.setOnClickListener(v -> makeOffer());
         btnViewProfile.setOnClickListener(v -> viewSellerProfile());
         fabShare.setOnClickListener(v -> shareProduct());
+
+        // ✅ THÊM BUY NOW LISTENER
+        if (btnBuyNow != null) {
+            btnBuyNow.setOnClickListener(v -> startPaymentFlow());
+        }
+    }
+
+    // ✅ NEW: Start payment flow
+    private void startPaymentFlow() {
+        if (productData == null) {
+            Toast.makeText(this, "Product information not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Check if user is logged in
+        if (!prefsManager.isLoggedIn()) {
+            Toast.makeText(this, "Please login to make a purchase", Toast.LENGTH_SHORT).show();
+            // TODO: Navigate to login
+            return;
+        }
+
+        // Check if user is trying to buy their own product
+        Long currentUserId = prefsManager.getUserId();
+        Map<String, Object> seller = (Map<String, Object>)
+                (productData.get("seller") != null ? productData.get("seller") : productData.get("user"));
+
+        if (seller != null && currentUserId != null) {
+            Long sellerId = parseToLong(seller.get("id"));
+            if (currentUserId.equals(sellerId)) {
+                Toast.makeText(this, "You cannot buy your own product", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        // Check if product is still available
+        String status = productData.get("status") != null ? productData.get("status").toString() : "";
+        if ("SOLD".equalsIgnoreCase(status) || "UNAVAILABLE".equalsIgnoreCase(status)) {
+            Toast.makeText(this, "This item is no longer available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // First create a transaction, then start payment
+        createTransactionForPayment();
+    }
+
+    // ✅ NEW: Create transaction for payment
+    private void createTransactionForPayment() {
+        showLoading(true);
+
+        // Create transaction request
+        Map<String, Object> transactionRequest = new HashMap<>();
+        transactionRequest.put("productId", productId);
+        transactionRequest.put("paymentMethod", "CARD"); // Default, user can change in payment screen
+        transactionRequest.put("deliveryMethod", "PICKUP"); // Default
+        transactionRequest.put("notes", "Purchase from product detail");
+
+        String userId = String.valueOf(prefsManager.getUserId());
+
+        Call<StandardResponse<Transaction>> call = ApiClient.getTransactionService()
+                .createTransaction(userId, transactionRequest);
+
+        call.enqueue(new Callback<StandardResponse<Transaction>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<Transaction>> call, Response<StandardResponse<Transaction>> response) {
+                showLoading(false);
+
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Transaction> standardResponse = response.body();
+                    if (standardResponse.isSuccess()) {
+                        Transaction transaction = standardResponse.getData();
+                        launchPaymentActivity(transaction);
+                        Log.d(TAG, "✅ Transaction created successfully: " + transaction.getId());
+                    } else {
+                        showError("Failed to create transaction: " + standardResponse.getMessage());
+                    }
+                } else {
+                    showError("Failed to create transaction");
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StandardResponse<Transaction>> call, Throwable t) {
+                showLoading(false);
+                Log.e(TAG, "Failed to create transaction", t);
+                showError("Network error: " + t.getMessage());
+            }
+        });
+    }
+
+    // ✅ NEW: Launch payment activity
+    private void launchPaymentActivity(Transaction transaction) {
+        Intent intent = new Intent(this, PaymentActivity.class);
+        intent.putExtra(PaymentActivity.EXTRA_TRANSACTION_ID, transaction.getId());
+        intent.putExtra(PaymentActivity.EXTRA_AMOUNT, transaction.getFinalAmount().doubleValue());
+        intent.putExtra(PaymentActivity.EXTRA_CURRENCY, "VND");
+        intent.putExtra(PaymentActivity.EXTRA_DESCRIPTION, "Purchase: " +
+                (productData.get("title") != null ? productData.get("title").toString() : "Product"));
+
+        startActivityForResult(intent, Constants.RC_PAYMENT);
+
+        Log.d(TAG, "🚀 Launched payment activity for transaction: " + transaction.getId());
+    }
+
+    // ✅ NEW: Handle payment result
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == Constants.RC_PAYMENT) {
+            if (resultCode == RESULT_OK) {
+                // Payment successful
+                Toast.makeText(this, "Payment successful! 🎉", Toast.LENGTH_LONG).show();
+
+                // Refresh product status (might be sold now)
+                loadProductDetails();
+
+                // Show success dialog with options
+                showPaymentSuccessDialog(data);
+            } else {
+                // Payment cancelled or failed
+                Toast.makeText(this, "Payment was cancelled", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    // ✅ NEW: Show payment success dialog
+    private void showPaymentSuccessDialog(Intent data) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Payment Successful! 🎉");
+        builder.setMessage("Your payment has been processed successfully. You can now contact the seller to arrange pickup/delivery.");
+
+        builder.setPositiveButton("Contact Seller", (dialog, which) -> {
+            // Start chat with seller
+            showContactOptions();
+        });
+
+        builder.setNeutralButton("View Transaction", (dialog, which) -> {
+            // View transaction details
+            if (data != null) {
+                Long transactionId = data.getLongExtra("transaction_id", 0L);
+                if (transactionId > 0) {
+                    Intent intent = new Intent(this, com.example.newtrade.ui.transaction.TransactionDetailActivity.class);
+                    intent.putExtra("transaction_id", transactionId);
+                    startActivity(intent);
+                }
+            }
+        });
+
+        builder.setNegativeButton("OK", null);
+        builder.show();
     }
 
     private void checkSaveStatus() {
@@ -307,6 +465,9 @@ public class ProductDetailActivity extends AppCompatActivity {
                                 // Check save status
                                 checkSaveStatus();
 
+                                // Update buy button based on product status
+                                updateBuyButton();
+
                                 Log.d(TAG, "✅ Product details loaded successfully");
 
                             } else {
@@ -349,24 +510,94 @@ public class ProductDetailActivity extends AppCompatActivity {
                 });
     }
 
+    // ✅ NEW: Update buy button based on product status
+    private void updateBuyButton() {
+        if (btnBuyNow == null || productData == null) return;
+
+        String status = productData.get("status") != null ? productData.get("status").toString() : "";
+
+        // Check if product is sold or unavailable
+        if ("SOLD".equalsIgnoreCase(status)) {
+            btnBuyNow.setText("SOLD");
+            btnBuyNow.setEnabled(false);
+            btnBuyNow.setBackgroundTintList(getColorStateList(android.R.color.darker_gray));
+            return;
+        }
+
+        if ("UNAVAILABLE".equalsIgnoreCase(status)) {
+            btnBuyNow.setText("UNAVAILABLE");
+            btnBuyNow.setEnabled(false);
+            btnBuyNow.setBackgroundTintList(getColorStateList(android.R.color.darker_gray));
+            return;
+        }
+
+        // Check if user is the owner
+        Long currentUserId = prefsManager.getUserId();
+        Map<String, Object> seller = (Map<String, Object>)
+                (productData.get("seller") != null ? productData.get("seller") : productData.get("user"));
+
+        if (seller != null && currentUserId != null) {
+            Long sellerId = parseToLong(seller.get("id"));
+            if (currentUserId.equals(sellerId)) {
+                btnBuyNow.setText("YOUR ITEM");
+                btnBuyNow.setEnabled(false);
+                btnBuyNow.setBackgroundTintList(getColorStateList(android.R.color.darker_gray));
+                return;
+            }
+        }
+
+        // Check login status
+        if (!prefsManager.isLoggedIn()) {
+            btnBuyNow.setText("LOGIN TO BUY");
+            btnBuyNow.setEnabled(true);
+            btnBuyNow.setBackgroundTintList(getColorStateList(R.color.primary));
+            return;
+        }
+
+        // Default state - available for purchase
+        btnBuyNow.setText("BUY NOW");
+        btnBuyNow.setEnabled(true);
+        btnBuyNow.setBackgroundTintList(getColorStateList(R.color.primary));
+    }
+
     private void showLoadingState(boolean isLoading) {
         Button btnSave = findViewById(R.id.btn_save);
 
         if (isLoading) {
+            // Show progress bar
+            if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
+
             // Disable all buttons during loading
             if (btnSave != null) btnSave.setEnabled(false);
             if (btnContact != null) btnContact.setEnabled(false);
             if (btnMakeOffer != null) btnMakeOffer.setEnabled(false);
+            if (btnBuyNow != null) btnBuyNow.setEnabled(false);
 
             Log.d(TAG, "🔄 Showing loading state");
         } else {
+            // Hide progress bar
+            if (progressBar != null) progressBar.setVisibility(View.GONE);
+
             // Enable all buttons after loading
             if (btnSave != null) btnSave.setEnabled(true);
             if (btnContact != null) btnContact.setEnabled(true);
             if (btnMakeOffer != null) btnMakeOffer.setEnabled(true);
+            if (btnBuyNow != null) btnBuyNow.setEnabled(true);
 
             Log.d(TAG, "✅ Hiding loading state");
         }
+    }
+
+    // ✅ NEW: Show loading overlay
+    private void showLoading(boolean show) {
+        if (progressBar != null) {
+            progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+
+        // Disable interaction during loading
+        if (btnBuyNow != null) btnBuyNow.setEnabled(!show);
+        if (btnContact != null) btnContact.setEnabled(!show);
+        if (btnMakeOffer != null) btnMakeOffer.setEnabled(!show);
     }
 
     private void showFABs() {

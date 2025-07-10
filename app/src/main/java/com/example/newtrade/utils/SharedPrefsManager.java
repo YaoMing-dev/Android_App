@@ -18,9 +18,9 @@ public class SharedPrefsManager {
         return instance;
     }
 
-    private SharedPrefsManager(Context context) {
-        prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
-    }
+        public SharedPrefsManager(Context context) {
+            prefs = context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE);
+        }
 
     // ===== USER DATA =====
 
@@ -182,6 +182,52 @@ public class SharedPrefsManager {
     public Long getTestProductId() {
         long id = prefs.getLong("test_product_id", 0L);
         return id > 0 ? id : null;
+    }
+
+    public void saveString(String key, String value) {
+        prefs.edit().putString(key, value).apply();
+        Log.d(TAG, "✅ String saved - " + key + ": " + value);
+    }
+
+    public String getString(String key, String defaultValue) {
+        return prefs.getString(key, defaultValue);
+    }
+
+    public void saveInt(String key, int value) {
+        prefs.edit().putInt(key, value).apply();
+        Log.d(TAG, "✅ Int saved - " + key + ": " + value);
+    }
+
+    public int getInt(String key, int defaultValue) {
+        return prefs.getInt(key, defaultValue);
+    }
+
+    public void saveBoolean(String key, boolean value) {
+        prefs.edit().putBoolean(key, value).apply();
+        Log.d(TAG, "✅ Boolean saved - " + key + ": " + value);
+    }
+
+    public boolean getBoolean(String key, boolean defaultValue) {
+        return prefs.getBoolean(key, defaultValue);
+    }
+
+
+// ===== PAYMENT PREFERENCES =====
+
+    public void savePreferredPaymentMethod(String paymentMethod) {
+        saveString("preferred_payment_method", paymentMethod);
+    }
+
+    public String getPreferredPaymentMethod() {
+        return getString("preferred_payment_method", "CARD");
+    }
+
+    public void savePaymentNotificationsEnabled(boolean enabled) {
+        saveBoolean("payment_notifications_enabled", enabled);
+    }
+
+    public boolean isPaymentNotificationsEnabled() {
+        return getBoolean("payment_notifications_enabled", true);
     }
 
 }

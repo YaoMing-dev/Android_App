@@ -211,4 +211,73 @@ public class Transaction {
         }
         return "Transaction";
     }
+    // ===== 🆕 THÊM METHODS CHO PAYMENT INTEGRATION =====
+
+    /**
+     * Get seller as User object for compatibility
+     */
+    public User getSeller() {
+        if (sellerId != null && sellerName != null) {
+            User seller = new User();
+            seller.setId(sellerId);
+            seller.setDisplayName(sellerName);
+            seller.setProfilePicture(sellerAvatarUrl);
+            return seller;
+        }
+        return null;
+    }
+
+    /**
+     * Get buyer as User object for compatibility
+     */
+    public User getBuyer() {
+        if (buyerId != null && buyerName != null) {
+            User buyer = new User();
+            buyer.setId(buyerId);
+            buyer.setDisplayName(buyerName);
+            buyer.setProfilePicture(buyerAvatarUrl);
+            return buyer;
+        }
+        return null;
+    }
+
+    /**
+     * Alias for getFormattedPrice() for compatibility
+     */
+    public String getDisplayPrice() {
+        return getFormattedPrice();
+    }
+
+    /**
+     * Alias for getFormattedPrice() for compatibility
+     */
+    public String getDisplayAmount() {
+        return getFormattedPrice();
+    }
+
+    /**
+     * Get createdAt as Date object for compatibility
+     */
+    public java.util.Date getCreatedAtDate() {
+        if (createdAt == null) return null;
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+            return sdf.parse(createdAt);
+        } catch (Exception e) {
+            return new java.util.Date();
+        }
+    }
+
+    /**
+     * Get completedAt as Date object for compatibility
+     */
+    public java.util.Date getCompletedAtDate() {
+        if (completionDate == null) return null;
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+            return sdf.parse(completionDate);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }

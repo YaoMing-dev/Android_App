@@ -30,6 +30,7 @@ public class ApiClient {
 
     // Service instances
     private static AuthService authService;
+    private static PaymentService paymentService; // ✅ ĐÚNG VỊ TRÍ
     private static UserService userService;
     private static ProductService productService;
     private static ApiService apiService;
@@ -38,7 +39,7 @@ public class ApiClient {
     private static SavedItemsService savedItemsService;
     private static OfferService offerService;
     private static AnalyticsService analyticsService;
-    private static NotificationService notificationService; // ✅ THÊM NOTIFICATION SERVICE
+    private static NotificationService notificationService;
 
     // ===== DYNAMIC INITIALIZATION =====
 
@@ -123,8 +124,9 @@ public class ApiClient {
             currentBaseUrl = baseUrl;
             retrofit = createRetrofit(context, baseUrl);
 
-            // Initialize ALL services
+            // Initialize ALL services - ✅ SỬA ĐẦY ĐỦ
             authService = retrofit.create(AuthService.class);
+            paymentService = retrofit.create(PaymentService.class); // ✅ THÊM PAYMENT SERVICE
             userService = retrofit.create(UserService.class);
             productService = retrofit.create(ProductService.class);
             apiService = retrofit.create(ApiService.class);
@@ -133,7 +135,7 @@ public class ApiClient {
             savedItemsService = retrofit.create(SavedItemsService.class);
             offerService = retrofit.create(OfferService.class);
             analyticsService = retrofit.create(AnalyticsService.class);
-            notificationService = retrofit.create(NotificationService.class); // ✅ THÊM NOTIFICATION SERVICE
+            notificationService = retrofit.create(NotificationService.class);
 
             Log.d(TAG, "✅ ApiClient initialized successfully with base URL: " + baseUrl);
 
@@ -247,13 +249,21 @@ public class ApiClient {
                 .build();
     }
 
-    // ===== SERVICE GETTERS =====
+    // ===== SERVICE GETTERS - ✅ SỬA ĐẦY ĐỦ =====
 
     public static AuthService getAuthService() {
         if (authService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
         }
         return authService;
+    }
+
+    // ✅ SỬA PAYMENT SERVICE GETTER
+    public static PaymentService getPaymentService() {
+        if (paymentService == null) {
+            throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
+        }
+        return paymentService;
     }
 
     public static UserService getUserService() {
@@ -298,8 +308,6 @@ public class ApiClient {
         return analyticsService;
     }
 
-
-
     public static SavedItemsService getSavedItemsService() {
         if (savedItemsService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
@@ -314,7 +322,6 @@ public class ApiClient {
         return offerService;
     }
 
-    // ✅ THÊM NOTIFICATION SERVICE GETTER
     public static NotificationService getNotificationService() {
         if (notificationService == null) {
             throw new IllegalStateException("ApiClient not initialized. Call ApiClient.init() first.");
@@ -332,9 +339,11 @@ public class ApiClient {
         return currentBaseUrl;
     }
 
+    // ✅ SỬA RESET CLIENT - THÊM PAYMENT SERVICE
     public static void resetClient() {
         retrofit = null;
         authService = null;
+        paymentService = null; // ✅ THÊM RESET PAYMENT SERVICE
         userService = null;
         productService = null;
         apiService = null;
@@ -343,7 +352,7 @@ public class ApiClient {
         savedItemsService = null;
         offerService = null;
         analyticsService = null;
-        notificationService = null; // ✅ THÊM RESET NOTIFICATION SERVICE
+        notificationService = null;
         currentBaseUrl = null;
         Log.d(TAG, "🧹 ApiClient reset");
     }

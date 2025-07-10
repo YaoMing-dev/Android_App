@@ -154,13 +154,13 @@ public class TransactionHistoryActivity extends AppCompatActivity implements Tra
         if (currentPage == 0) {
             swipeRefresh.setRefreshing(true);
         }
-
+        String userId = String.valueOf(prefsManager.getUserId());
         // ✅ API endpoints chính xác với backend
         Call<StandardResponse<Map<String, Object>>> call;
         if ("PURCHASES".equals(currentTab)) {
-            call = ApiClient.getTransactionService().getPurchases(currentPage, Constants.DEFAULT_PAGE_SIZE);
+            call = ApiClient.getTransactionService().getPurchasesWithAuth(userId, currentPage, Constants.DEFAULT_PAGE_SIZE);
         } else {
-            call = ApiClient.getTransactionService().getSales(currentPage, Constants.DEFAULT_PAGE_SIZE);
+            call = ApiClient.getTransactionService().getSalesWithAuth(userId, currentPage, Constants.DEFAULT_PAGE_SIZE);
         }
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
