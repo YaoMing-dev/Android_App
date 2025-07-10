@@ -18,46 +18,40 @@ import retrofit2.http.Query;
 
 public interface PaymentService {
 
-    // Get payment configuration (Stripe publishable key, etc.)
-    @GET("payments/config")
+    // ✅ SỬA: Thêm /api prefix cho tất cả endpoints
+    @GET("api/payments/config")
     Call<StandardResponse<PaymentConfig>> getPaymentConfig();
 
-    // Create payment intent for transaction
-    @POST("payments/create-payment-intent")
+    @POST("api/payments/create-payment-intent")
     Call<StandardResponse<PaymentIntentResponse>> createPaymentIntent(
             @Header("User-ID") String userId,
             @Body PaymentIntentRequest request
     );
 
-    // Confirm payment after Stripe confirmation
-    @POST("payments/confirm-payment")
+    @POST("api/payments/confirm-payment")
     Call<StandardResponse<Payment>> confirmPayment(
             @Query("paymentIntentId") String paymentIntentId
     );
 
-    // Get payment details by transaction ID
-    @GET("payments/transaction/{transactionId}")
+    @GET("api/payments/transaction/{transactionId}")
     Call<StandardResponse<Payment>> getPaymentByTransaction(
             @Header("User-ID") String userId,
             @Path("transactionId") Long transactionId
     );
 
-    // Get payment status by payment intent ID
-    @GET("payments/status/{paymentIntentId}")
+    @GET("api/payments/status/{paymentIntentId}")
     Call<StandardResponse<Payment>> getPaymentStatus(
             @Path("paymentIntentId") String paymentIntentId
     );
 
-    // Get user's payment history
-    @GET("payments/my-payments")
+    @GET("api/payments/my-payments")
     Call<StandardResponse<PagedResponse<Payment>>> getMyPayments(
             @Header("User-ID") String userId,
             @Query("page") int page,
             @Query("size") int size
     );
 
-    // Process refund (for sellers)
-    @POST("payments/{paymentId}/refund")
+    @POST("api/payments/{paymentId}/refund")
     Call<StandardResponse<Payment>> processRefund(
             @Header("User-ID") String userId,
             @Path("paymentId") Long paymentId,

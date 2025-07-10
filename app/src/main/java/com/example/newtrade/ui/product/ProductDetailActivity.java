@@ -253,17 +253,19 @@ public class ProductDetailActivity extends AppCompatActivity {
     private void createTransactionForPayment() {
         showLoading(true);
 
-        // Create transaction request
-        Map<String, Object> transactionRequest = new HashMap<>();
-        transactionRequest.put("productId", productId);
-        transactionRequest.put("paymentMethod", "CARD"); // Default, user can change in payment screen
-        transactionRequest.put("deliveryMethod", "PICKUP"); // Default
-        transactionRequest.put("notes", "Purchase from product detail");
-
         String userId = String.valueOf(prefsManager.getUserId());
 
+        // ✅ SỬA: Gọi với @Query parameters và đúng enum values
         Call<StandardResponse<Transaction>> call = ApiClient.getTransactionService()
-                .createTransaction(userId, transactionRequest);
+                .createTransaction(
+                        userId,
+                        productId,                  // productId
+                        null,                       // offerId (optional)
+                        "CREDIT_CARD",              // ✅ SỬA: CREDIT_CARD thay vì CARD
+                        "PICKUP",                   // deliveryMethod
+                        null,                       // deliveryAddress (optional)
+                        "Purchase from product detail"  // notes
+                );
 
         call.enqueue(new Callback<StandardResponse<Transaction>>() {
             @Override
@@ -280,6 +282,7 @@ public class ProductDetailActivity extends AppCompatActivity {
                         showError("Failed to create transaction: " + standardResponse.getMessage());
                     }
                 } else {
+                    Log.e(TAG, "❌ Error: " + response.code() + " - " + response.message());
                     showError("Failed to create transaction");
                 }
             }
@@ -287,7 +290,7 @@ public class ProductDetailActivity extends AppCompatActivity {
             @Override
             public void onFailure(Call<StandardResponse<Transaction>> call, Throwable t) {
                 showLoading(false);
-                Log.e(TAG, "Failed to create transaction", t);
+                Log.e(TAG, "❌ Failed to create transaction", t);
                 showError("Network error: " + t.getMessage());
             }
         });

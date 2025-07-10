@@ -174,6 +174,7 @@ public interface ProductService {
     @GET("api/saved-items/{productId}/check")
     Call<StandardResponse<Map<String, Object>>> isProductSaved(@Path("productId") Long productId);
 
+
     // ===== PRODUCT OFFERS =====
 
     @POST("api/products/{id}/offers")

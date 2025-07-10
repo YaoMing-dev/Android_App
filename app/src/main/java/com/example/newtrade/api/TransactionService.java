@@ -22,7 +22,12 @@ public interface TransactionService {
     @POST("api/transactions")
     Call<StandardResponse<Transaction>> createTransaction(
             @Header("User-ID") String userId,
-            @Body Map<String, Object> transactionRequest
+            @Query("productId") Long productId,
+            @Query("offerId") Long offerId,  // Optional
+            @Query("paymentMethod") String paymentMethod,
+            @Query("deliveryMethod") String deliveryMethod,
+            @Query("deliveryAddress") String deliveryAddress,  // Optional
+            @Query("notes") String notes  // Optional
     );
 
     // Overloaded methods with User-ID headers for existing methods

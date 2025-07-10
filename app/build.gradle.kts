@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
     implementation(libs.okhttp.logging)
+    implementation("com.stripe:stripe-android:20.32.0")
 
     // Image Loading
     implementation(libs.glide)

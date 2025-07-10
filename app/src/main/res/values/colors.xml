@@ -45,6 +45,7 @@
     <color name="warning_color">#FF9800</color>
     <color name="info_color">#2196F3</color>
     <color name="pending_color">#FFC107</color>
+    <color name="surface_variant">#E7E0EC</color>
 
 
         <color name="surface">#FAFAFA</color> <!-- Nền nhẹ -->
