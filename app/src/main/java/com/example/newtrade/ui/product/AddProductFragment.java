@@ -1,6 +1,7 @@
 // app/src/main/java/com/example/newtrade/ui/product/AddProductFragment.java
 package com.example.newtrade.ui.product;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -8,12 +9,17 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -22,9 +28,21 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
+
+import android.provider.Settings;
+import android.location.Geocoder;
+import android.location.Address;
+import android.os.Handler;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationResult;
+import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -38,19 +56,25 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.api.ApiService;
 import com.example.newtrade.models.PreviewData;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.LocationUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -404,34 +428,186 @@ public class AddProductFragment extends Fragment implements SelectedImageAdapter
 
     // ✅ KEEP: Original location functionality unchanged
     private void getCurrentLocation() {
+        // ✅ 1. Check permissions
         if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
+            requestPermissions(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            }, REQUEST_LOCATION_PERMISSION);
             return;
         }
 
+        // ✅ 2. Check GPS enabled
+        if (!LocationUtils.isLocationEnabled(requireContext())) {
+            Toast.makeText(requireContext(),
+                    "Please enable GPS in Settings", Toast.LENGTH_LONG).show();
+
+            // ✅ Optional: Open GPS settings
+            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(intent);
+            return;
+        }
+
+        // ✅ 3. Show loading state
         btnGetLocation.setEnabled(false);
-        btnGetLocation.setText("Getting...");
+        btnGetLocation.setText("⏳ Getting Location...");
 
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(location -> {
-                    btnGetLocation.setEnabled(true);
-                    btnGetLocation.setText("GPS");
+        // ✅ 4. Use getCurrentLocation() instead of getLastLocation()
+        try {
+            fusedLocationClient.getCurrentLocation(
+                    com.google.android.gms.location.LocationRequest.PRIORITY_HIGH_ACCURACY,
+                    null
+            ).addOnCompleteListener(task -> {
+                btnGetLocation.setEnabled(true);
+                btnGetLocation.setText("📍 GPS");
 
-                    if (location != null) {
-                        String locationText = String.format("%.4f, %.4f", location.getLatitude(), location.getLongitude());
-                        etLocation.setText(locationText);
-                        Log.d(TAG, "Location obtained: " + locationText);
-                        Toast.makeText(requireContext(), "Location updated", Toast.LENGTH_SHORT).show();
+                if (task.isSuccessful() && task.getResult() != null) {
+                    Location location = task.getResult();
+                    handleLocationSuccess(location);
+                } else {
+                    // ✅ 5. Fallback to getLastLocation()
+                    Log.w(TAG, "getCurrentLocation failed, trying getLastLocation");
+                    tryGetLastLocation();
+                }
+            });
+        } catch (SecurityException e) {
+            btnGetLocation.setEnabled(true);
+            btnGetLocation.setText("📍 GPS");
+            Log.e(TAG, "Location permission denied", e);
+            Toast.makeText(requireContext(),
+                    "Location permission denied", Toast.LENGTH_SHORT).show();
+        }
+    }
+    private void tryGetLastLocation() {
+        try {
+            fusedLocationClient.getLastLocation()
+                    .addOnSuccessListener(location -> {
+                        if (location != null) {
+                            handleLocationSuccess(location);
+                        } else {
+                            // ✅ 7. Final fallback: Request location updates
+                            requestLocationUpdates();
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "getLastLocation failed", e);
+                        Toast.makeText(requireContext(),
+                                "Unable to get location. Please try again.",
+                                Toast.LENGTH_LONG).show();
+                    });
+        } catch (SecurityException e) {
+            Log.e(TAG, "Location permission denied in fallback", e);
+        }
+    }
+    private void handleLocationSuccess(Location location) {
+        double latitude = location.getLatitude();
+        double longitude = location.getLongitude();
+
+        Log.d(TAG, "✅ Location obtained: " + latitude + ", " + longitude);
+
+        // ✅ Convert to address in background thread
+        convertCoordinatesToAddress(latitude, longitude);
+    }
+
+    private void showLocationProgress() {
+        ProgressDialog progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage("Getting your location...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
+        // Auto dismiss after 15 seconds
+        new Handler().postDelayed(() -> {
+            if (progressDialog.isShowing()) {
+                progressDialog.dismiss();
+            }
+        }, 15000);
+    }
+    private void showManualLocationDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Enter Location Manually");
+
+        EditText input = new EditText(requireContext());
+        input.setHint("Enter your location...");
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            String location = input.getText().toString().trim();
+            if (!location.isEmpty()) {
+                etLocation.setText(location);
+                Toast.makeText(requireContext(), "Location set manually", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    private void convertCoordinatesToAddress(double latitude, double longitude) {
+        new Thread(() -> {
+            try {
+                Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
+                List<Address> addresses = geocoder.getFromLocation(latitude, longitude, 1);
+
+                requireActivity().runOnUiThread(() -> {
+                    if (addresses != null && !addresses.isEmpty()) {
+                        Address address = addresses.get(0);
+                        String addressText = address.getAddressLine(0);
+                        etLocation.setText(addressText);
+                        Toast.makeText(requireContext(), "📍 Location updated", Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(requireContext(), "Unable to get current location", Toast.LENGTH_SHORT).show();
+                        // ✅ Fallback: use coordinates
+                        String locationText = String.format("%.4f, %.4f", latitude, longitude);
+                        etLocation.setText(locationText);
+                        Toast.makeText(requireContext(), "📍 Location updated (coordinates)", Toast.LENGTH_SHORT).show();
                     }
-                })
-                .addOnFailureListener(e -> {
-                    btnGetLocation.setEnabled(true);
-                    btnGetLocation.setText("GPS");
-                    Log.e(TAG, "Failed to get location", e);
-                    Toast.makeText(requireContext(), "Failed to get location", Toast.LENGTH_SHORT).show();
                 });
+            } catch (IOException e) {
+                Log.e(TAG, "Geocoding failed", e);
+                requireActivity().runOnUiThread(() -> {
+                    String locationText = String.format("%.4f, %.4f", latitude, longitude);
+                    etLocation.setText(locationText);
+                    Toast.makeText(requireContext(),
+                            "📍 Location updated (geocoding failed)", Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
+    }
+    private void requestLocationUpdates() {
+        Log.d(TAG, "Requesting location updates as final fallback");
+
+        LocationRequest locationRequest = LocationRequest.create()
+                .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                .setInterval(10000) // 10 seconds
+                .setFastestInterval(5000) // 5 seconds
+                .setNumUpdates(1); // Only get 1 update
+
+        LocationCallback locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult != null && !locationResult.getLocations().isEmpty()) {
+                    Location location = locationResult.getLocations().get(0);
+                    handleLocationSuccess(location);
+
+                    // ✅ Stop location updates
+                    fusedLocationClient.removeLocationUpdates(this);
+                }
+            }
+        };
+
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
+
+            // ✅ Timeout after 15 seconds
+            new Handler().postDelayed(() -> {
+                fusedLocationClient.removeLocationUpdates(locationCallback);
+                Toast.makeText(requireContext(),
+                        "Location request timed out. Please try again or enter manually.",
+                        Toast.LENGTH_LONG).show();
+            }, 15000);
+
+        } catch (SecurityException e) {
+            Log.e(TAG, "Location permission denied in requestLocationUpdates", e);
+        }
     }
 
     // ✅ KEEP: Original validation with image check enhanced

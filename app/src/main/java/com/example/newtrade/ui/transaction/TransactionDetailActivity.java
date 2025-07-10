@@ -126,6 +126,8 @@ public class TransactionDetailActivity extends AppCompatActivity {
     private void loadTransactionDetail() {
         String userId = String.valueOf(prefsManager.getUserId());
 
+        Log.d(TAG, "🔍 Loading transaction detail: userId=" + userId + ", transactionId=" + transactionId);
+
         ApiClient.getTransactionService().getTransactionWithAuth(userId, transactionId)
                 .enqueue(new Callback<StandardResponse<Transaction>>() {
                     @Override
@@ -134,23 +136,27 @@ public class TransactionDetailActivity extends AppCompatActivity {
                         if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                             transaction = response.body().getData();
                             displayTransactionDetails();
+                            Log.d(TAG, "✅ Transaction loaded successfully");
                         } else {
                             String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to load transaction";
                             Toast.makeText(TransactionDetailActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
-                            Log.e(TAG, "Error loading transaction: " + errorMsg);
+                            Log.e(TAG, "❌ Error loading transaction: " + errorMsg);
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<Transaction>> call, Throwable t) {
-                        Log.e(TAG, "Network error loading transaction", t);
+                        Log.e(TAG, "❌ Network error loading transaction", t);
                         Toast.makeText(TransactionDetailActivity.this, "Network error. Please try again.", Toast.LENGTH_SHORT).show();
                     }
                 });
     }
 
     private void displayTransactionDetails() {
-        if (transaction == null) return;
+        if (transaction == null) {
+            Log.e(TAG, "❌ Transaction is null, cannot display details");
+            return;
+        }
 
         Long currentUserId = prefsManager.getUserId();
 
@@ -211,33 +217,40 @@ public class TransactionDetailActivity extends AppCompatActivity {
         setupButtonStates();
     }
 
-    // ✅ ENHANCED: Sửa logic setup button states
+    // ✅ ENHANCED: Setup button states với debug logging
     private void setupButtonStates() {
-        if (transaction == null) return;
+        if (transaction == null) {
+            Log.e(TAG, "❌ Cannot setup button states - transaction is null");
+            return;
+        }
 
         Long currentUserId = prefsManager.getUserId();
 
-        // ✅ DEBUG: Log transaction state
-        Log.d(TAG, "🔍 Transaction Debug: " +
-                "id=" + transaction.getId() +
-                ", status=" + transaction.getPaymentStatus() +
-                ", completed=" + transaction.isCompleted() +
-                ", paid=" + transaction.isPaid() +
-                ", canReview=" + transaction.isCanReview() +
-                ", hasReviewed=" + transaction.isHasReviewed());
+        // ✅ DEBUG: Log transaction state chi tiết
+        Log.d(TAG, "=== TRANSACTION DEBUG INFO ===");
+        Log.d(TAG, "Transaction ID: " + transaction.getId());
+        Log.d(TAG, "Payment Status: " + transaction.getPaymentStatus());
+        Log.d(TAG, "isCompleted(): " + transaction.isCompleted());
+        Log.d(TAG, "isPaid(): " + transaction.isPaid());
+        Log.d(TAG, "isCanReview(): " + transaction.isCanReview());
+        Log.d(TAG, "isHasReviewed(): " + transaction.isHasReviewed());
+        Log.d(TAG, "Current User ID: " + currentUserId);
+        Log.d(TAG, "isSeller: " + transaction.isSeller(currentUserId));
+        Log.d(TAG, "isBuyer: " + transaction.isBuyer(currentUserId));
+        Log.d(TAG, "=============================");
 
-        // ✅ ENHANCED: Review button logic - allow review for PAID or COMPLETED transactions
-        boolean transactionFinished = transaction.isCompleted() || transaction.isPaid();
+        // ✅ ENHANCED: Review button logic - check backend cho mọi transaction PAID/COMPLETED
+        boolean transactionEligible = transaction.isCompleted() || transaction.isPaid();
 
-        if (transactionFinished) {
-            // Always check backend for review eligibility
+        if (transactionEligible) {
+            Log.d(TAG, "✅ Transaction eligible for review, checking backend...");
             checkCanReviewFromBackend();
         } else {
             btnWriteReview.setVisibility(View.GONE);
-            Log.d(TAG, "❌ Transaction not finished yet, hiding review button");
+            Log.d(TAG, "❌ Transaction not eligible for review yet (not PAID/COMPLETED)");
         }
 
-        // Contact button - always visible
+        // Contact button - always visible for completed/paid transactions
         btnContact.setVisibility(View.VISIBLE);
 
         // Complete transaction button - only for sellers when transaction is paid but not completed
@@ -245,18 +258,23 @@ public class TransactionDetailActivity extends AppCompatActivity {
             btnCompleteTransaction.setVisibility(View.VISIBLE);
             btnCompleteTransaction.setText("Mark as Complete");
             btnCompleteTransaction.setEnabled(true);
+            Log.d(TAG, "✅ Showing 'Complete Transaction' button for seller");
         } else {
             btnCompleteTransaction.setVisibility(View.GONE);
+            Log.d(TAG, "❌ Hiding 'Complete Transaction' button");
         }
     }
 
-    // ✅ NEW: Check backend can-review API
+    // ✅ NEW: Check backend để xác định có thể review không
     private void checkCanReviewFromBackend() {
-        if (transaction == null) return;
+        if (transaction == null) {
+            Log.e(TAG, "❌ Cannot check review eligibility - transaction is null");
+            return;
+        }
 
         Long currentUserId = prefsManager.getUserId();
 
-        Log.d(TAG, "🔍 Checking review eligibility with backend...");
+        Log.d(TAG, "🔍 Checking review eligibility with backend for transaction: " + transaction.getId());
 
         ApiClient.getReviewService().canReviewTransaction(transaction.getId(), currentUserId)
                 .enqueue(new Callback<StandardResponse<Map<String, Boolean>>>() {
@@ -270,19 +288,14 @@ public class TransactionDetailActivity extends AppCompatActivity {
                             Log.d(TAG, "✅ Backend canReview response: " + canReview);
 
                             if (canReview) {
-                                btnWriteReview.setVisibility(View.VISIBLE);
-                                btnWriteReview.setText("Write Review ⭐");
-                                btnWriteReview.setEnabled(true);
-                                btnWriteReview.setBackgroundTintList(getColorStateList(R.color.primary_color));
+                                showReviewButton(true);
                             } else {
-                                btnWriteReview.setVisibility(View.VISIBLE);
-                                btnWriteReview.setText("Already Reviewed ✓");
-                                btnWriteReview.setEnabled(false);
-                                btnWriteReview.setBackgroundTintList(getColorStateList(android.R.color.darker_gray));
+                                showReviewButton(false);
                             }
                         } else {
-                            Log.e(TAG, "❌ Backend error checking review: " + response.message());
-                            // Fallback: show button anyway for user to try
+                            Log.e(TAG, "❌ Backend error checking review eligibility: " +
+                                    (response.body() != null ? response.body().getMessage() : response.message()));
+                            // Fallback: show button for user to try
                             showReviewButtonFallback();
                         }
                     }
@@ -296,27 +309,69 @@ public class TransactionDetailActivity extends AppCompatActivity {
                 });
     }
 
-    // ✅ NEW: Fallback method to show review button
+    // ✅ NEW: Show review button based on eligibility
+    private void showReviewButton(boolean canReview) {
+        if (canReview) {
+            btnWriteReview.setVisibility(View.VISIBLE);
+            btnWriteReview.setText("Write Review ⭐");
+            btnWriteReview.setEnabled(true);
+            // Set primary color if available
+            try {
+                btnWriteReview.setBackgroundTintList(getColorStateList(R.color.primary_color));
+            } catch (Exception e) {
+                // Fallback to default if color not found
+                Log.w(TAG, "Primary color not found, using default");
+            }
+            Log.d(TAG, "✅ Showing enabled 'Write Review' button");
+        } else {
+            btnWriteReview.setVisibility(View.VISIBLE);
+            btnWriteReview.setText("Already Reviewed ✓");
+            btnWriteReview.setEnabled(false);
+            // Set gray color for disabled state
+            try {
+                btnWriteReview.setBackgroundTintList(getColorStateList(android.R.color.darker_gray));
+            } catch (Exception e) {
+                Log.w(TAG, "Gray color not found, using default");
+            }
+            Log.d(TAG, "⚪ Showing disabled 'Already Reviewed' button");
+        }
+    }
+
+    // ✅ NEW: Fallback method để show review button
     private void showReviewButtonFallback() {
         btnWriteReview.setVisibility(View.VISIBLE);
         btnWriteReview.setText("Write Review");
         btnWriteReview.setEnabled(true);
-        btnWriteReview.setBackgroundTintList(getColorStateList(R.color.primary_color));
-        Log.d(TAG, "✅ Showing review button as fallback");
+        // Use default button color
+        try {
+            btnWriteReview.setBackgroundTintList(getColorStateList(R.color.primary_color));
+        } catch (Exception e) {
+            Log.w(TAG, "Primary color not found, using default");
+        }
+        Log.d(TAG, "✅ Showing review button as fallback (backend check failed)");
     }
 
-    // ✅ ENHANCED: openWriteReview with better validation
+    // ✅ ENHANCED: Open write review với validation tốt hơn
     private void openWriteReview() {
         if (transaction == null) {
             Toast.makeText(this, "Transaction data not available", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "❌ Cannot open review - transaction is null");
             return;
         }
 
-        // ✅ Allow review for both PAID and COMPLETED transactions
+        // ✅ Check eligibility - allow cho cả PAID và COMPLETED
         boolean canProceed = transaction.isCompleted() || transaction.isPaid();
 
         if (!canProceed) {
-            Toast.makeText(this, "Transaction must be completed before writing a review", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Transaction must be completed before writing a review", Toast.LENGTH_LONG).show();
+            Log.w(TAG, "❌ Cannot review - transaction not completed/paid");
+            return;
+        }
+
+        // Disabled button check
+        if (!btnWriteReview.isEnabled()) {
+            Toast.makeText(this, "You have already reviewed this transaction", Toast.LENGTH_SHORT).show();
+            Log.w(TAG, "❌ Cannot review - already reviewed");
             return;
         }
 
@@ -335,7 +390,10 @@ public class TransactionDetailActivity extends AppCompatActivity {
     }
 
     private void openChat() {
-        if (transaction == null) return;
+        if (transaction == null) {
+            Log.e(TAG, "❌ Cannot open chat - transaction is null");
+            return;
+        }
 
         Long currentUserId = prefsManager.getUserId();
         Long otherPartyId;
@@ -350,12 +408,19 @@ public class TransactionDetailActivity extends AppCompatActivity {
         intent.putExtra("product_id", transaction.getProductId());
         intent.putExtra("other_user_id", otherPartyId);
         startActivity(intent);
+
+        Log.d(TAG, "💬 Opening chat with user: " + otherPartyId + " for product: " + transaction.getProductId());
     }
 
     private void completeTransaction() {
-        if (transaction == null) return;
+        if (transaction == null) {
+            Log.e(TAG, "❌ Cannot complete transaction - transaction is null");
+            return;
+        }
 
         String userId = String.valueOf(prefsManager.getUserId());
+
+        Log.d(TAG, "🔄 Completing transaction: " + transaction.getId());
 
         ApiClient.getTransactionService().completeTransactionWithAuth(userId, transaction.getId())
                 .enqueue(new Callback<StandardResponse<Transaction>>() {
@@ -367,19 +432,22 @@ public class TransactionDetailActivity extends AppCompatActivity {
                             displayTransactionDetails();
                             Toast.makeText(TransactionDetailActivity.this, "Transaction completed successfully! 🎉", Toast.LENGTH_SHORT).show();
 
-                            // ✅ NEW: Auto-show review option after completing transaction
+                            Log.d(TAG, "✅ Transaction completed successfully");
+
+                            // ✅ NEW: Auto-prompt cho review sau khi complete
                             if (transaction.isCompleted()) {
-                                Toast.makeText(TransactionDetailActivity.this, "You can now write a review!", Toast.LENGTH_LONG).show();
+                                Toast.makeText(TransactionDetailActivity.this, "You can now write a review! ⭐", Toast.LENGTH_LONG).show();
                             }
                         } else {
                             String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to complete transaction";
                             Toast.makeText(TransactionDetailActivity.this, errorMsg, Toast.LENGTH_SHORT).show();
+                            Log.e(TAG, "❌ Error completing transaction: " + errorMsg);
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<Transaction>> call, Throwable t) {
-                        Log.e(TAG, "Error completing transaction", t);
+                        Log.e(TAG, "❌ Network error completing transaction", t);
                         Toast.makeText(TransactionDetailActivity.this, "Network error. Please try again.", Toast.LENGTH_SHORT).show();
                     }
                 });
@@ -390,9 +458,10 @@ public class TransactionDetailActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == REQUEST_WRITE_REVIEW && resultCode == RESULT_OK) {
-            // ✅ ENHANCED: Show success message and reload
+            // ✅ ENHANCED: Show success message and reload data
             Toast.makeText(this, "Thank you for your review! ⭐", Toast.LENGTH_SHORT).show();
-            loadTransactionDetail(); // Reload to update review status
+            Log.d(TAG, "✅ Review submitted successfully, reloading transaction data");
+            loadTransactionDetail(); // Reload để update review status
         }
     }
 
