@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/newtrade/ui/payment/PaymentActivity.java
 package com.example.newtrade.ui.payment;
 
 import android.app.AlertDialog;
@@ -25,6 +24,9 @@ import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.api.PaymentService;
 import com.example.newtrade.models.PaymentConfig;
 import com.example.newtrade.models.PaymentMethod;
+import com.example.newtrade.models.PaymentIntentRequest;
+import com.example.newtrade.models.PaymentIntentResponse;
+import com.example.newtrade.models.Payment;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
@@ -67,7 +69,7 @@ public class PaymentActivity extends AppCompatActivity {
     private TextView tvSelectedPaymentMethod;
     private ImageView ivSelectedPaymentIcon;
 
-    // ✅ CARD INPUT FIELDS
+    // Card input fields
     private CardView cardStripeInput;
     private TextView tvCardInstructions;
     private TextInputEditText etCardNumber;
@@ -92,6 +94,10 @@ public class PaymentActivity extends AppCompatActivity {
     private PaymentService paymentService;
     private SharedPrefsManager prefsManager;
 
+    // ✅ NEW: Payment Intent Data
+    private String paymentIntentId;
+    private String clientSecret;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -101,7 +107,9 @@ public class PaymentActivity extends AppCompatActivity {
         setupToolbar();
         getIntentData();
         setupListeners();
-        setupPaymentMethodsDirectly();
+
+        // ✅ CHANGED: Load payment config from backend first
+        loadPaymentConfig();
 
         Log.d(TAG, "PaymentActivity created for transaction: " + transactionId);
     }
@@ -128,7 +136,7 @@ public class PaymentActivity extends AppCompatActivity {
         tvSelectedPaymentMethod = findViewById(R.id.tv_selected_payment_method);
         ivSelectedPaymentIcon = findViewById(R.id.iv_selected_payment_icon);
 
-        // ✅ CARD INPUT FIELDS
+        // Card input fields
         cardStripeInput = findViewById(R.id.card_stripe_input);
         tvCardInstructions = findViewById(R.id.tv_card_instructions);
         etCardNumber = findViewById(R.id.et_card_number);
@@ -174,16 +182,67 @@ public class PaymentActivity extends AppCompatActivity {
         tvDescription.setText("Select your payment method");
     }
 
+    // ✅ NEW: Load payment config from backend
+    private void loadPaymentConfig() {
+        Log.d(TAG, "🔄 Loading payment config from backend...");
+        showLoading(true);
+
+        paymentService.getPaymentConfig().enqueue(new Callback<StandardResponse<PaymentConfig>>() {
+            @Override
+            public void onResponse(Call<StandardResponse<PaymentConfig>> call,
+                                   Response<StandardResponse<PaymentConfig>> response) {
+                showLoading(false);
+
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    paymentConfig = response.body().getData();
+                    Log.d(TAG, "✅ Payment config loaded successfully");
+                    setupPaymentMethods();
+                } else {
+                    Log.e(TAG, "❌ Failed to load payment config: " +
+                            (response.body() != null ? response.body().getMessage() : "Unknown error"));
+                    // Fallback to default config
+                    setupPaymentMethodsWithFallback();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StandardResponse<PaymentConfig>> call, Throwable t) {
+                showLoading(false);
+                Log.e(TAG, "❌ Network error loading payment config", t);
+                setupPaymentMethodsWithFallback();
+            }
+        });
+    }
+
+    private void setupPaymentMethodsWithFallback() {
+        Log.d(TAG, "Using fallback payment config");
+        paymentConfig = new PaymentConfig();
+        paymentConfig.setPublishableKey("pk_test_fallback");
+        paymentConfig.setCurrency("VND");
+        setupPaymentMethods();
+    }
+
+    private void setupPaymentMethods() {
+        layoutPaymentMethods.removeAllViews();
+
+        addPaymentMethodOption(PaymentMethod.CARD, "Credit/Debit Card", R.drawable.ic_credit_card);
+        addPaymentMethodOption(PaymentMethod.DIGITAL_WALLET, "Digital Wallet", R.drawable.ic_wallet);
+        addPaymentMethodOption(PaymentMethod.BANK_TRANSFER, "Bank Transfer", R.drawable.ic_bank);
+        addPaymentMethodOption(PaymentMethod.CASH, "Cash Payment", R.drawable.ic_cash);
+
+        // Default to cash for simplicity
+        selectPaymentMethod(PaymentMethod.CASH);
+        Log.d(TAG, "✅ Payment methods setup completed");
+    }
+
     private void setupListeners() {
         btnProceedPayment.setOnClickListener(v -> proceedWithPayment());
         btnCancel.setOnClickListener(v -> showCancelConfirmation());
         selectedPaymentCard.setOnClickListener(v -> showPaymentMethodSelection());
 
-        // ✅ SETUP CARD INPUT LISTENERS
         setupCardInputListeners();
     }
 
-    // ✅ SETUP CARD INPUT LISTENERS
     private void setupCardInputListeners() {
         // Auto-format card number
         etCardNumber.addTextChangedListener(new TextWatcher() {
@@ -247,34 +306,11 @@ public class PaymentActivity extends AppCompatActivity {
         btnFillDeclined.setOnClickListener(v -> fillTestCard("4000 0000 0000 0002", "12/25", "123"));
     }
 
-    // ✅ FILL TEST CARD DATA
     private void fillTestCard(String cardNumber, String expiry, String cvc) {
         etCardNumber.setText(cardNumber);
         etExpiryDate.setText(expiry);
         etCvc.setText(cvc);
         Toast.makeText(this, "Test card filled", Toast.LENGTH_SHORT).show();
-    }
-
-    private void setupPaymentMethodsDirectly() {
-        Log.d(TAG, "Setting up payment methods directly");
-
-        paymentConfig = new PaymentConfig();
-        paymentConfig.setPublishableKey("pk_test_example");
-        paymentConfig.setCurrency("VND");
-
-        setupPaymentMethods();
-        Log.d(TAG, "✅ Payment methods setup completed");
-    }
-
-    private void setupPaymentMethods() {
-        layoutPaymentMethods.removeAllViews();
-
-        addPaymentMethodOption(PaymentMethod.CARD, "Credit/Debit Card", R.drawable.ic_credit_card);
-        addPaymentMethodOption(PaymentMethod.DIGITAL_WALLET, "Digital Wallet", R.drawable.ic_wallet);
-        addPaymentMethodOption(PaymentMethod.BANK_TRANSFER, "Bank Transfer", R.drawable.ic_bank);
-        addPaymentMethodOption(PaymentMethod.CASH, "Cash Payment", R.drawable.ic_cash);
-
-        selectPaymentMethod(PaymentMethod.CASH);
     }
 
     private void addPaymentMethodOption(PaymentMethod method, String name, int iconRes) {
@@ -303,7 +339,6 @@ public class PaymentActivity extends AppCompatActivity {
         selectedPaymentCard.setVisibility(View.VISIBLE);
         btnProceedPayment.setEnabled(true);
 
-        // ✅ CHỈ HIỂN THỊ CARD INPUT KHI CHỌN DEBIT/CREDIT CARD
         if (method == PaymentMethod.CARD) {
             showStripeCardInput();
         } else {
@@ -314,16 +349,12 @@ public class PaymentActivity extends AppCompatActivity {
         Log.d(TAG, "Selected payment method: " + method);
     }
 
-    // ✅ HIỂN THỊ CARD INPUT FORM
     private void showStripeCardInput() {
         cardStripeInput.setVisibility(View.VISIBLE);
         btnProceedPayment.setText("Pay with Card");
-
-        // Fill default test card for convenience
         fillTestCard("4242 4242 4242 4242", "12/25", "123");
     }
 
-    // ✅ ẨN CARD INPUT FORM
     private void hideStripeCardInput() {
         cardStripeInput.setVisibility(View.GONE);
         btnProceedPayment.setText("Proceed Payment");
@@ -359,7 +390,6 @@ public class PaymentActivity extends AppCompatActivity {
         }
     }
 
-    // ✅ VALIDATE CARD INPUT
     private boolean validateCardInput() {
         String cardNumber = etCardNumber.getText().toString().replaceAll("\\s", "");
         String expiry = etExpiryDate.getText().toString();
@@ -383,7 +413,7 @@ public class PaymentActivity extends AppCompatActivity {
         return true;
     }
 
-    // ✅ PROCEED WITH PAYMENT
+    // ✅ ENHANCED: Proceed with payment
     private void proceedWithPayment() {
         if (selectedPaymentMethod == null) {
             showError("Please select a payment method");
@@ -393,20 +423,20 @@ public class PaymentActivity extends AppCompatActivity {
         switch (selectedPaymentMethod) {
             case CARD:
                 if (validateCardInput()) {
-                    processCardPayment();
+                    createPaymentIntentAndProcess();
                 }
                 break;
 
             case CASH:
-                showSimplePaymentSuccess("Cash payment arranged. Please contact the seller.");
+                processNonCardPayment("Cash payment arranged. Please contact the seller.");
                 break;
 
             case BANK_TRANSFER:
-                showSimplePaymentSuccess("Bank transfer arranged. Please contact the seller for details.");
+                processNonCardPayment("Bank transfer arranged. Please contact the seller for details.");
                 break;
 
             case DIGITAL_WALLET:
-                showSimplePaymentSuccess("Digital wallet payment arranged.");
+                processNonCardPayment("Digital wallet payment arranged.");
                 break;
 
             default:
@@ -415,46 +445,167 @@ public class PaymentActivity extends AppCompatActivity {
         }
     }
 
-    // ✅ PROCESS CARD PAYMENT
-    private void processCardPayment() {
+    // ✅ NEW: Create payment intent and process
+    private void createPaymentIntentAndProcess() {
+        Log.d(TAG, "🔄 Creating payment intent for transaction: " + transactionId);
+        showLoading(true);
+
+        PaymentIntentRequest request = new PaymentIntentRequest();
+        request.setTransactionId(transactionId);
+        request.setDescription(description);
+
+        String userId = String.valueOf(prefsManager.getUserId());
+
+        paymentService.createPaymentIntent(userId, request)
+                .enqueue(new Callback<StandardResponse<PaymentIntentResponse>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<PaymentIntentResponse>> call,
+                                           Response<StandardResponse<PaymentIntentResponse>> response) {
+                        showLoading(false);
+
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            PaymentIntentResponse data = response.body().getData();
+                            paymentIntentId = data.getPaymentIntentId();
+                            clientSecret = data.getClientSecret();
+
+                            Log.d(TAG, "✅ Payment intent created: " + paymentIntentId);
+
+                            // Now process the card payment
+                            processCardPaymentWithIntent();
+                        } else {
+                            Log.e(TAG, "❌ Failed to create payment intent: " +
+                                    (response.body() != null ? response.body().getMessage() : "Unknown error"));
+                            showError("Failed to create payment intent");
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<PaymentIntentResponse>> call, Throwable t) {
+                        showLoading(false);
+                        Log.e(TAG, "❌ Network error creating payment intent", t);
+                        showError("Network error. Please try again.");
+                    }
+                });
+    }
+
+    // ✅ NEW: Process card payment with intent
+    private void processCardPaymentWithIntent() {
         String cardNumber = etCardNumber.getText().toString().replaceAll("\\s", "");
         String expiry = etExpiryDate.getText().toString();
         String cvc = etCvc.getText().toString();
 
-        Log.d(TAG, "Processing card payment: " + cardNumber.substring(0, 4) + "****");
+        Log.d(TAG, "🔄 Processing card payment with intent: " + paymentIntentId);
+        Log.d(TAG, "Card: " + cardNumber.substring(0, 4) + "****");
 
         showLoading(true);
 
-        // Simulate payment processing
+        // ✅ SIMULATE: Stripe payment processing
+        // In real implementation, này sẽ gọi Stripe SDK
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            showLoading(false);
-
             // Check if it's a decline test card
             if (cardNumber.equals("4000000000000002")) {
+                showLoading(false);
                 showError("Card declined. Please try a different card.");
             } else {
-                showCardPaymentSuccess(cardNumber);
+                // Payment successful, confirm with backend
+                confirmPaymentWithBackend();
             }
         }, 2000);
     }
 
-    // ✅ SHOW CARD PAYMENT SUCCESS
-    private void showCardPaymentSuccess(String cardNumber) {
+    // ✅ NEW: Confirm payment with backend
+    private void confirmPaymentWithBackend() {
+        Log.d(TAG, "🔄 Confirming payment with backend: " + paymentIntentId);
+
+        paymentService.confirmPayment(paymentIntentId)
+                .enqueue(new Callback<StandardResponse<Payment>>() {
+                    @Override
+                    public void onResponse(Call<StandardResponse<Payment>> call,
+                                           Response<StandardResponse<Payment>> response) {
+                        showLoading(false);
+
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            Payment payment = response.body().getData();
+                            Log.d(TAG, "✅ Payment confirmed successfully with backend");
+
+                            // Show success and return result
+                            showCardPaymentSuccessWithData(payment);
+                        } else {
+                            Log.e(TAG, "❌ Failed to confirm payment with backend: " +
+                                    (response.body() != null ? response.body().getMessage() : "Unknown error"));
+
+                            // Payment succeeded với Stripe nhưng backend confirmation failed
+                            showPartialSuccessDialog();
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<StandardResponse<Payment>> call, Throwable t) {
+                        showLoading(false);
+                        Log.e(TAG, "❌ Network error confirming payment", t);
+                        showPartialSuccessDialog();
+                    }
+                });
+    }
+
+    // ✅ NEW: Show card payment success with data
+    private void showCardPaymentSuccessWithData(Payment payment) {
+        String cardNumber = etCardNumber.getText().toString().replaceAll("\\s", "");
         String cardType = getCardType(cardNumber);
         String maskedCard = "**** **** **** " + cardNumber.substring(cardNumber.length() - 4);
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Payment Successful! 🎉");
-        builder.setMessage("Your " + cardType + " card (" + maskedCard + ") has been charged successfully.\n\nThe seller will be notified and you can arrange delivery.");
+        builder.setMessage("Your " + cardType + " card (" + maskedCard + ") has been charged successfully.\n\n" +
+                "Transaction has been completed and the seller will be notified.");
+
         builder.setPositiveButton("OK", (dialog, which) -> {
-            setResult(RESULT_OK);
+            // ✅ QUAN TRỌNG: Return với transaction data
+            Intent resultIntent = new Intent();
+            resultIntent.putExtra("payment_successful", true);
+            resultIntent.putExtra("transaction_id", transactionId);
+            resultIntent.putExtra("payment_intent_id", paymentIntentId);
+            setResult(RESULT_OK, resultIntent);
             finish();
         });
+
         builder.setCancelable(false);
         builder.show();
     }
 
-    // ✅ GET CARD TYPE
+    // ✅ NEW: Show partial success dialog
+    private void showPartialSuccessDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Payment Completed");
+        builder.setMessage("Your payment was processed successfully, but there was an issue updating the transaction status. Please contact support if needed.");
+
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            Intent resultIntent = new Intent();
+            resultIntent.putExtra("payment_successful", true);
+            resultIntent.putExtra("transaction_id", transactionId);
+            setResult(RESULT_OK, resultIntent);
+            finish();
+        });
+
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    // ✅ ENHANCED: Process non-card payment
+    private void processNonCardPayment(String message) {
+        Log.d(TAG, "🔄 Processing non-card payment: " + selectedPaymentMethod);
+
+        // For non-card payments, we still need to create a payment intent
+        // but mark it as pending awaiting manual confirmation
+        showLoading(true);
+
+        // Simulate processing
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            showLoading(false);
+            showSimplePaymentSuccess(message);
+        }, 1500);
+    }
+
     private String getCardType(String cardNumber) {
         if (cardNumber.startsWith("4")) {
             return "Visa";
@@ -470,7 +621,11 @@ public class PaymentActivity extends AppCompatActivity {
         builder.setTitle("Payment Arranged! 🎉");
         builder.setMessage(message);
         builder.setPositiveButton("OK", (dialog, which) -> {
-            setResult(RESULT_OK);
+            // ✅ FIXED: Return transaction data
+            Intent resultIntent = new Intent();
+            resultIntent.putExtra("payment_successful", true);
+            resultIntent.putExtra("transaction_id", transactionId);
+            setResult(RESULT_OK, resultIntent);
             finish();
         });
         builder.setCancelable(false);

@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/newtrade/api/PaymentService.java
 package com.example.newtrade.api;
 
 import com.example.newtrade.models.PagedResponse;
@@ -18,7 +17,6 @@ import retrofit2.http.Query;
 
 public interface PaymentService {
 
-    // ✅ SỬA: Thêm /api prefix cho tất cả endpoints
     @GET("api/payments/config")
     Call<StandardResponse<PaymentConfig>> getPaymentConfig();
 
@@ -28,6 +26,7 @@ public interface PaymentService {
             @Body PaymentIntentRequest request
     );
 
+    // ✅ ENHANCED: Confirm payment endpoint
     @POST("api/payments/confirm-payment")
     Call<StandardResponse<Payment>> confirmPayment(
             @Query("paymentIntentId") String paymentIntentId
@@ -58,7 +57,7 @@ public interface PaymentService {
             @Body RefundRequest refundRequest
     );
 
-    // Refund request model
+    // ✅ ENHANCED: Refund request model
     class RefundRequest {
         private Double amount;
         private String reason;
@@ -68,7 +67,6 @@ public interface PaymentService {
             this.reason = reason;
         }
 
-        // Getters and setters
         public Double getAmount() { return amount; }
         public void setAmount(Double amount) { this.amount = amount; }
 

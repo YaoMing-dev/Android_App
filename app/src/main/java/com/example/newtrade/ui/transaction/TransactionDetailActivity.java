@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/newtrade/ui/transaction/TransactionDetailActivity.java
 package com.example.newtrade.ui.transaction;
 
 import android.content.Intent;
@@ -251,7 +250,11 @@ public class TransactionDetailActivity extends AppCompatActivity {
         }
 
         // Contact button - always visible for completed/paid transactions
-        btnContact.setVisibility(View.VISIBLE);
+        if (transactionEligible) {
+            btnContact.setVisibility(View.VISIBLE);
+        } else {
+            btnContact.setVisibility(View.GONE);
+        }
 
         // Complete transaction button - only for sellers when transaction is paid but not completed
         if (transaction.isSeller(currentUserId) && transaction.isPaid() && !transaction.isCompleted()) {
@@ -265,7 +268,7 @@ public class TransactionDetailActivity extends AppCompatActivity {
         }
     }
 
-    // ✅ NEW: Check backend để xác định có thể review không
+    // ✅ ENHANCED: Check backend để xác định có thể review không
     private void checkCanReviewFromBackend() {
         if (transaction == null) {
             Log.e(TAG, "❌ Cannot check review eligibility - transaction is null");
@@ -274,28 +277,37 @@ public class TransactionDetailActivity extends AppCompatActivity {
 
         Long currentUserId = prefsManager.getUserId();
 
-        Log.d(TAG, "🔍 Checking review eligibility with backend for transaction: " + transaction.getId());
+        Log.d(TAG, "🔍 Checking review eligibility with backend...");
+        Log.d(TAG, "Request: GET /api/reviews/transaction/" + transaction.getId() + "/can-review");
+        Log.d(TAG, "Header: User-ID=" + currentUserId);
 
+        // ✅ FIXED: Sử dụng đúng parameter order như backend expects
         ApiClient.getReviewService().canReviewTransaction(transaction.getId(), currentUserId)
                 .enqueue(new Callback<StandardResponse<Map<String, Boolean>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Boolean>>> call,
                                            Response<StandardResponse<Map<String, Boolean>>> response) {
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            Map<String, Boolean> data = response.body().getData();
-                            boolean canReview = data != null && Boolean.TRUE.equals(data.get("canReview"));
 
-                            Log.d(TAG, "✅ Backend canReview response: " + canReview);
+                        Log.d(TAG, "🔍 Review eligibility response: " + response.code());
 
-                            if (canReview) {
-                                showReviewButton(true);
+                        if (response.isSuccessful() && response.body() != null) {
+                            if (response.body().isSuccess()) {
+                                Map<String, Boolean> data = response.body().getData();
+                                boolean canReview = data != null && Boolean.TRUE.equals(data.get("canReview"));
+
+                                Log.d(TAG, "✅ Backend canReview response: " + canReview);
+                                Log.d(TAG, "✅ Backend message: " + response.body().getMessage());
+
+                                showReviewButton(canReview);
                             } else {
-                                showReviewButton(false);
+                                Log.e(TAG, "❌ Backend returned error: " + response.body().getMessage());
+                                showReviewButtonFallback();
                             }
                         } else {
-                            Log.e(TAG, "❌ Backend error checking review eligibility: " +
-                                    (response.body() != null ? response.body().getMessage() : response.message()));
-                            // Fallback: show button for user to try
+                            Log.e(TAG, "❌ Backend error checking review eligibility: " + response.code());
+                            if (response.body() != null) {
+                                Log.e(TAG, "Error body: " + response.body().getMessage());
+                            }
                             showReviewButtonFallback();
                         }
                     }
@@ -303,18 +315,18 @@ public class TransactionDetailActivity extends AppCompatActivity {
                     @Override
                     public void onFailure(Call<StandardResponse<Map<String, Boolean>>> call, Throwable t) {
                         Log.e(TAG, "❌ Network error checking review eligibility", t);
-                        // Fallback: show button anyway
                         showReviewButtonFallback();
                     }
                 });
     }
 
-    // ✅ NEW: Show review button based on eligibility
+    // ✅ ENHANCED: Show review button based on eligibility
     private void showReviewButton(boolean canReview) {
         if (canReview) {
             btnWriteReview.setVisibility(View.VISIBLE);
             btnWriteReview.setText("Write Review ⭐");
             btnWriteReview.setEnabled(true);
+
             // Set primary color if available
             try {
                 btnWriteReview.setBackgroundTintList(getColorStateList(R.color.primary_color));
@@ -322,32 +334,37 @@ public class TransactionDetailActivity extends AppCompatActivity {
                 // Fallback to default if color not found
                 Log.w(TAG, "Primary color not found, using default");
             }
+
             Log.d(TAG, "✅ Showing enabled 'Write Review' button");
         } else {
             btnWriteReview.setVisibility(View.VISIBLE);
             btnWriteReview.setText("Already Reviewed ✓");
             btnWriteReview.setEnabled(false);
+
             // Set gray color for disabled state
             try {
                 btnWriteReview.setBackgroundTintList(getColorStateList(android.R.color.darker_gray));
             } catch (Exception e) {
                 Log.w(TAG, "Gray color not found, using default");
             }
+
             Log.d(TAG, "⚪ Showing disabled 'Already Reviewed' button");
         }
     }
 
-    // ✅ NEW: Fallback method để show review button
+    // ✅ ENHANCED: Fallback method để show review button
     private void showReviewButtonFallback() {
         btnWriteReview.setVisibility(View.VISIBLE);
         btnWriteReview.setText("Write Review");
         btnWriteReview.setEnabled(true);
+
         // Use default button color
         try {
             btnWriteReview.setBackgroundTintList(getColorStateList(R.color.primary_color));
         } catch (Exception e) {
             Log.w(TAG, "Primary color not found, using default");
         }
+
         Log.d(TAG, "✅ Showing review button as fallback (backend check failed)");
     }
 
@@ -434,9 +451,11 @@ public class TransactionDetailActivity extends AppCompatActivity {
 
                             Log.d(TAG, "✅ Transaction completed successfully");
 
-                            // ✅ NEW: Auto-prompt cho review sau khi complete
+                            // ✅ ENHANCED: Auto-prompt cho review sau khi complete
                             if (transaction.isCompleted()) {
                                 Toast.makeText(TransactionDetailActivity.this, "You can now write a review! ⭐", Toast.LENGTH_LONG).show();
+                                // Re-check review eligibility after completion
+                                checkCanReviewFromBackend();
                             }
                         } else {
                             String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to complete transaction";
@@ -461,7 +480,9 @@ public class TransactionDetailActivity extends AppCompatActivity {
             // ✅ ENHANCED: Show success message and reload data
             Toast.makeText(this, "Thank you for your review! ⭐", Toast.LENGTH_SHORT).show();
             Log.d(TAG, "✅ Review submitted successfully, reloading transaction data");
-            loadTransactionDetail(); // Reload để update review status
+
+            // Reload transaction detail to update review status
+            loadTransactionDetail();
         }
     }
 
