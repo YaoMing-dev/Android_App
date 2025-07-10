@@ -229,5 +229,20 @@ public class SharedPrefsManager {
     public boolean isPaymentNotificationsEnabled() {
         return getBoolean("payment_notifications_enabled", true);
     }
+    public void setNotificationsEnabled(boolean enabled) {
+        prefs.edit().putBoolean("notifications_enabled", enabled).apply();
+    }
+
+    public boolean isNotificationsEnabled() {
+        return prefs.getBoolean("notifications_enabled", true);
+    }
+
+    public void setLocationEnabled(boolean enabled) {
+        prefs.edit().putBoolean("location_enabled", enabled).apply();
+    }
+
+    public boolean isLocationEnabled() {
+        return prefs.getBoolean("location_enabled", true);
+    }
 
 }

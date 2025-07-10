@@ -8,9 +8,13 @@ import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.http.Body;
+import retrofit2.http.DELETE;
 import retrofit2.http.GET;
+import retrofit2.http.HTTP;
+import retrofit2.http.Header;
 import retrofit2.http.PUT;
 import retrofit2.http.Path;
+import retrofit2.http.Query;
 
 public interface UserService {
 
@@ -33,4 +37,9 @@ public interface UserService {
     // ✅ Update FCM token cho push notifications
     @PUT("api/users/fcm-token")
     Call<StandardResponse<String>> updateFcmToken(@Body Map<String, String> request);
+    @DELETE("api/users/delete")
+    Call<StandardResponse<Void>> deleteAccount(
+            @Header("User-ID") Long userId,
+            @Query("confirmEmail") String confirmEmail
+    );
 }
