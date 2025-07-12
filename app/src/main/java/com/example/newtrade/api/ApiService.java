@@ -222,4 +222,40 @@ public interface ApiService {
             @Body Map<String, Object> productData,
             @retrofit2.http.Header("User-ID") Long userId
     );
+
+    // ===== ANALYTICS & RECOMMENDATIONS - NEW =====
+
+    @POST("api/analytics/track-behavior")
+    Call<StandardResponse<String>> trackUserBehavior(@Body Map<String, Object> behaviorData);
+
+    @GET("api/recommendations/personalized")
+    Call<StandardResponse<Map<String, Object>>> getPersonalizedRecommendations(
+            @Query("userId") Long userId,
+            @Query("limit") int limit
+    );
+
+    @GET("api/recommendations/popular")
+    Call<StandardResponse<Map<String, Object>>> getPopularRecommendations(
+            @Query("limit") int limit
+    );
+
+    @GET("api/recommendations/nearby")
+    Call<StandardResponse<Map<String, Object>>> getNearbyRecommendations(
+            @Query("latitude") double latitude,
+            @Query("longitude") double longitude,
+            @Query("radius") double radius,
+            @Query("limit") int limit
+    );
+
+    @GET("api/recommendations/category/{categoryId}")
+    Call<StandardResponse<Map<String, Object>>> getCategoryRecommendations(
+            @Path("categoryId") Long categoryId,
+            @Query("limit") int limit
+    );
+
+    @GET("api/analytics/trending")
+    Call<StandardResponse<Map<String, Object>>> getTrendingProducts(@Query("limit") int limit);
+
+    @GET("api/analytics/popular-searches")
+    Call<StandardResponse<List<String>>> getPopularSearches(@Query("limit") int limit);
 }

@@ -1,6 +1,10 @@
 // app/src/main/java/com/example/newtrade/activities/NotificationActivity.java
 package com.example.newtrade.activities;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
@@ -13,6 +17,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.NotificationAdapter;
 import com.example.newtrade.api.ApiClient;
@@ -116,7 +121,6 @@ public class NotificationActivity extends AppCompatActivity implements
             swipeRefresh.setRefreshing(true);
         }
 
-        // ✅ UPDATED: Sử dụng Map<String, Object> response
         Call<StandardResponse<Map<String, Object>>> call =
                 notificationService.getNotifications(page, Constants.DEFAULT_PAGE_SIZE);
 
@@ -134,7 +138,6 @@ public class NotificationActivity extends AppCompatActivity implements
                     if (standardResponse.isSuccess()) {
                         Map<String, Object> responseData = standardResponse.getData();
 
-                        // ✅ UPDATED: Parse Map to PagedResponse
                         PagedResponse<NotificationResponse> pagedResponse =
                                 NotificationResponseHelper.parsePagedResponse(responseData);
 
@@ -192,8 +195,29 @@ public class NotificationActivity extends AppCompatActivity implements
         markAsRead(notification);
     }
 
+    // ✅ NEW: Handle promotion clicks - FR-4.2.1
+    @Override
+    public void onPromotionClick(NotificationResponse notification) {
+        // Mark as read
+        if (notification.isUnread()) {
+            markAsRead(notification);
+        }
+
+        // Handle promotion navigation
+        handlePromotionDeepLink(notification);
+    }
+
+    // ✅ NEW: Handle promo code copy - FR-4.2.1
+    @Override
+    public void onPromoCodeCopy(String promoCode) {
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        ClipData clip = ClipData.newPlainText("Promo Code", promoCode);
+        clipboard.setPrimaryClip(clip);
+
+        Toast.makeText(this, "Promo code copied: " + promoCode, Toast.LENGTH_SHORT).show();
+    }
+
     private void markAsRead(NotificationResponse notification) {
-        // ✅ UPDATED: Sử dụng String response
         Call<StandardResponse<String>> call = notificationService.markAsRead(notification.getId());
 
         call.enqueue(new Callback<StandardResponse<String>>() {
@@ -216,37 +240,93 @@ public class NotificationActivity extends AppCompatActivity implements
         });
     }
 
+    // ✅ UPDATED: Enhanced deep link handling
     private void handleNotificationDeepLink(NotificationResponse notification) {
-        // Handle deep linking based on notification type
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
         switch (notification.getType()) {
             case MESSAGE:
-                // Navigate to chat screen
-                // TODO: Implement navigation
+                intent.putExtra("navigate_to", "chat");
+                intent.putExtra("conversation_id", notification.getReferenceId());
                 break;
 
             case OFFER:
-                // Navigate to offer details
-                // TODO: Implement navigation
+                intent.putExtra("navigate_to", "offers");
+                intent.putExtra("offer_id", notification.getReferenceId());
                 break;
 
             case TRANSACTION:
-                // Navigate to transaction/listing details
-                // TODO: Implement navigation
+                intent.putExtra("navigate_to", "transactions");
+                intent.putExtra("transaction_id", notification.getReferenceId());
+                break;
+
+            case LISTING_UPDATE:    // ✅ NEW
+                intent.putExtra("navigate_to", "listings");
+                intent.putExtra("product_id", notification.getReferenceId());
                 break;
 
             case REVIEW:
-                // Navigate to review details
-                // TODO: Implement navigation
+                intent.putExtra("navigate_to", "reviews");
+                intent.putExtra("review_id", notification.getReferenceId());
                 break;
 
             case GENERAL:
-                // Handle general notifications
-                break;
+            default:
+                // Stay in notifications
+                return;
+        }
+
+        startActivity(intent);
+    }
+
+    // ✅ NEW: Handle promotion deep linking - FR-4.2.1
+    private void handlePromotionDeepLink(NotificationResponse notification) {
+        if (!notification.isPromotion()) {
+            handleNotificationDeepLink(notification);
+            return;
+        }
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra("navigate_to", "promotions");
+
+        // Add promotion-specific data
+        intent.putExtra("promotion_type", notification.getPromotionType());
+        intent.putExtra("promo_code", notification.getPromoCode());
+        intent.putExtra("notification_id", notification.getId());
+
+        // Show different screens based on promotion type
+        String promotionType = notification.getPromotionType();
+        if (promotionType != null) {
+            switch (promotionType.toUpperCase()) {
+                case "DISCOUNT":
+                case "FLASH_SALE":
+                    intent.putExtra("navigate_to", "deals");
+                    break;
+                case "NEW_FEATURE":
+                    intent.putExtra("navigate_to", "features");
+                    break;
+                case "LOCATION":
+                    intent.putExtra("navigate_to", "nearby");
+                    break;
+                default:
+                    intent.putExtra("navigate_to", "home");
+                    break;
+            }
+        }
+
+        startActivity(intent);
+
+        // Show toast if promo code exists
+        if (notification.hasPromoCode()) {
+            Toast.makeText(this,
+                    "Use promo code: " + notification.getPromoCode(),
+                    Toast.LENGTH_LONG).show();
         }
     }
 
     private void updateUnreadCount() {
-        // ✅ UPDATED: Sử dụng Map<String, Object> response
         Call<StandardResponse<Map<String, Object>>> call = notificationService.getUnreadCount();
 
         call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
@@ -258,11 +338,9 @@ public class NotificationActivity extends AppCompatActivity implements
                     if (standardResponse.isSuccess()) {
                         Map<String, Object> data = standardResponse.getData();
 
-                        // ✅ UPDATED: Parse unread count from Map
                         long unreadCount = NotificationResponseHelper.parseUnreadCount(data);
 
                         // Update UI badge
-                        // TODO: Update badge in UI
                         Log.d(TAG, "Unread count: " + unreadCount);
                     }
                 }

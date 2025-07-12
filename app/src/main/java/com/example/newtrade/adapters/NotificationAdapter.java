@@ -23,6 +23,9 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     public interface OnNotificationClickListener {
         void onNotificationClick(NotificationResponse notification);
         void onMarkAsReadClick(NotificationResponse notification);
+        // ✅ NEW: Add promotion-specific click handler
+        void onPromotionClick(NotificationResponse notification);
+        void onPromoCodeCopy(String promoCode);
     }
 
     public NotificationAdapter(List<NotificationResponse> notifications,
@@ -69,14 +72,40 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
 
             itemView.setOnClickListener(v -> {
                 if (listener != null) {
-                    listener.onNotificationClick(notifications.get(getAdapterPosition()));
+                    NotificationResponse notification = notifications.get(getAdapterPosition());
+
+                    // ✅ NEW: Handle promotion clicks differently
+                    if (notification.isPromotion()) {
+                        listener.onPromotionClick(notification);
+                    } else {
+                        listener.onNotificationClick(notification);
+                    }
                 }
+            });
+
+            // ✅ NEW: Add long click for promo code copy (using existing message TextView)
+            itemView.setOnLongClickListener(v -> {
+                if (listener != null) {
+                    NotificationResponse notification = notifications.get(getAdapterPosition());
+                    if (notification.hasPromoCode()) {
+                        listener.onPromoCodeCopy(notification.getPromoCode());
+                        return true;
+                    }
+                }
+                return false;
             });
         }
 
         public void bind(NotificationResponse notification) {
             textTitle.setText(notification.getTitle());
-            textMessage.setText(notification.getMessage());
+
+            // ✅ NEW: Enhanced message display for promotions
+            String displayMessage = notification.getMessage();
+            if (notification.isPromotion() && notification.hasPromoCode()) {
+                displayMessage += "\n🎟️ Code: " + notification.getPromoCode();
+            }
+            textMessage.setText(displayMessage);
+
             textTime.setText(notification.getFormattedTime());
 
             // Set icon based on type
@@ -86,27 +115,52 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             unreadIndicator.setVisibility(notification.isUnread() ?
                     View.VISIBLE : View.GONE);
 
-            // Set background tint for unread notifications
-            itemView.setAlpha(notification.isUnread() ? 1.0f : 0.7f);
+            // ✅ NEW: Enhanced visual styling for different notification types
+            if (notification.isUnread()) {
+                itemView.setAlpha(1.0f);
+                if (notification.isPromotion()) {
+                    // Subtle promotion highlighting
+                    itemView.setBackgroundColor(itemView.getContext().getColor(android.R.color.holo_orange_light));
+                } else {
+                    itemView.setBackgroundColor(itemView.getContext().getColor(android.R.color.white));
+                }
+            } else {
+                itemView.setAlpha(0.7f);
+                itemView.setBackgroundColor(itemView.getContext().getColor(android.R.color.transparent));
+            }
         }
 
+        // ✅ UPDATED: Enhanced notification icon setting with promotion support
         private void setNotificationIcon(NotificationResponse.NotificationType type) {
             switch (type) {
                 case MESSAGE:
                     iconType.setImageResource(R.drawable.ic_message);
+                    iconType.setColorFilter(itemView.getContext().getColor(android.R.color.holo_green_dark));
                     break;
                 case OFFER:
                     iconType.setImageResource(R.drawable.ic_offer);
+                    iconType.setColorFilter(itemView.getContext().getColor(android.R.color.holo_purple));
                     break;
                 case TRANSACTION:
-                    iconType.setImageResource(R.drawable.ic_transaction);
+                    iconType.setImageResource(R.drawable.ic_notification);
+                    iconType.setColorFilter(itemView.getContext().getColor(android.R.color.holo_blue_dark));
                     break;
                 case REVIEW:
                     iconType.setImageResource(R.drawable.ic_star);
+                    iconType.setColorFilter(itemView.getContext().getColor(android.R.color.holo_orange_dark));
+                    break;
+                case PROMOTION:         // ✅ NEW
+                    iconType.setImageResource(R.drawable.ic_local_offer);
+                    iconType.setColorFilter(itemView.getContext().getColor(android.R.color.holo_red_dark));
+                    break;
+                case LISTING_UPDATE:    // ✅ NEW
+                    iconType.setImageResource(R.drawable.ic_notification);
+                    iconType.setColorFilter(itemView.getContext().getColor(android.R.color.holo_blue_light));
                     break;
                 case GENERAL:
                 default:
                     iconType.setImageResource(R.drawable.ic_notification);
+                    iconType.setColorFilter(itemView.getContext().getColor(android.R.color.darker_gray));
                     break;
             }
         }

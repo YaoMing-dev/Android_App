@@ -30,7 +30,7 @@ import com.example.newtrade.ui.review.ReviewListActivity;
 import com.example.newtrade.ui.profile.OfferHistoryActivity;
 import com.example.newtrade.ui.transaction.TransactionHistoryActivity;
 import com.example.newtrade.ui.profile.SavedItemsActivity;
-import com.example.newtrade.ui.profile.MyListingsActivity;        // ✅ THÊM IMPORT NÀY
+import com.example.newtrade.ui.profile.MyListingsActivity;
 import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -49,9 +49,9 @@ public class ProfileFragment extends Fragment {
     // UI Components
     private CircleImageView ivProfilePicture;
     private TextView tvDisplayName, tvEmail, tvMemberSince;
+    private TextView tvBio; // ✅ THÊM: Bio TextView
     private TextView tvListingsCount, tvSoldCount, tvBoughtCount;
     private LinearLayout llMyListings, llSavedItems, llOfferHistory, llTransactionHistory;
-
     private LinearLayout llReviews, llAccountSettings, llHelpSupport, llAbout, llLogout;
     private FloatingActionButton fabEditProfile;
 
@@ -97,6 +97,7 @@ public class ProfileFragment extends Fragment {
         tvDisplayName = view.findViewById(R.id.tv_display_name);
         tvEmail = view.findViewById(R.id.tv_email);
         tvMemberSince = view.findViewById(R.id.tv_member_since);
+        tvBio = view.findViewById(R.id.tv_bio); // ✅ THÊM: Initialize bio TextView
 
         // Stats
         llRatingSection = view.findViewById(R.id.ll_rating_section);
@@ -156,7 +157,7 @@ public class ProfileFragment extends Fragment {
             llTransactionHistory.setOnClickListener(v -> openTransactionHistory());
         }
         if (llOfferHistory != null) {
-            llOfferHistory.setOnClickListener(v -> openOfferHistory()); // ✅ THÊM
+            llOfferHistory.setOnClickListener(v -> openOfferHistory());
         }
 
         if (llReviews != null) {
@@ -233,6 +234,7 @@ public class ProfileFragment extends Fragment {
                     }
                 });
     }
+
     private void loadReviewCountForDisplay(Long userId, Double rating) {
         // ✅ Get total review count từ backend paginated API
         ApiClient.getReviewService().getUserReviews(userId, 0, 1)
@@ -263,6 +265,7 @@ public class ProfileFragment extends Fragment {
                     }
                 });
     }
+
     private void displayBackendRatingInfo(Double rating, int reviewCount) {
         if (rating != null && rating.doubleValue() > 0 && reviewCount > 0) {
             tvUserRating.setText(String.format("%.1f", rating));
@@ -274,42 +277,6 @@ public class ProfileFragment extends Fragment {
             llRatingSection.setVisibility(View.GONE);
             Log.d(TAG, "❌ No rating to display: rating=" + rating + ", reviewCount=" + reviewCount);
         }
-    }
-
-    private void loadUserAverageRating(int reviewCount) {
-        Long userId = prefsManager.getUserId();
-
-        ApiClient.getApiService().getCurrentUserProfile()
-                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                    @Override
-                    public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
-                                           Response<StandardResponse<Map<String, Object>>> response) {
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            Map<String, Object> userData = response.body().getData();
-
-                            Double rating = null;
-                            if (userData.get("rating") instanceof Number) {
-                                rating = ((Number) userData.get("rating")).doubleValue();
-                            }
-
-                            if (rating != null && rating > 0) {
-                                tvUserRating.setText(String.format("%.1f", rating));
-                                tvReviewCount.setText(String.format("(%d reviews)", reviewCount));
-                                llRatingSection.setVisibility(View.VISIBLE);
-
-                                Log.d(TAG, "✅ Displayed rating: " + rating + " with " + reviewCount + " reviews");
-                            } else {
-                                llRatingSection.setVisibility(View.GONE);
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
-                        Log.e(TAG, "Failed to load average rating", t);
-                        llRatingSection.setVisibility(View.GONE);
-                    }
-                });
     }
 
     private void openOfferHistory() {
@@ -381,6 +348,7 @@ public class ProfileFragment extends Fragment {
                 });
     }
 
+    // ✅ UPDATED: updateProfileFromServer() với bio handling
     private void updateProfileFromServer(Map<String, Object> profile) {
         try {
             // Update stats
@@ -400,6 +368,24 @@ public class ProfileFragment extends Fragment {
             if (tvMemberSince != null && profile.get("createdAt") != null) {
                 String createdAt = profile.get("createdAt").toString();
                 tvMemberSince.setText("Member since " + createdAt.substring(0, 4));
+            }
+
+            // ✅ THÊM: Update bio từ server data
+            if (tvBio != null && profile.get("bio") != null) {
+                String bio = profile.get("bio").toString().trim();
+                if (!bio.isEmpty()) {
+                    tvBio.setText(bio);
+                    tvBio.setVisibility(View.VISIBLE);
+                    Log.d(TAG, "✅ Bio displayed: " + bio);
+                } else {
+                    tvBio.setVisibility(View.GONE);
+                    Log.d(TAG, "❌ Bio is empty, hiding view");
+                }
+            } else {
+                if (tvBio != null) {
+                    tvBio.setVisibility(View.GONE);
+                }
+                Log.d(TAG, "❌ No bio data from server");
             }
 
             // Update profile picture if different from SharedPrefs

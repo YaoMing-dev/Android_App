@@ -688,31 +688,72 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
 
     // Method chính nhận ProductStatus enum
     private void updateProductStatus(Product product, Product.ProductStatus newStatus) {
+        // ✅ THÊM: Show loading với progress dialog
+        android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+        progressDialog.setMessage("Updating product status...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
         Map<String, Object> updateData = new HashMap<>();
-        updateData.put("status", newStatus.name()); // Convert enum to String for API
+        updateData.put("status", newStatus.name());
 
         ApiClient.getProductService().updateProduct(product.getId(), updateData)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
                                            @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                        progressDialog.dismiss();
+
                         if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                             // Update local product status
                             product.setStatus(newStatus);
                             productAdapter.notifyDataSetChanged();
-                            showSuccess("Status updated to " + newStatus.getDisplayName());
-                            Log.d(TAG, "✅ Status updated: " + newStatus.name());
+
+                            // ✅ THÊM: Better success feedback
+                            String statusName = getStatusDisplayName(newStatus);
+                            showSuccessWithSnackbar("✅ Product status changed to " + statusName);
+
                         } else {
-                            showError("Failed to update status");
+                            String error = response.body() != null ?
+                                    response.body().getMessage() : "Failed to update status";
+                            showErrorWithSnackbar("❌ " + error);
                         }
                     }
 
                     @Override
                     public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                        Log.e(TAG, "❌ Failed to update status", t);
-                        showError("Network error");
+                        progressDialog.dismiss();
+                        Log.e(TAG, "❌ Failed to update product status", t);
+                        showErrorWithSnackbar("❌ Network error. Please try again.");
                     }
                 });
+    }
+
+    private String getStatusDisplayName(Product.ProductStatus status) {
+        switch (status) {
+            case AVAILABLE: return "Available";
+            case SOLD: return "Sold";
+            case PAUSED: return "Paused";
+            case ARCHIVED: return "Archived";
+            default: return status.name();
+        }
+    }
+    private void showSuccessWithSnackbar(String message) {
+        com.google.android.material.snackbar.Snackbar snackbar =
+                com.google.android.material.snackbar.Snackbar.make(
+                        findViewById(android.R.id.content), message,
+                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
+        snackbar.setBackgroundTint(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_green_dark));
+        snackbar.show();
+    }
+    private void showErrorWithSnackbar(String message) {
+        com.google.android.material.snackbar.Snackbar snackbar =
+                com.google.android.material.snackbar.Snackbar.make(
+                        findViewById(android.R.id.content), message,
+                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
+        snackbar.setBackgroundTint(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_red_dark));
+        snackbar.setAction("RETRY", v -> refreshData());
+        snackbar.show();
     }
 
     // Overload method để hỗ trợ String (backward compatibility)
@@ -765,7 +806,7 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
     }
 
     private void showSuccess(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        showSuccessWithSnackbar("✅ " + message);
         Log.d(TAG, "Success: " + message);
     }
 
@@ -789,7 +830,7 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
     // ===== UTILITY =====
 
     private void showError(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        showErrorWithSnackbar("❌ " + message);
         Log.e(TAG, "Error: " + message);
     }
 

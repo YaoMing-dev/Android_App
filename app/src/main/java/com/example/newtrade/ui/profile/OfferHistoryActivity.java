@@ -112,33 +112,35 @@ public class OfferHistoryActivity extends AppCompatActivity implements OfferAdap
     private void setupRecyclerView() {
         offerAdapter = new OfferAdapter(offers, currentTab, this);
 
-        // ✅ SET ACTION LISTENER
+        // ✅ SET ACTION LISTENER - QUAN TRỌNG!
         offerAdapter.setOnOfferActionListener(new OfferAdapter.OnOfferActionListener() {
             @Override
             public void onOfferAccepted(Offer offer) {
+                android.util.Log.d("OfferHistory", "✅ Accept clicked for offer: " + offer.getId());
                 respondToOffer(offer.getId(), "ACCEPTED", null, "Thank you! I accept your offer.");
             }
 
             @Override
             public void onOfferRejected(Offer offer) {
+                android.util.Log.d("OfferHistory", "✅ Reject clicked for offer: " + offer.getId());
                 respondToOffer(offer.getId(), "REJECTED", null, "Sorry, I cannot accept this offer.");
             }
 
             @Override
             public void onOfferCountered(Offer offer, double counterAmount, String message) {
+                android.util.Log.d("OfferHistory", "✅ Counter clicked for offer: " + offer.getId() + " amount: " + counterAmount);
                 respondToOffer(offer.getId(), "COUNTERED", counterAmount, message);
             }
 
             @Override
             public void onOfferCancelled(Offer offer) {
+                android.util.Log.d("OfferHistory", "✅ Cancel clicked for offer: " + offer.getId());
                 cancelOffer(offer.getId());
             }
         });
 
         rvOffers.setLayoutManager(new LinearLayoutManager(this));
         rvOffers.setAdapter(offerAdapter);
-
-        // ✅ PAGINATION...
     }
 
     // ✅ THÊM methods cho API calls:
@@ -146,50 +148,36 @@ public class OfferHistoryActivity extends AppCompatActivity implements OfferAdap
         Log.d(TAG, "🔄 Responding to offer: " + offerId + " with status: " + status +
                 (counterAmount != null ? ", amount: " + counterAmount : ""));
 
+        // ✅ THÊM: Show loading state
+        swipeRefresh.setRefreshing(true);
+
         ApiClient.getOfferService().respondToOffer(offerId, status, counterAmount, message)
                 .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
                     @Override
                     public void onResponse(Call<StandardResponse<Map<String, Object>>> call,
                                            Response<StandardResponse<Map<String, Object>>> response) {
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            String successMsg = "ACCEPTED".equals(status) ? "Offer accepted!" :
-                                    "REJECTED".equals(status) ? "Offer rejected!" :
-                                            "COUNTERED".equals(status) ? "Counter offer sent!" : "Response sent!";
+                        swipeRefresh.setRefreshing(false);
 
-                            Toast.makeText(OfferHistoryActivity.this, successMsg, Toast.LENGTH_SHORT).show();
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            String successMsg = getSuccessMessage(status);
+                            showSuccessMessage(successMsg);
                             refreshOffers(); // Reload data
 
                         } else {
-                            // ✅ BETTER ERROR HANDLING
-                            String error = "Failed to respond to offer";
-                            if (response.body() != null) {
-                                String backendError = response.body().getMessage();
-
-                                if (backendError.contains("Offer not found")) {
-                                    error = "Offer no longer exists";
-                                } else if (backendError.contains("Only seller can respond")) {
-                                    error = "You can only respond to offers on your products";
-                                } else if (backendError.contains("no longer pending")) {
-                                    error = "Offer has already been responded to";
-                                } else if (backendError.contains("expired")) {
-                                    error = "Offer has expired";
-                                } else {
-                                    error = backendError;
-                                }
-                            }
-
-                            Log.e(TAG, "❌ Respond error: " + response.code() + " - " + error);
-                            Toast.makeText(OfferHistoryActivity.this, error, Toast.LENGTH_LONG).show();
+                            String error = getDetailedErrorMessage(response);
+                            showErrorMessage(error);
                         }
                     }
 
                     @Override
                     public void onFailure(Call<StandardResponse<Map<String, Object>>> call, Throwable t) {
+                        swipeRefresh.setRefreshing(false);
                         Log.e(TAG, "❌ Network error responding to offer", t);
-                        Toast.makeText(OfferHistoryActivity.this, "Network error. Please try again.", Toast.LENGTH_SHORT).show();
+                        showErrorMessage("Network error. Please check your connection and try again.");
                     }
                 });
     }
+
     private void cancelOffer(Long offerId) {
         ApiClient.getOfferService().cancelOffer(offerId)
                 .enqueue(new Callback<StandardResponse<String>>() {
@@ -210,6 +198,42 @@ public class OfferHistoryActivity extends AppCompatActivity implements OfferAdap
                     }
                 });
     }
+
+    private String getSuccessMessage(String status) {
+        switch (status) {
+            case "ACCEPTED": return "✅ Offer accepted! The buyer will be notified.";
+            case "REJECTED": return "❌ Offer rejected and buyer notified.";
+            case "COUNTERED": return "💬 Counter offer sent successfully!";
+            default: return "✅ Response sent successfully!";
+        }
+    }
+    private String getDetailedErrorMessage(Response<StandardResponse<Map<String, Object>>> response) {
+        if (response.body() != null) {
+            String backendError = response.body().getMessage();
+
+            if (backendError.contains("Offer not found")) {
+                return "This offer no longer exists. It may have been cancelled or expired.";
+            } else if (backendError.contains("Only seller can respond")) {
+                return "You can only respond to offers on your own products.";
+            } else if (backendError.contains("no longer pending")) {
+                return "This offer has already been responded to.";
+            } else if (backendError.contains("expired")) {
+                return "This offer has expired and can no longer be responded to.";
+            } else {
+                return backendError;
+            }
+        }
+        return "Failed to respond to offer. Please try again.";
+    }
+
+    private void showSuccessMessage(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    private void showErrorMessage(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
 
     private void setupSwipeRefresh() {
         swipeRefresh.setOnRefreshListener(this::refreshOffers);

@@ -195,6 +195,96 @@ public class Constants {
     public static final String ERROR_PAYMENT_NETWORK = "Lỗi kết nối thanh toán";
     public static final String ERROR_STRIPE_NOT_INITIALIZED = "Stripe chưa được khởi tạo";
 
+
+
+
+    public static final String NOTIFICATION_TYPE_MESSAGE = "MESSAGE";
+    public static final String NOTIFICATION_TYPE_OFFER = "OFFER";
+    public static final String NOTIFICATION_TYPE_PROMOTION = "PROMOTION";
+    public static final String NOTIFICATION_TYPE_LISTING_UPDATE = "LISTING_UPDATE";
+    public static final String NOTIFICATION_TYPE_TRANSACTION = "TRANSACTION";
+    public static final String NOTIFICATION_TYPE_GENERAL = "GENERAL";
+
+    // Promotion Types
+    public static final String PROMOTION_TYPE_DISCOUNT = "DISCOUNT";
+    public static final String PROMOTION_TYPE_FLASH_SALE = "FLASH_SALE";
+    public static final String PROMOTION_TYPE_NEW_FEATURE = "NEW_FEATURE";
+    public static final String PROMOTION_TYPE_LOCATION = "LOCATION";
+    public static final String PROMOTION_TYPE_SEASONAL = "SEASONAL";
+    public static final String PROMOTION_TYPE_WELCOME = "WELCOME";
+
+    // Notification Actions
+    public static final String ACTION_VIEW_PROMOTION = "view_promotion";
+    public static final String ACTION_COPY_PROMO_CODE = "copy_promo_code";
+    public static final String ACTION_QUICK_REPLY = "quick_reply";
+    public static final String ACTION_VIEW_OFFER = "view_offer";
+
+    // Notification Preferences Keys
+    public static final String PREF_NOTIFICATIONS_ENABLED = "notifications_enabled";
+    public static final String PREF_MESSAGE_NOTIFICATIONS = "message_notifications_enabled";
+    public static final String PREF_OFFER_NOTIFICATIONS = "offer_notifications_enabled";
+    public static final String PREF_PROMOTION_NOTIFICATIONS = "promotion_notifications_enabled";
+    public static final String PREF_LISTING_NOTIFICATIONS = "listing_notifications_enabled";
+    public static final String PREF_TRANSACTION_NOTIFICATIONS = "transaction_notifications_enabled";
+
+// ===== ✅ NEW: NOTIFICATION HELPER METHODS =====
+
+    /**
+     * Get notification type display name
+     */
+    public static String getNotificationTypeDisplayName(String type) {
+        if (type == null) return "Notification";
+
+        switch (type.toUpperCase()) {
+            case NOTIFICATION_TYPE_MESSAGE:
+                return "New Message";
+            case NOTIFICATION_TYPE_OFFER:
+                return "Price Offer";
+            case NOTIFICATION_TYPE_PROMOTION:
+                return "Promotion";
+            case NOTIFICATION_TYPE_LISTING_UPDATE:
+                return "Listing Update";
+            case NOTIFICATION_TYPE_TRANSACTION:
+                return "Transaction";
+            case NOTIFICATION_TYPE_GENERAL:
+                return "General";
+            default:
+                return "Notification";
+        }
+    }
+
+    /**
+     * Get promotion type display name with emoji
+     */
+    public static String getPromotionTypeDisplayName(String type) {
+        if (type == null) return "🎁 Special Offer";
+
+        switch (type.toUpperCase()) {
+            case PROMOTION_TYPE_DISCOUNT:
+                return "💰 Discount";
+            case PROMOTION_TYPE_FLASH_SALE:
+                return "⚡ Flash Sale";
+            case PROMOTION_TYPE_NEW_FEATURE:
+                return "🆕 New Feature";
+            case PROMOTION_TYPE_LOCATION:
+                return "📍 Local Deal";
+            case PROMOTION_TYPE_SEASONAL:
+                return "🌟 Seasonal Sale";
+            case PROMOTION_TYPE_WELCOME:
+                return "🎉 Welcome Offer";
+            default:
+                return "🎁 Special Offer";
+        }
+    }
+
+    /**
+     * Check if notification type requires high priority
+     */
+    public static boolean isHighPriorityNotification(String type) {
+        return NOTIFICATION_TYPE_MESSAGE.equals(type) ||
+                PROMOTION_TYPE_FLASH_SALE.equals(type);
+    }
+
     // ===== NEW METHODS FOR IP MANAGEMENT - UNCHANGED =====
 
     private static String getOptimalHostIP(Context context) {

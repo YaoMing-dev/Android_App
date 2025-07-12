@@ -16,7 +16,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.example.newtrade.R;
 import com.example.newtrade.adapters.ProductAdapter;
 import com.example.newtrade.api.ApiClient;
@@ -24,10 +23,12 @@ import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.models.User;
 import com.example.newtrade.ui.chat.ChatActivity;
+import com.example.newtrade.utils.ImageUtils;
 import com.example.newtrade.utils.NavigationUtils;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.appbar.MaterialToolbar;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -128,176 +129,302 @@ public class UserProfileActivity extends AppCompatActivity {
         btnViewListings.setOnClickListener(v -> viewAllListings());
     }
 
+    // ✅ SỬA: Load real profile data from API
     private void loadUserProfile() {
         Log.d(TAG, "Loading profile for user: " + userId);
 
-        // Load real profile from API
-        ApiClient.getApiService().getUserProfile(userId).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Map<String, Object> profileData = response.body().getData();
-                    parseAndDisplayProfile(profileData);
-                    Log.d(TAG, "✅ Profile loaded from API");
-                } else {
-                    Log.e(TAG, "Failed to load user profile");
-                    loadMockUserProfile(); // Fallback
-                }
-            }
+        // ✅ SỬA: Dùng UserService thay vì ApiService và handle real User object
+        ApiClient.getUserService().getUserProfile(userId)
+                .enqueue(new Callback<StandardResponse<User>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<StandardResponse<User>> call,
+                                           @NonNull Response<StandardResponse<User>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            // ✅ REAL DATA từ API - không cần parse
+                            User user = response.body().getData();
+                            userProfile = user;
+                            displayUserProfile(user);
+                            Log.d(TAG, "✅ Real profile loaded from API");
+                        } else {
+                            Log.e(TAG, "Failed to load user profile: " + response.code());
+                            String errorMsg = response.body() != null ? response.body().getMessage() : "Failed to load user profile";
+                            showErrorAndFallback(errorMsg);
+                        }
+                    }
 
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                Log.e(TAG, "Error loading user profile", t);
-                loadMockUserProfile(); // Fallback
-            }
-        });
-    }
-    private void parseAndDisplayProfile(Map<String, Object> profileData) {
-        if (profileData == null) {
-            loadMockUserProfile();
-            return;
-        }
-
-        try {
-            // Parse API response to User object
-            userProfile = new User();
-            userProfile.setId(userId);
-            userProfile.setDisplayName((String) profileData.get("displayName"));
-            userProfile.setEmail((String) profileData.get("email"));
-            userProfile.setBio((String) profileData.get("bio"));
-            userProfile.setContactInfo((String) profileData.get("contactInfo"));
-            userProfile.setProfilePicture((String) profileData.get("profilePicture"));
-
-            // Parse numbers safely
-            Object ratingObj = profileData.get("rating");
-            if (ratingObj instanceof Number) {
-                userProfile.setRating(((Number) ratingObj).doubleValue());
-            }
-
-            Object transactionsObj = profileData.get("totalTransactions");
-            if (transactionsObj instanceof Number) {
-                userProfile.setTotalTransactions(((Number) transactionsObj).intValue());
-            }
-
-            displayUserProfile(userProfile);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error parsing profile data", e);
-            loadMockUserProfile(); // Fallback
-        }
+                    @Override
+                    public void onFailure(@NonNull Call<StandardResponse<User>> call, @NonNull Throwable t) {
+                        Log.e(TAG, "Error loading user profile", t);
+                        showErrorAndFallback("Network error while loading profile");
+                    }
+                });
     }
 
-    private void loadMockUserProfile() {
-        // Create mock user profile
-        userProfile = new User();
-        userProfile.setId(userId);
-        userProfile.setDisplayName("John Seller");
-        userProfile.setEmail("john.seller@example.com");
-        userProfile.setBio("Experienced seller with quality items. Fast shipping and excellent customer service.");
-        userProfile.setContactInfo("+1 (555) 123-4567");
-        userProfile.setRating(4.5);
-        userProfile.setTotalTransactions(47);
-        // userProfile.setCreatedAt(new Date()); // Member since
+    // ✅ SỬA: Better error handling thay vì loadMockUserProfile
+    private void showErrorAndFallback(String error) {
+        Toast.makeText(this, error, Toast.LENGTH_SHORT).show();
 
-        displayUserProfile(userProfile);
+        // ✅ Show empty state instead của mock data
+        tvDisplayName.setText("User Profile");
+        tvMemberSince.setText("Member since recently");
+        tvBio.setVisibility(View.GONE);
+        llContactSection.setVisibility(View.GONE);
+        tvRating.setVisibility(View.GONE);
+        tvListingsCount.setText("0");
+        tvSoldCount.setText("0");
+        tvResponseRate.setText("--");
+        ivProfilePicture.setImageResource(R.drawable.placeholder_avatar);
+
+        Log.d(TAG, "Showing error state for user profile");
     }
 
+    // ✅ SỬA: displayUserProfile để handle real User object
     private void displayUserProfile(User user) {
         if (user == null) return;
 
-        // Basic info
-        tvDisplayName.setText(user.getDisplayName() != null ? user.getDisplayName() : "User");
-        tvMemberSince.setText("Member since 2023");
+        try {
+            // ✅ Basic info từ User object
+            tvDisplayName.setText(user.getDisplayName() != null ? user.getDisplayName() : "User");
 
-        // Rating
-        if (user.getRating() != null && user.getRating() > 0) {
-            tvRating.setText(String.format("⭐ %.1f", user.getRating()));
-            tvRating.setVisibility(View.VISIBLE);
-        } else {
-            tvRating.setVisibility(View.GONE);
-        }
+            // ✅ Member since từ createdAt
+            if (user.getCreatedAt() != null) {
+                String year = extractYearFromDate(user.getCreatedAt());
+                tvMemberSince.setText("Member since " + year);
+            } else {
+                tvMemberSince.setText("Member since recently");
+            }
 
-        // Bio
-        if (user.getBio() != null && !user.getBio().trim().isEmpty()) {
-            tvBio.setText(user.getBio());
-            tvBio.setVisibility(View.VISIBLE);
-        } else {
-            tvBio.setVisibility(View.GONE);
-        }
+            // ✅ Rating
+            if (user.getRating() != null && user.getRating() > 0) {
+                tvRating.setText(String.format("⭐ %.1f", user.getRating()));
+                tvRating.setVisibility(View.VISIBLE);
+            } else {
+                tvRating.setVisibility(View.GONE);
+            }
 
-        // Contact info (only show if available)
-        if (user.getContactInfo() != null && !user.getContactInfo().trim().isEmpty()) {
-            tvContactInfo.setText(user.getContactInfo());
-            llContactSection.setVisibility(View.VISIBLE);
-        } else {
-            llContactSection.setVisibility(View.GONE);
-        }
+            // ✅ Bio - REAL DATA
+            if (user.getBio() != null && !user.getBio().trim().isEmpty()) {
+                tvBio.setText(user.getBio());
+                tvBio.setVisibility(View.VISIBLE);
+            } else {
+                tvBio.setVisibility(View.GONE);
+            }
 
-        // Profile picture
-        if (user.getProfilePicture() != null && !user.getProfilePicture().trim().isEmpty()) {
-            Glide.with(this)
-                    .load(user.getProfilePicture())
-                    .placeholder(R.drawable.placeholder_avatar)
-                    .error(R.drawable.placeholder_avatar)
-                    .into(ivProfilePicture);
-        } else {
-            ivProfilePicture.setImageResource(R.drawable.placeholder_avatar);
-        }
+            // ✅ Contact Info - REAL DATA
+            if (user.getContactInfo() != null && !user.getContactInfo().trim().isEmpty()) {
+                tvContactInfo.setText(user.getContactInfo());
+                llContactSection.setVisibility(View.VISIBLE);
+            } else {
+                llContactSection.setVisibility(View.GONE);
+            }
 
-        // Stats
-        tvListingsCount.setText(String.valueOf(userProducts.size()));
-        tvSoldCount.setText(user.getTotalTransactions() != null ?
-                String.valueOf(user.getTotalTransactions()) : "0");
-        tvResponseRate.setText("95%"); // Mock response rate
+            // ✅ Profile Picture - REAL DATA
+            if (user.getProfilePicture() != null && !user.getProfilePicture().trim().isEmpty()) {
+                ImageUtils.loadAvatarImage(this, user.getProfilePicture(), ivProfilePicture);
+            } else {
+                ivProfilePicture.setImageResource(R.drawable.placeholder_avatar);
+            }
 
-        // Update toolbar title
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(user.getDisplayName());
+            // ✅ Stats - REAL DATA (sẽ được update khi products load)
+            tvListingsCount.setText(String.valueOf(userProducts.size()));
+            tvSoldCount.setText(user.getTotalTransactions() != null ?
+                    String.valueOf(user.getTotalTransactions()) : "0");
+            tvResponseRate.setText("95%"); // TODO: Get from API if available
+
+            // ✅ Update toolbar title
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setTitle(user.getDisplayName());
+            }
+
+            Log.d(TAG, "✅ Real user profile displayed successfully");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error displaying user profile", e);
+            showErrorAndFallback("Error displaying profile");
         }
     }
 
+    // ✅ THÊM helper method
+    private String extractYearFromDate(String dateStr) {
+        try {
+            // Backend date format: "2023-12-25T10:30:00" hoặc "2023-12-25"
+            if (dateStr != null && dateStr.length() >= 4) {
+                return dateStr.substring(0, 4);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing date: " + dateStr, e);
+        }
+        return "2023"; // fallback
+    }
+
+    // ✅ SỬA: Load real user products
     private void loadUserProducts() {
-        // Load mock products for now
-        loadMockUserProducts();
+        Log.d(TAG, "Loading products for user: " + userId);
 
-        // TODO: Load real products from API
-        /*
-        ApiClient.getProductService().getUserProducts(userId, 0, 20).enqueue(new Callback<...>() {
-            // Implementation here
-        });
-        */
+        // ✅ SỬA: Load real products thay vì mock
+        ApiClient.getProductService().getProductsByUser(userId)
+                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                           @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                            Map<String, Object> data = response.body().getData();
+                            parseUserProducts(data);
+                            Log.d(TAG, "✅ Real user products loaded");
+                        } else {
+                            Log.e(TAG, "Failed to load user products: " + response.code());
+                            updateProductsVisibility(); // Show empty state
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                        Log.e(TAG, "Error loading user products", t);
+                        updateProductsVisibility(); // Show empty state
+                    }
+                });
     }
 
-    private void loadMockUserProducts() {
+    // ✅ THÊM method để parse real products
+    private void parseUserProducts(Map<String, Object> data) {
         userProducts.clear();
 
-        // Mock product 1
-        Product product1 = new Product();
-        product1.setId(1L);
-        product1.setTitle("iPhone 13 Pro Max");
-        product1.setPrice(new java.math.BigDecimal("25000000"));
-        product1.setImageUrl("https://example.com/iphone.jpg");
-        product1.setCondition(Product.ProductCondition.GOOD);
-        userProducts.add(product1);
+        try {
+            // Parse paginated response like in MyListingsActivity
+            List<Map<String, Object>> productList = extractProductsFromPaginatedResponse(data);
 
-        // Mock product 2
-        Product product2 = new Product();
-        product2.setId(2L);
-        product2.setTitle("MacBook Air M2");
-        product2.setPrice(new java.math.BigDecimal("30000000"));
-        product2.setImageUrl("https://example.com/macbook.jpg");
-        product2.setCondition(Product.ProductCondition.LIKE_NEW);
-        userProducts.add(product2);
+            if (productList != null) {
+                for (Map<String, Object> productData : productList) {
+                    Product product = parseProductFromData(productData);
+                    if (product != null) {
+                        userProducts.add(product);
+                    }
+                }
+            }
 
-        productAdapter.notifyDataSetChanged();
-        updateProductsVisibility();
+            productAdapter.notifyDataSetChanged();
+            updateProductsVisibility();
+
+            // ✅ Update listings count sau khi load products
+            tvListingsCount.setText(String.valueOf(userProducts.size()));
+
+            Log.d(TAG, "✅ Parsed " + userProducts.size() + " user products");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing user products", e);
+            updateProductsVisibility();
+        }
+    }
+
+    // ✅ Copy methods từ MyListingsActivity
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> extractProductsFromPaginatedResponse(Map<String, Object> paginatedData) {
+        if (paginatedData == null) {
+            Log.w(TAG, "Paginated data is null");
+            return new ArrayList<>();
+        }
+
+        Log.d(TAG, "🔍 Paginated response keys: " + paginatedData.keySet());
+
+        // Spring Boot pagination thường có field "content"
+        Object contentObj = paginatedData.get("content");
+        if (contentObj instanceof List) {
+            List<Map<String, Object>> content = (List<Map<String, Object>>) contentObj;
+            Log.d(TAG, "✅ Found 'content' field with " + content.size() + " items");
+            return content;
+        }
+
+        // Thử các field khác có thể có
+        String[] possibleFields = {"items", "data", "products", "results"};
+        for (String field : possibleFields) {
+            Object fieldValue = paginatedData.get(field);
+            if (fieldValue instanceof List) {
+                List<Map<String, Object>> list = (List<Map<String, Object>>) fieldValue;
+                Log.d(TAG, "✅ Found '" + field + "' field with " + list.size() + " items");
+                return list;
+            }
+        }
+
+        Log.w(TAG, "❌ Could not find product list in paginated response");
+        return new ArrayList<>();
+    }
+
+    private Product parseProductFromData(Map<String, Object> productData) {
+        try {
+            Product product = new Product();
+
+            // Basic info
+            Object idObj = productData.get("id");
+            if (idObj instanceof Number) {
+                product.setId(((Number) idObj).longValue());
+            }
+
+            product.setTitle((String) productData.get("title"));
+            product.setDescription((String) productData.get("description"));
+            product.setLocation((String) productData.get("location"));
+
+            // Price
+            Object priceObj = productData.get("price");
+            if (priceObj instanceof Number) {
+                product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
+            }
+
+            // Condition
+            String conditionStr = (String) productData.get("condition");
+            if (conditionStr != null) {
+                try {
+                    Product.ProductCondition condition = Product.ProductCondition.valueOf(conditionStr);
+                    product.setCondition(condition);
+                } catch (IllegalArgumentException e) {
+                    product.setCondition(Product.ProductCondition.GOOD);
+                }
+            }
+
+            // Status
+            String statusStr = (String) productData.get("status");
+            if (statusStr != null) {
+                try {
+                    Product.ProductStatus status = Product.ProductStatus.valueOf(statusStr);
+                    product.setStatus(status);
+                } catch (IllegalArgumentException e) {
+                    product.setStatus(Product.ProductStatus.AVAILABLE);
+                }
+            }
+
+            // Image URLs
+            Object imageUrlsObj = productData.get("imageUrls");
+            if (imageUrlsObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<String> imageUrls = (List<String>) imageUrlsObj;
+                product.setImageUrls(imageUrls);
+            } else if (imageUrlsObj instanceof String) {
+                List<String> imageUrls = new ArrayList<>();
+                imageUrls.add((String) imageUrlsObj);
+                product.setImageUrls(imageUrls);
+            }
+
+            // Additional fields
+            Object viewCountObj = productData.get("viewCount");
+            if (viewCountObj instanceof Number) {
+                product.setViewCount(((Number) viewCountObj).intValue());
+            }
+
+            product.setCreatedAt((String) productData.get("createdAt"));
+            product.setCategoryName((String) productData.get("categoryName"));
+
+            return product;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing product data", e);
+            return null;
+        }
     }
 
     private void updateProductsVisibility() {
         if (userProducts.isEmpty()) {
             rvUserProducts.setVisibility(View.GONE);
             tvEmptyProducts.setVisibility(View.VISIBLE);
+            tvEmptyProducts.setText("This user has no public listings");
         } else {
             rvUserProducts.setVisibility(View.VISIBLE);
             tvEmptyProducts.setVisibility(View.GONE);
@@ -310,6 +437,13 @@ public class UserProfileActivity extends AppCompatActivity {
     private void contactUser() {
         if (userProfile == null) {
             Toast.makeText(this, "Profile not loaded", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Check if user is trying to contact themselves
+        Long currentUserId = prefsManager.getUserId();
+        if (currentUserId != null && currentUserId.equals(userId)) {
+            Toast.makeText(this, "You cannot message yourself", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -329,7 +463,7 @@ public class UserProfileActivity extends AppCompatActivity {
             return;
         }
 
-        // TODO: Open all listings activity
+        // TODO: Implement view all listings activity hoặc show dialog với full list
         Toast.makeText(this, "View all " + userProducts.size() + " listings", Toast.LENGTH_SHORT).show();
     }
 

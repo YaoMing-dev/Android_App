@@ -1,6 +1,7 @@
 // app/src/main/java/com/example/newtrade/adapters/ProductAdapter.java
 package com.example.newtrade.adapters;
 
+import android.content.Context;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -48,13 +49,15 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
 
     @Override
     public void onBindViewHolder(@NonNull ProductViewHolder holder, int position) {
-        Product product = products.get(position);
-        holder.bind(product, listener);
+        if (position >= 0 && position < products.size()) {
+            Product product = products.get(position);
+            holder.bind(product, listener);
+        }
     }
 
     @Override
     public int getItemCount() {
-        return products.size();
+        return products != null ? products.size() : 0;
     }
 
     public static class ProductViewHolder extends RecyclerView.ViewHolder {
@@ -76,80 +79,158 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         }
 
         void bind(Product product, OnProductClickListener listener) {
-            // Set title
-            if (tvTitle != null) {
-                tvTitle.setText(product.getTitle());
-            }
+            if (product == null) return;
 
-            // Set price
-            if (tvPrice != null && product.getPrice() != null) {
-                tvPrice.setText(product.getFormattedPrice());
-            }
-
-            // Set location
-            if (tvLocation != null) {
-                tvLocation.setText(product.getLocation());
-            }
-
-            // Set condition
-            if (tvCondition != null) {
-                Product.ProductCondition condition = product.getCondition();
-                if (condition != null) {
-                    tvCondition.setText(condition.getDisplayName());
-                    tvCondition.setVisibility(View.VISIBLE);
-                } else {
-                    tvCondition.setVisibility(View.GONE);
-                }
-            }
-            if (tvCategory != null) {
-                String categoryName = product.getCategoryName();
-                if (categoryName != null && !categoryName.isEmpty()) {
-                    tvCategory.setText(categoryName);
-                    tvCategory.setVisibility(View.VISIBLE);
-                } else {
-                    tvCategory.setVisibility(View.GONE);
+            try {
+                // Set title
+                if (tvTitle != null) {
+                    String title = product.getTitle();
+                    tvTitle.setText(title != null ? title : "No title");
                 }
 
-                // Load product image
-                if (ivProduct != null) {
-                    String imageUrl = product.getPrimaryImageUrl();
-
+                // Set price
+                if (tvPrice != null) {
                     try {
-                        if (!TextUtils.isEmpty(imageUrl)) {
-                            String fullImageUrl = imageUrl;
-                            if (imageUrl.startsWith("/")) {
-                                fullImageUrl = Constants.BASE_URL + imageUrl.substring(1);
-                            }
-
-                            Glide.with(itemView.getContext())
-                                    .load(fullImageUrl)
-                                    .placeholder(R.drawable.ic_image_placeholder)
-                                    .error(R.drawable.ic_image_placeholder)
-                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                                    .centerCrop()
-                                    .into(ivProduct);
+                        if (product.getPrice() != null) {
+                            tvPrice.setText(product.getFormattedPrice());
                         } else {
-                            ivProduct.setImageResource(R.drawable.ic_image_placeholder);
+                            tvPrice.setText("Price not available");
                         }
                     } catch (Exception e) {
-                        ivProduct.setImageResource(R.drawable.ic_image_placeholder);
+                        tvPrice.setText("Price not available");
                     }
                 }
 
+                // Set location
+                if (tvLocation != null) {
+                    String location = product.getLocation();
+                    tvLocation.setText(location != null ? location : "Location not specified");
+                }
+
+                // Set condition
+                if (tvCondition != null) {
+                    try {
+                        Product.ProductCondition condition = product.getCondition();
+                        if (condition != null) {
+                            tvCondition.setText(condition.getDisplayName());
+                            tvCondition.setVisibility(View.VISIBLE);
+                        } else {
+                            tvCondition.setVisibility(View.GONE);
+                        }
+                    } catch (Exception e) {
+                        tvCondition.setVisibility(View.GONE);
+                    }
+                }
+
+                // Set category
+                if (tvCategory != null) {
+                    try {
+                        String categoryName = product.getCategoryName();
+                        if (categoryName != null && !categoryName.isEmpty()) {
+                            tvCategory.setText(categoryName);
+                            tvCategory.setVisibility(View.VISIBLE);
+                        } else {
+                            tvCategory.setVisibility(View.GONE);
+                        }
+                    } catch (Exception e) {
+                        tvCategory.setVisibility(View.GONE);
+                    }
+                }
+
+                // ✅ SET STATUS BADGE SAFELY
+                setStatusBadgeSafe(product);
+
+                // Load product image
+                loadProductImage(product);
+
                 // Set click listeners
+                setClickListeners(product, listener);
+
+            } catch (Exception e) {
+                // Fallback in case of any error
+                if (tvTitle != null) tvTitle.setText("Error loading product");
+            }
+        }
+
+        private void setStatusBadgeSafe(Product product) {
+            try {
+                TextView tvStatusBadge = itemView.findViewById(R.id.tv_status_badge);
+                if (tvStatusBadge != null && product.getStatus() != null) {
+                    Context context = itemView.getContext();
+
+                    switch (product.getStatus()) {
+                        case AVAILABLE:
+                            tvStatusBadge.setVisibility(View.GONE);
+                            break;
+
+                        case SOLD:
+                            tvStatusBadge.setText("SOLD");
+                            tvStatusBadge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                                    androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_red_dark)));
+                            tvStatusBadge.setVisibility(View.VISIBLE);
+                            break;
+
+                        case PAUSED:
+                            tvStatusBadge.setText("PAUSED");
+                            tvStatusBadge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                                    androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_orange_dark)));
+                            tvStatusBadge.setVisibility(View.VISIBLE);
+                            break;
+
+                        default:
+                            tvStatusBadge.setVisibility(View.GONE);
+                            break;
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore status badge errors
+            }
+        }
+
+        private void loadProductImage(Product product) {
+            if (ivProduct != null) {
+                try {
+                    String imageUrl = product.getPrimaryImageUrl();
+
+                    if (!TextUtils.isEmpty(imageUrl)) {
+                        String fullImageUrl = imageUrl;
+                        if (imageUrl.startsWith("/")) {
+                            fullImageUrl = Constants.BASE_URL + imageUrl.substring(1);
+                        }
+
+                        Glide.with(itemView.getContext())
+                                .load(fullImageUrl)
+                                .placeholder(R.drawable.ic_image_placeholder)
+                                .error(R.drawable.ic_image_placeholder)
+                                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                .centerCrop()
+                                .into(ivProduct);
+                    } else {
+                        ivProduct.setImageResource(R.drawable.ic_image_placeholder);
+                    }
+                } catch (Exception e) {
+                    ivProduct.setImageResource(R.drawable.ic_image_placeholder);
+                }
+            }
+        }
+
+        private void setClickListeners(Product product, OnProductClickListener listener) {
+            try {
                 itemView.setOnClickListener(v -> {
-                    if (listener != null) {
+                    if (listener != null && product != null) {
                         listener.onProductClick(product);
                     }
                 });
 
                 itemView.setOnLongClickListener(v -> {
-                    if (listener != null) {
+                    if (listener != null && product != null) {
                         listener.onProductLongClick(product);
                         return true;
                     }
                     return false;
                 });
+            } catch (Exception e) {
+                // Ignore click listener errors
             }
         }
     }

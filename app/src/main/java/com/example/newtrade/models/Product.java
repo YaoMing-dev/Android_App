@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/newtrade/models/Product.java
 package com.example.newtrade.models;
 
 import java.math.BigDecimal;
@@ -22,17 +23,13 @@ public class Product {
     private List<String> imageUrls;
     private String createdAt;
 
-    // ✅ ADD: Location coordinates
+    // ✅ ENHANCED: Location coordinates
     private Double latitude;
     private Double longitude;
 
-    // ✅ FIX: Implement getImageUrl() method properly
-    public String getImageUrl() {
-        if (imageUrls != null && !imageUrls.isEmpty()) {
-            return imageUrls.get(0); // Return first image as primary
-        }
-        return null;
-    }
+    // ✅ NEW: Distance tracking from user location
+    private Double distanceFromUser; // in km
+    private String distanceText; // formatted display text
 
     // Enums
     public enum ProductCondition {
@@ -51,13 +48,6 @@ public class Product {
         public String getDisplayName() {
             return displayName;
         }
-    }
-
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-
-    public String getDisplayPrice() {
-        return getFormattedPrice();
     }
 
     public enum ProductStatus {
@@ -82,18 +72,18 @@ public class Product {
     // Constructors
     public Product() {
         this.imageUrls = new ArrayList<>();
+        this.status = ProductStatus.AVAILABLE;
     }
 
     public Product(String title, String description, BigDecimal price, String location) {
+        this();
         this.title = title;
         this.description = description;
         this.price = price;
         this.location = location;
-        this.status = ProductStatus.AVAILABLE;
-        this.imageUrls = new ArrayList<>();
     }
 
-    // Getters and Setters
+    // ===== BASIC GETTERS & SETTERS =====
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -102,6 +92,9 @@ public class Product {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
@@ -127,34 +120,10 @@ public class Product {
     public Integer getViewCount() { return viewCount; }
     public void setViewCount(Integer viewCount) { this.viewCount = viewCount; }
 
-    public List<String> getImageUrls() {
-        if (imageUrls == null) {
-            imageUrls = new ArrayList<>();
-        }
-        return imageUrls;
-    }
-
-    public void setImageUrls(List<String> imageUrls) {
-        this.imageUrls = imageUrls != null ? imageUrls : new ArrayList<>();
-    }
-
-    // ✅ FIX: setImageUrl method for single image compatibility
-    public void setImageUrl(String imageUrl) {
-        if (this.imageUrls == null) {
-            this.imageUrls = new ArrayList<>();
-        }
-
-        if (imageUrl != null && !imageUrl.isEmpty()) {
-            // Clear existing and add new primary image
-            this.imageUrls.clear();
-            this.imageUrls.add(imageUrl);
-        }
-    }
-
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 
-    // ✅ ADD: Location coordinates getter/setter
+    // ===== LOCATION COORDINATES =====
     public Double getLatitude() {
         return latitude;
     }
@@ -171,7 +140,102 @@ public class Product {
         this.longitude = longitude;
     }
 
-    // ✅ FIX: setPrimaryImageUrl method
+    public void setLocationCoordinates(Double latitude, Double longitude) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+    }
+
+    public boolean hasLocation() {
+        return latitude != null && longitude != null;
+    }
+
+    public String getLocationCoordinates() {
+        if (hasLocation()) {
+            return String.format("%.6f, %.6f", latitude, longitude);
+        }
+        return null;
+    }
+
+    // ===== DISTANCE FROM USER =====
+    public Double getDistanceFromUser() {
+        return distanceFromUser;
+    }
+
+    public void setDistanceFromUser(Double distanceFromUser) {
+        this.distanceFromUser = distanceFromUser;
+        // Auto-generate formatted distance text
+        updateDistanceText();
+    }
+
+    private void updateDistanceText() {
+        if (distanceFromUser != null) {
+            if (distanceFromUser < 1.0) {
+                this.distanceText = String.format("%.0f m away", distanceFromUser * 1000);
+            } else {
+                this.distanceText = String.format("%.1f km away", distanceFromUser);
+            }
+        } else {
+            this.distanceText = null;
+        }
+    }
+
+    public String getDistanceText() {
+        return distanceText;
+    }
+
+    public String getFormattedDistance() {
+        if (distanceFromUser == null) return "";
+
+        if (distanceFromUser < 1.0) {
+            return String.format("%.0f m", distanceFromUser * 1000);
+        } else {
+            return String.format("%.1f km", distanceFromUser);
+        }
+    }
+
+    public boolean isNearby(double radiusKm) {
+        return distanceFromUser != null && distanceFromUser <= radiusKm;
+    }
+
+    public boolean isWithinRadius(double radiusKm) {
+        return isNearby(radiusKm);
+    }
+
+    // ===== IMAGE HANDLING =====
+    public List<String> getImageUrls() {
+        if (imageUrls == null) {
+            imageUrls = new ArrayList<>();
+        }
+        return imageUrls;
+    }
+
+    public void setImageUrls(List<String> imageUrls) {
+        this.imageUrls = imageUrls != null ? imageUrls : new ArrayList<>();
+    }
+
+    public String getImageUrl() {
+        if (imageUrls != null && !imageUrls.isEmpty()) {
+            return imageUrls.get(0); // Return first image as primary
+        }
+        return null;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        if (this.imageUrls == null) {
+            this.imageUrls = new ArrayList<>();
+        }
+
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            // Clear existing and add new primary image
+            this.imageUrls.clear();
+            this.imageUrls.add(imageUrl);
+        }
+    }
+
+    public String getPrimaryImageUrl() {
+        return getImageUrl();
+    }
+
     public void setPrimaryImageUrl(String primaryImageUrl) {
         if (this.imageUrls == null) {
             this.imageUrls = new ArrayList<>();
@@ -188,30 +252,6 @@ public class Product {
         }
     }
 
-    // Helper methods
-    public String getFormattedPrice() {
-        if (price == null) return "Free";
-        NumberFormat formatter = NumberFormat.getNumberInstance(new Locale("vi", "VN"));
-        return formatter.format(price) + " VNĐ";
-    }
-
-    // ✅ FIX: getPrimaryImageUrl method
-    public String getPrimaryImageUrl() {
-        if (imageUrls != null && !imageUrls.isEmpty()) {
-            return imageUrls.get(0);
-        }
-        return null;
-    }
-
-    public String getConditionDisplayName() {
-        return condition != null ? condition.getDisplayName() : "";
-    }
-
-    public String getStatusDisplayName() {
-        return status != null ? status.getDisplayName() : "";
-    }
-
-    // ✅ ADD: Utility methods for image handling
     public boolean hasImages() {
         return imageUrls != null && !imageUrls.isEmpty();
     }
@@ -241,24 +281,89 @@ public class Product {
         }
     }
 
-    // ✅ ADD: Location utility methods
-    public boolean hasLocation() {
-        return latitude != null && longitude != null;
+    // ===== DISPLAY METHODS =====
+    public String getFormattedPrice() {
+        if (price == null) return "Free";
+        NumberFormat formatter = NumberFormat.getNumberInstance(new Locale("vi", "VN"));
+        return formatter.format(price) + " VNĐ";
     }
 
-    public String getLocationCoordinates() {
-        if (hasLocation()) {
-            return String.format("%.6f, %.6f", latitude, longitude);
+    public String getDisplayPrice() {
+        return getFormattedPrice();
+    }
+
+    public String getConditionDisplayName() {
+        return condition != null ? condition.getDisplayName() : "";
+    }
+
+    public String getStatusDisplayName() {
+        return status != null ? status.getDisplayName() : "";
+    }
+
+    // ===== LOCATION DISPLAY WITH DISTANCE =====
+    public String getLocationWithDistance() {
+        StringBuilder locationText = new StringBuilder();
+
+        if (location != null && !location.isEmpty()) {
+            locationText.append(location);
         }
-        return null;
+
+        if (distanceFromUser != null) {
+            if (locationText.length() > 0) {
+                locationText.append(" • ");
+            }
+            locationText.append(getFormattedDistance());
+        }
+
+        return locationText.toString();
     }
 
-    public void setLocationCoordinates(Double latitude, Double longitude) {
-        this.latitude = latitude;
-        this.longitude = longitude;
+    public String getFullLocationInfo() {
+        StringBuilder info = new StringBuilder();
+
+        if (location != null && !location.isEmpty()) {
+            info.append(location);
+        }
+
+        if (hasLocation()) {
+            if (info.length() > 0) {
+                info.append("\n");
+            }
+            info.append("Coordinates: ").append(getLocationCoordinates());
+        }
+
+        if (distanceFromUser != null) {
+            if (info.length() > 0) {
+                info.append("\n");
+            }
+            info.append("Distance: ").append(getFormattedDistance());
+        }
+
+        return info.toString();
     }
 
-    // ✅ ADD: toString method for debugging
+    // ===== UTILITY METHODS =====
+    public boolean isAvailable() {
+        return status == ProductStatus.AVAILABLE;
+    }
+
+    public boolean isSold() {
+        return status == ProductStatus.SOLD;
+    }
+
+    public boolean hasPrice() {
+        return price != null && price.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    // ===== COMPARISON & SORTING =====
+    public int compareDistanceTo(Product other) {
+        if (this.distanceFromUser == null && other.distanceFromUser == null) return 0;
+        if (this.distanceFromUser == null) return 1; // null distance goes to end
+        if (other.distanceFromUser == null) return -1;
+        return this.distanceFromUser.compareTo(other.distanceFromUser);
+    }
+
+    // ===== DEBUG =====
     @Override
     public String toString() {
         return "Product{" +
@@ -266,12 +371,11 @@ public class Product {
                 ", title='" + title + '\'' +
                 ", price=" + price +
                 ", location='" + location + '\'' +
-                ", latitude=" + latitude +
-                ", longitude=" + longitude +
+                ", coordinates=(" + latitude + ", " + longitude + ")" +
+                ", distance=" + (distanceFromUser != null ? distanceFromUser + "km" : "unknown") +
                 ", condition=" + condition +
                 ", status=" + status +
                 ", imageCount=" + getImageCount() +
-                ", primaryImage='" + getPrimaryImageUrl() + '\'' +
                 '}';
     }
 }

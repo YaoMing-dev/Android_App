@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/newtrade/adapters/OfferAdapter.java
+// File: OfferAdapter.java - SỬA TOÀN BỘ
 package com.example.newtrade.adapters;
 
 import android.app.AlertDialog;
@@ -9,28 +9,26 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.newtrade.R;
-import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.Offer;
-import com.example.newtrade.models.StandardResponse;
 import com.google.android.material.textfield.TextInputEditText;
 
-import java.text.DecimalFormat;
+import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 public class OfferAdapter extends RecyclerView.Adapter<OfferAdapter.OfferViewHolder> {
+
+    private static final String TAG = "OfferAdapter";
+
+    // ✅ CONSTANTS for ViewType
+    private static final int VIEW_TYPE_SENT = 0;
+    private static final int VIEW_TYPE_RECEIVED = 1;
 
     private List<Offer> offers;
     private OnOfferClickListener listener;
@@ -42,7 +40,6 @@ public class OfferAdapter extends RecyclerView.Adapter<OfferAdapter.OfferViewHol
         void onOfferClick(Offer offer);
     }
 
-    // ✅ THÊM interface cho offer actions
     public interface OnOfferActionListener {
         void onOfferAccepted(Offer offer);
         void onOfferRejected(Offer offer);
@@ -52,233 +49,326 @@ public class OfferAdapter extends RecyclerView.Adapter<OfferAdapter.OfferViewHol
 
     public OfferAdapter(List<Offer> offers, String currentTab, OnOfferClickListener listener) {
         this.offers = offers;
-        this.currentTab = currentTab;
+        this.currentTab = currentTab != null ? currentTab : "SENT";
         this.listener = listener;
+
+        android.util.Log.d(TAG, "✅ OfferAdapter created with tab: " + this.currentTab);
     }
 
-    // ✅ SETTER cho action listener
     public void setOnOfferActionListener(OnOfferActionListener actionListener) {
         this.actionListener = actionListener;
+    }
+
+    // ✅ CRITICAL: getItemViewType để phân biệt layout
+    @Override
+    public int getItemViewType(int position) {
+        int viewType = "RECEIVED".equals(currentTab) ? VIEW_TYPE_RECEIVED : VIEW_TYPE_SENT;
+        android.util.Log.d(TAG, "✅ getItemViewType: position=" + position + ", currentTab=" + currentTab + ", viewType=" + viewType);
+        return viewType;
     }
 
     @NonNull
     @Override
     public OfferViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // ✅ SỬ DỤNG layout khác nhau cho SENT vs RECEIVED
-        int layoutId = "RECEIVED".equals(currentTab) ?
-                R.layout.item_offer_received : R.layout.item_offer_sent;
+        int layoutId;
+        boolean isReceivedLayout;
+
+        if (viewType == VIEW_TYPE_RECEIVED) {
+            layoutId = R.layout.item_offer_received;
+            isReceivedLayout = true;
+            android.util.Log.d(TAG, "✅ Creating RECEIVED ViewHolder");
+        } else {
+            layoutId = R.layout.item_offer_sent;
+            isReceivedLayout = false;
+            android.util.Log.d(TAG, "✅ Creating SENT ViewHolder");
+        }
 
         View view = LayoutInflater.from(parent.getContext()).inflate(layoutId, parent, false);
-        return new OfferViewHolder(view);
+        return new OfferViewHolder(view, isReceivedLayout);
     }
 
     @Override
     public void onBindViewHolder(@NonNull OfferViewHolder holder, int position) {
-        Offer offer = offers.get(position);
-        holder.bind(offer, currentTab);
+        if (offers != null && position >= 0 && position < offers.size()) {
+            Offer offer = offers.get(position);
+            android.util.Log.d(TAG, "✅ Binding offer: " + offer.getId() + ", tab: " + currentTab + ", isReceived: " + holder.isReceivedLayout);
+            holder.bind(offer, currentTab);
+        }
     }
 
     @Override
     public int getItemCount() {
-        return offers.size();
+        return offers != null ? offers.size() : 0;
+    }
+
+    // ✅ CRITICAL: updateTab phải trigger notifyDataSetChanged để rebuild ViewHolders
+    public void updateTab(String newTab) {
+        android.util.Log.d(TAG, "🔄 updateTab: " + currentTab + " -> " + newTab);
+        this.currentTab = newTab != null ? newTab : "SENT";
+        notifyDataSetChanged(); // ✅ Trigger ViewHolder recreation
     }
 
     class OfferViewHolder extends RecyclerView.ViewHolder {
         // Common views
         TextView tvProductTitle, tvOfferAmount, tvOriginalPrice, tvStatus, tvMessage, tvDateTime;
-        TextView tvUserName; // ✅ THÊM để hiển thị buyer/seller name
+        TextView tvUserName;
 
-        // Action views (for RECEIVED tab)
-        LinearLayout llActionButtons;
-        Button btnAccept, btnReject, btnCounter, btnCancel;
+        // SENT layout views
+        Button btnCancel; // Only in SENT layout
 
-        public OfferViewHolder(@NonNull View itemView) {
+        // RECEIVED layout views
+        LinearLayout llActionButtons; // Only in RECEIVED layout
+        Button btnAccept, btnReject, btnCounter; // Only in RECEIVED layout
+
+        boolean isReceivedLayout;
+
+        public OfferViewHolder(@NonNull View itemView, boolean isReceivedLayout) {
             super(itemView);
+            this.isReceivedLayout = isReceivedLayout;
 
-            // Common views
+            android.util.Log.d(TAG, "✅ OfferViewHolder created, isReceivedLayout: " + isReceivedLayout);
+
+            // Initialize common views
             tvProductTitle = itemView.findViewById(R.id.tv_product_title);
             tvOfferAmount = itemView.findViewById(R.id.tv_offer_amount);
             tvOriginalPrice = itemView.findViewById(R.id.tv_original_price);
             tvStatus = itemView.findViewById(R.id.tv_status);
             tvMessage = itemView.findViewById(R.id.tv_message);
             tvDateTime = itemView.findViewById(R.id.tv_date_time);
-            tvUserName = itemView.findViewById(R.id.tv_user_name); // ✅ THÊM
+            tvUserName = itemView.findViewById(R.id.tv_user_name);
 
-            // Action views (only in RECEIVED layout)
-            llActionButtons = itemView.findViewById(R.id.ll_action_buttons);
-            btnAccept = itemView.findViewById(R.id.btn_accept);
-            btnReject = itemView.findViewById(R.id.btn_reject);
-            btnCounter = itemView.findViewById(R.id.btn_counter);
-            btnCancel = itemView.findViewById(R.id.btn_cancel);
+            // ✅ Initialize layout-specific views
+            if (isReceivedLayout) {
+                // RECEIVED layout - có action buttons
+                llActionButtons = itemView.findViewById(R.id.ll_action_buttons);
+                btnAccept = itemView.findViewById(R.id.btn_accept);
+                btnReject = itemView.findViewById(R.id.btn_reject);
+                btnCounter = itemView.findViewById(R.id.btn_counter);
+
+                android.util.Log.d(TAG, "✅ RECEIVED views initialized - llActionButtons: " + (llActionButtons != null));
+            } else {
+                // SENT layout - có cancel button
+                btnCancel = itemView.findViewById(R.id.btn_cancel);
+
+                android.util.Log.d(TAG, "✅ SENT views initialized - btnCancel: " + (btnCancel != null));
+            }
 
             // Click listener for item
             itemView.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onOfferClick(offers.get(getAdapterPosition()));
+                try {
+                    if (listener != null && getAdapterPosition() != RecyclerView.NO_POSITION) {
+                        int position = getAdapterPosition();
+                        if (offers != null && position >= 0 && position < offers.size()) {
+                            listener.onOfferClick(offers.get(position));
+                        }
+                    }
+                } catch (Exception e) {
+                    android.util.Log.e(TAG, "Click error", e);
                 }
             });
         }
 
         public void bind(Offer offer, String currentTab) {
-            // Common data
-            tvProductTitle.setText(offer.getProductTitle());
-            tvOfferAmount.setText(formatPrice(offer.getOfferAmount()) + " VNĐ");
-            tvOriginalPrice.setText("Original: " + formatPrice(offer.getOriginalPrice()) + " VNĐ");
-            tvStatus.setText(offer.getStatusDisplayText());
-            tvDateTime.setText(offer.getCreatedAt());
+            if (offer == null) return;
 
-            if (offer.getMessage() != null && !offer.getMessage().isEmpty()) {
-                tvMessage.setText(offer.getMessage());
-                tvMessage.setVisibility(View.VISIBLE);
-            } else {
-                tvMessage.setVisibility(View.GONE);
-            }
+            try {
+                // ✅ COMMON DATA BINDING
+                setTextSafely(tvProductTitle, offer.getProductTitle(), "Product");
+                setTextSafely(tvOfferAmount, formatPrice(offer.getOfferAmount()) + " VNĐ", "0 VNĐ");
+                setTextSafely(tvOriginalPrice, "Original: " + formatPrice(offer.getOriginalPrice()) + " VNĐ", "Original: 0 VNĐ");
+                setTextSafely(tvStatus, offer.getStatusDisplayText(), "Unknown");
+                setTextSafely(tvDateTime, offer.getCreatedAt(), "Unknown date");
 
-            // ✅ HIỂN THỊ USER NAME theo tab
-            if ("RECEIVED".equals(currentTab)) {
-                // Hiển thị buyer name (người gửi offer)
-                tvUserName.setText("From: " + (offer.getBuyerName() != null ? offer.getBuyerName() : "Unknown"));
-            } else {
-                // Hiển thị seller name (người nhận offer)
-                tvUserName.setText("To: " + (offer.getSellerName() != null ? offer.getSellerName() : "Unknown"));
-            }
+                // ✅ MESSAGE
+                if (tvMessage != null) {
+                    String message = offer.getMessage();
+                    if (message != null && !message.isEmpty()) {
+                        tvMessage.setText(message);
+                        tvMessage.setVisibility(View.VISIBLE);
+                    } else {
+                        tvMessage.setVisibility(View.GONE);
+                    }
+                }
 
-            // ✅ STATUS COLOR
-            setStatusColor(offer.getStatus());
+                // ✅ USER NAME - phân biệt SENT vs RECEIVED
+                if (tvUserName != null) {
+                    if ("RECEIVED".equals(currentTab)) {
+                        String buyerName = offer.getBuyerName();
+                        tvUserName.setText("From: " + (buyerName != null ? buyerName : "Unknown"));
+                    } else {
+                        String sellerName = offer.getSellerName();
+                        tvUserName.setText("To: " + (sellerName != null ? sellerName : "Unknown"));
+                    }
+                }
 
-            // ✅ ACTION BUTTONS cho RECEIVED tab
-            if ("RECEIVED".equals(currentTab) && llActionButtons != null) {
-                setupActionButtons(offer);
+                // ✅ STATUS COLOR
+                setStatusColor(offer.getStatus());
+
+                // ✅ LAYOUT-SPECIFIC LOGIC
+                if (isReceivedLayout) {
+                    setupReceivedButtons(offer);
+                } else {
+                    setupSentButtons(offer);
+                }
+
+            } catch (Exception e) {
+                android.util.Log.e(TAG, "Error in bind: " + e.getMessage());
+                setTextSafely(tvProductTitle, "Error loading offer", "Error");
             }
         }
 
-        private void setStatusColor(Offer.OfferStatus status) {
-            int colorRes;
-            switch (status) {
-                case PENDING:
-                    colorRes = R.color.status_pending;
-                    break;
-                case ACCEPTED:
-                    colorRes = R.color.status_success;
-                    break;
-                case REJECTED:
-                    colorRes = R.color.status_error;
-                    break;
-                case COUNTERED:
-                    colorRes = R.color.status_warning;
-                    break;
-                default:
-                    colorRes = R.color.text_secondary;
+        // ✅ SETUP BUTTONS cho RECEIVED layout
+        private void setupReceivedButtons(Offer offer) {
+            if (llActionButtons == null) {
+                android.util.Log.e(TAG, "❌ llActionButtons is NULL!");
+                return;
             }
-            tvStatus.setTextColor(itemView.getContext().getResources().getColor(colorRes, null));
-        }
 
-        // ✅ SETUP ACTION BUTTONS cho RECEIVED offers
-        private void setupActionButtons(Offer offer) {
-            if (offer.isPending()) {
-                llActionButtons.setVisibility(View.VISIBLE);
+            // ✅ CHỈ HIỆN BUTTONS CHO PENDING OFFERS
+            if (!offer.isPending()) {
+                llActionButtons.setVisibility(View.GONE);
+                android.util.Log.d(TAG, "✅ Offer not pending, hiding buttons. Status: " + offer.getStatus());
+                return;
+            }
 
-                // Accept button
+            // ✅ PENDING OFFER - HIỆN BUTTONS
+            llActionButtons.setVisibility(View.VISIBLE);
+            android.util.Log.d(TAG, "✅ Showing action buttons for pending offer");
+
+            // Accept button
+            if (btnAccept != null) {
                 btnAccept.setOnClickListener(v -> {
+                    android.util.Log.d(TAG, "✅ Accept clicked");
                     if (actionListener != null) {
                         actionListener.onOfferAccepted(offer);
                     }
                 });
+            }
 
-                // Reject button
+            // Reject button
+            if (btnReject != null) {
                 btnReject.setOnClickListener(v -> {
+                    android.util.Log.d(TAG, "✅ Reject clicked");
                     if (actionListener != null) {
                         actionListener.onOfferRejected(offer);
                     }
                 });
-
-                // Counter button
-                btnCounter.setOnClickListener(v -> showCounterOfferDialog(offer));
-
-            } else {
-                llActionButtons.setVisibility(View.GONE);
             }
 
-            // Cancel button for SENT offers with PENDING status
-            if (btnCancel != null && "SENT".equals(currentTab) && offer.isPending()) {
-                btnCancel.setVisibility(View.VISIBLE);
-                btnCancel.setOnClickListener(v -> {
-                    if (actionListener != null) {
-                        actionListener.onOfferCancelled(offer);
-                    }
+            // Counter button
+            if (btnCounter != null) {
+                btnCounter.setOnClickListener(v -> {
+                    android.util.Log.d(TAG, "✅ Counter clicked");
+                    showCounterDialog(offer);
                 });
             }
         }
 
-        // ✅ DIALOG cho Counter Offer
-        private void showCounterOfferDialog(Offer offer) {
-            Context context = itemView.getContext();
+        // ✅ SETUP BUTTONS cho SENT layout
+        private void setupSentButtons(Offer offer) {
+            if (btnCancel == null) {
+                android.util.Log.e(TAG, "❌ btnCancel is NULL!");
+                return;
+            }
 
-            View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_counter_offer, null);
-            TextInputEditText etCounterAmount = dialogView.findViewById(R.id.et_counter_amount);
-            TextInputEditText etCounterMessage = dialogView.findViewById(R.id.et_counter_message);
-
-            new AlertDialog.Builder(context)
-                    .setTitle("Counter Offer")
-                    .setMessage("Current offer: " + formatPrice(offer.getOfferAmount()) + " VNĐ\nOriginal price: " + formatPrice(offer.getOriginalPrice()) + " VNĐ")
-                    .setView(dialogView)
-                    .setPositiveButton("Send Counter", (dialog, which) -> {
-                        String amount = etCounterAmount.getText().toString().trim();
-                        String message = etCounterMessage.getText().toString().trim();
-
-                        if (!amount.isEmpty()) {
-                            try {
-                                // ✅ FIX: Parse và validate số
-                                double counterAmount = Double.parseDouble(amount);
-
-                                // ✅ VALIDATION: Check reasonable range
-                                double originalPrice = Double.parseDouble(offer.getOriginalPrice().toString());
-                                double minAmount = originalPrice * 0.1; // 10% of original
-                                double maxAmount = originalPrice * 2.0; // 200% of original (reasonable max)
-
-                                if (counterAmount < minAmount) {
-                                    Toast.makeText(context, "Counter offer too low. Minimum: " + formatPrice(minAmount) + " VNĐ", Toast.LENGTH_LONG).show();
-                                    return;
-                                }
-
-                                if (counterAmount > maxAmount) {
-                                    Toast.makeText(context, "Counter offer too high. Maximum: " + formatPrice(maxAmount) + " VNĐ", Toast.LENGTH_LONG).show();
-                                    return;
-                                }
-
-                                // ✅ FIX: Round to 2 decimal places để tránh scientific notation
-                                counterAmount = Math.round(counterAmount * 100.0) / 100.0;
-
-                                if (actionListener != null) {
-                                    actionListener.onOfferCountered(offer, counterAmount, message);
-                                }
-
-                            } catch (NumberFormatException e) {
-                                Toast.makeText(context, "Please enter valid amount", Toast.LENGTH_SHORT).show();
-                            }
-                        } else {
-                            Toast.makeText(context, "Please enter counter amount", Toast.LENGTH_SHORT).show();
-                        }
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-        }
-
-        private String formatPrice(Object price) {
-            if (price == null) return "0";
-
-            try {
-                double value = Double.parseDouble(price.toString());
-                return priceFormat.format(value);
-            } catch (Exception e) {
-                return price.toString();
+            // ✅ CHỈ HIỆN CANCEL CHO PENDING OFFERS
+            if (offer.isPending()) {
+                btnCancel.setVisibility(View.VISIBLE);
+                btnCancel.setOnClickListener(v -> {
+                    android.util.Log.d(TAG, "✅ Cancel clicked");
+                    if (actionListener != null) {
+                        actionListener.onOfferCancelled(offer);
+                    }
+                });
+            } else {
+                btnCancel.setVisibility(View.GONE);
             }
         }
-    }
 
-    // ✅ METHOD để update tab
-    public void updateTab(String newTab) {
-        this.currentTab = newTab;
-        notifyDataSetChanged();
+        // ✅ COUNTER OFFER DIALOG
+        private void showCounterDialog(Offer offer) {
+            // ✅ Tạo simple dialog vì chưa có layout
+            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
+
+            // Tạo simple input layout
+            LinearLayout layout = new LinearLayout(itemView.getContext());
+            layout.setOrientation(LinearLayout.VERTICAL);
+            layout.setPadding(50, 40, 50, 10);
+
+            final android.widget.EditText etAmount = new android.widget.EditText(itemView.getContext());
+            etAmount.setHint("Counter amount (VNĐ)");
+            etAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            layout.addView(etAmount);
+
+            final android.widget.EditText etMessage = new android.widget.EditText(itemView.getContext());
+            etMessage.setHint("Message (optional)");
+            etMessage.setLines(3);
+            layout.addView(etMessage);
+
+            builder.setTitle("Counter Offer")
+                    .setView(layout)
+                    .setPositiveButton("Send Counter", (dialog, id) -> {
+                        try {
+                            String amountStr = etAmount.getText().toString().trim();
+                            String message = etMessage.getText().toString().trim();
+
+                            if (amountStr.isEmpty()) {
+                                etAmount.setError("Please enter counter amount");
+                                return;
+                            }
+
+                            double counterAmount = Double.parseDouble(amountStr);
+
+                            if (actionListener != null) {
+                                actionListener.onOfferCountered(offer, counterAmount, message);
+                            }
+                        } catch (NumberFormatException e) {
+                            etAmount.setError("Please enter valid number");
+                        }
+                    })
+                    .setNegativeButton("Cancel", null);
+
+            builder.create().show();
+        }
+
+        // ✅ HELPER METHODS
+        private void setTextSafely(TextView textView, String text, String fallback) {
+            if (textView != null) {
+                textView.setText(text != null ? text : fallback);
+            }
+        }
+
+        private String formatPrice(BigDecimal price) {
+            if (price == null) return "0";
+            return priceFormat.format(price);
+        }
+
+        private void setStatusColor(Offer.OfferStatus status) {
+            if (tvStatus == null || status == null) return;
+
+            Context context = itemView.getContext();
+            switch (status) {
+                case PENDING:
+                    tvStatus.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                            androidx.core.content.ContextCompat.getColor(context, R.color.offer_pending)));
+                    break;
+                case ACCEPTED:
+                    tvStatus.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                            androidx.core.content.ContextCompat.getColor(context, R.color.offer_accepted)));
+                    break;
+                case REJECTED:
+                    tvStatus.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                            androidx.core.content.ContextCompat.getColor(context, R.color.offer_rejected)));
+                    break;
+                case COUNTERED:
+                    tvStatus.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                            androidx.core.content.ContextCompat.getColor(context, R.color.offer_countered)));
+                    break;
+                default:
+                    tvStatus.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                            androidx.core.content.ContextCompat.getColor(context, android.R.color.darker_gray)));
+                    break;
+            }
+        }
     }
 }

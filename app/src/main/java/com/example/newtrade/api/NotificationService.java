@@ -17,70 +17,84 @@ public interface NotificationService {
 
     // ===== EXISTING METHODS (GET NOTIFICATIONS) =====
 
-    // ✅ Get paginated notifications
+    // Get paginated notifications
     @GET("api/notifications")
     Call<StandardResponse<Map<String, Object>>> getNotifications(
             @Query("page") int page,
             @Query("size") int size
     );
 
-    // ✅ Get unread notifications count
+    // Get unread notifications count
     @GET("api/notifications/unread-count")
     Call<StandardResponse<Map<String, Object>>> getUnreadCount();
 
-    // ✅ Mark single notification as read
+    // Mark single notification as read
     @PUT("api/notifications/{id}/mark-read")
     Call<StandardResponse<String>> markAsRead(@Path("id") Long notificationId);
 
-    // ✅ Mark all notifications as read
+    // Mark all notifications as read
     @PUT("api/notifications/mark-all-read")
     Call<StandardResponse<String>> markAllAsRead();
 
-    // ===== NEW METHODS (SEND NOTIFICATIONS) =====
+    // ===== EXISTING SEND METHODS =====
 
-    // ✅ THÊM: Send message notification - Chat notifications
+    // Send message notification - Chat notifications
     @POST("api/notifications/send-message")
     Call<StandardResponse<String>> sendMessageNotification(@Body Map<String, Object> request);
 
-    // ✅ THÊM: Send offer notification - Price offer notifications
+    // Send offer notification - Price offer notifications
     @POST("api/notifications/send-offer")
     Call<StandardResponse<String>> sendOfferNotification(@Body Map<String, Object> request);
 
-    // ✅ THÊM: Send general notification - General app notifications
+    // Send general notification - General app notifications
     @POST("api/notifications/send-general")
     Call<StandardResponse<String>> sendGeneralNotification(@Body Map<String, Object> request);
 
-    // ✅ THÊM: Send product upload notification - Product listing updates
+    // Send product upload notification - Product listing updates
     @POST("api/notifications/send-product-upload")
     Call<StandardResponse<String>> sendProductUploadNotification(@Body Map<String, Object> request);
 
-    // ✅ THÊM: Send listing update notification - When product is updated
-    @POST("api/notifications/send-listing-update")
-    Call<StandardResponse<String>> sendListingUpdateNotification(@Body Map<String, Object> request);
-
-    // ✅ THÊM: Send transaction notification - Payment/transaction notifications
+    // Send transaction notification - Payment/transaction notifications
     @POST("api/notifications/send-transaction")
     Call<StandardResponse<String>> sendTransactionNotification(@Body Map<String, Object> request);
 
-    // ✅ THÊM: Send bulk notification - Send to multiple users
-    @POST("api/notifications/send-bulk")
-    Call<StandardResponse<String>> sendBulkNotification(@Body Map<String, Object> request);
+    // ===== ✅ NEW: PROMOTION METHODS - FR-4.2.1 =====
 
-    // ===== UTILITY METHODS =====
+    // Send single promotion notification
+    @POST("api/notifications/send-promotion")
+    Call<StandardResponse<String>> sendPromotionNotification(@Body Map<String, Object> request);
 
-    // ✅ THÊM: Get notification by ID
-    @GET("api/notifications/{id}")
-    Call<StandardResponse<Map<String, Object>>> getNotificationById(@Path("id") Long notificationId);
+    // Send bulk promotion to multiple users
+    @POST("api/notifications/send-bulk-promotion")
+    Call<StandardResponse<String>> sendBulkPromotionNotification(@Body Map<String, Object> request);
 
-    // ✅ THÊM: Delete notification
-    @PUT("api/notifications/{id}/delete")
-    Call<StandardResponse<String>> deleteNotification(@Path("id") Long notificationId);
+    // Send location-based promotion
+    @POST("api/notifications/send-location-promotion")
+    Call<StandardResponse<String>> sendLocationBasedPromotion(@Body Map<String, Object> request);
 
-    // ✅ THÊM: Get notification preferences
+    // ===== ✅ NEW: LISTING UPDATE METHODS - FR-4.2.1 =====
+
+    // Send listing update notification
+    @POST("api/notifications/send-listing-update")
+    Call<StandardResponse<String>> sendListingUpdateNotification(@Body Map<String, Object> request);
+
+    // ===== ✅ NEW: PREFERENCE MANAGEMENT METHODS =====
+
+    // Get notification preferences
     @GET("api/notifications/preferences")
     Call<StandardResponse<Map<String, Object>>> getNotificationPreferences();
 
-    // ✅ THÊM: Update notification preferences
+    // Update notification preferences
     @PUT("api/notifications/preferences")
     Call<StandardResponse<String>> updateNotificationPreferences(@Body Map<String, Object> preferences);
+
+    // ===== UTILITY METHODS =====
+
+    // Get notification by ID
+    @GET("api/notifications/{id}")
+    Call<StandardResponse<Map<String, Object>>> getNotificationById(@Path("id") Long notificationId);
+
+    // Delete notification (if needed)
+    @PUT("api/notifications/{id}/delete")
+    Call<StandardResponse<String>> deleteNotification(@Path("id") Long notificationId);
 }

@@ -90,14 +90,14 @@
             android:layout_marginBottom="8dp"
             android:visibility="gone" />
 
-        <!-- ✅ ACTION BUTTONS for RECEIVED offers -->
+        <!-- ✅ ACTION BUTTONS for RECEIVED offers - ALWAYS VISIBLE -->
         <LinearLayout
             android:id="@+id/ll_action_buttons"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginTop="8dp"
-            android:visibility="gone">
+            android:visibility="visible">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_accept"
@@ -108,7 +108,7 @@
                 android:layout_marginEnd="4dp"
                 android:text="Accept"
                 android:textSize="12sp"
-                app:backgroundTint="@color/status_success" />
+                android:backgroundTint="@android:color/holo_green_dark" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_counter"
@@ -119,8 +119,8 @@
                 android:layout_marginHorizontal="4dp"
                 android:text="Counter"
                 android:textSize="12sp"
-                app:strokeColor="@color/status_warning"
-                android:textColor="@color/status_warning" />
+                app:strokeColor="@android:color/holo_orange_dark"
+                android:textColor="@android:color/holo_orange_dark" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_reject"
@@ -131,8 +131,8 @@
                 android:layout_marginStart="4dp"
                 android:text="Reject"
                 android:textSize="12sp"
-                app:strokeColor="@color/status_error"
-                android:textColor="@color/status_error" />
+                app:strokeColor="@android:color/holo_red_dark"
+                android:textColor="@android:color/holo_red_dark" />
 
         </LinearLayout>
 

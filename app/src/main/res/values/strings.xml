@@ -9,6 +9,9 @@
     <string name="nav_sell">Sell</string>
     <string name="nav_messages">Messages</string>
     <string name="nav_profile">Profile</string>
+    <color name="accent_color">#FF4081</color> <!-- Pink Accent (Material default) -->
+
+
 
     <!-- Authentication -->
     <string name="login">Sign In</string>

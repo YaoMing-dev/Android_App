@@ -1,4 +1,4 @@
-// Cập nhật app/src/main/java/com/example/newtrade/services/TradeUpFirebaseMessagingService.java
+// app/src/main/java/com/example/newtrade/services/TradeUpFirebaseMessagingService.java
 package com.example.newtrade.services;
 
 import android.app.NotificationChannel;
@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Build;
 import android.util.Log;
 
@@ -33,10 +34,11 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "FCMService";
 
-    // Multiple notification channels for different types
+    // ✅ UPDATED: Multiple notification channels for different types - FR-4.2.1
     private static final String CHANNEL_MESSAGES = "tradeup_messages";
     private static final String CHANNEL_OFFERS = "tradeup_offers";
     private static final String CHANNEL_TRANSACTIONS = "tradeup_transactions";
+    private static final String CHANNEL_PROMOTIONS = "tradeup_promotions";    // ✅ NEW
     private static final String CHANNEL_GENERAL = "tradeup_general";
 
     @Override
@@ -65,7 +67,7 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
             );
         }
 
-        // ✅ ALWAYS SHOW NOTIFICATION FOR DEBUGGING
+        // ALWAYS SHOW NOTIFICATION FOR DEBUGGING
         if (remoteMessage.getData().isEmpty() && remoteMessage.getNotification() == null) {
             Log.d(TAG, "🔔 Empty FCM message received - showing debug notification");
             showNotification("FCM Test", "Empty FCM message received", remoteMessage.getData());
@@ -80,8 +82,7 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
         // Save token locally
         SharedPrefsManager.getInstance(this).saveFcmToken(token);
 
-        // TODO: Send token to server
-        // You should send this token to your server for sending notifications
+        // Send token to server
         sendTokenToServer(token);
     }
 
@@ -138,12 +139,19 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
 
         Log.d(TAG, "🔔 Showing notification - Title: " + title + ", Body: " + body + ", Type: " + notificationType);
 
+        // ✅ Check user notification preferences
+        SharedPrefsManager prefsManager = SharedPrefsManager.getInstance(this);
+        if (!shouldShowNotification(notificationType, prefsManager)) {
+            Log.d(TAG, "🔕 Notification blocked by user preferences: " + notificationType);
+            return;
+        }
+
         // Create appropriate notification channel
         String channelId = getChannelForType(notificationType);
         createNotificationChannel(channelId, notificationType);
 
         // Create appropriate intent based on notification type
-        Intent intent = createIntentForNotification(notificationType, referenceId);
+        Intent intent = createIntentForNotification(notificationType, referenceId, data);
 
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
@@ -152,9 +160,9 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
                 PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        // Build notification with appropriate styling
+        // ✅ Build notification with enhanced styling for different types
         NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(R.drawable.ic_notification) // Make sure this exists
+                .setSmallIcon(getIconForType(notificationType))
                 .setContentTitle(title)
                 .setContentText(body)
                 .setAutoCancel(true)
@@ -162,10 +170,16 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
                 .setContentIntent(pendingIntent)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setShowWhen(true)
-                .setWhen(System.currentTimeMillis());
+                .setWhen(System.currentTimeMillis())
+                .setColor(getColorForType(notificationType));
+
+        // ✅ Add promotion-specific features
+        if ("PROMOTION".equals(notificationType)) {
+            addPromotionFeatures(notificationBuilder, data);
+        }
 
         // Add action buttons based on type
-        addNotificationActions(notificationBuilder, notificationType, referenceId);
+        addNotificationActions(notificationBuilder, notificationType, referenceId, data);
 
         NotificationManager notificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -179,6 +193,30 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
         }
     }
 
+    // ✅ NEW: Check if notification should be shown based on user preferences
+    private boolean shouldShowNotification(String type, SharedPrefsManager prefsManager) {
+        if (!prefsManager.isNotificationsEnabled()) {
+            return false;
+        }
+
+        if (type == null) return true;
+
+        switch (type.toUpperCase()) {
+            case "MESSAGE":
+                return prefsManager.isChatNotificationsEnabled();
+            case "OFFER":
+                return prefsManager.getBoolean("offer_notifications_enabled", true);
+            case "PROMOTION":
+                return prefsManager.getBoolean("promotion_notifications_enabled", true);
+            case "LISTING_UPDATE":
+            case "TRANSACTION":
+                return prefsManager.getBoolean("listing_notifications_enabled", true);
+            default:
+                return true;
+        }
+    }
+
+    // ✅ UPDATED: Get channel for notification type including promotions
     private String getChannelForType(String type) {
         if (type == null) return CHANNEL_GENERAL;
 
@@ -190,11 +228,14 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
             case "TRANSACTION":
             case "LISTING_UPDATE":
                 return CHANNEL_TRANSACTIONS;
+            case "PROMOTION":               // ✅ NEW
+                return CHANNEL_PROMOTIONS;  // ✅ NEW
             default:
                 return CHANNEL_GENERAL;
         }
     }
 
+    // ✅ UPDATED: Create notification channels including promotions
     private void createNotificationChannel(String channelId, String type) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             CharSequence name;
@@ -217,6 +258,11 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
                     description = "Notifications for transaction and listing updates";
                     importance = NotificationManager.IMPORTANCE_DEFAULT;
                     break;
+                case CHANNEL_PROMOTIONS:    // ✅ NEW
+                    name = "Promotions & Deals";    // ✅ NEW
+                    description = "Promotional offers and discounts";  // ✅ NEW
+                    importance = NotificationManager.IMPORTANCE_DEFAULT; // ✅ NEW
+                    break;  // ✅ NEW
                 default:
                     name = "General Notifications";
                     description = "General app notifications";
@@ -229,6 +275,13 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
             channel.enableVibration(true);
             channel.enableLights(true);
 
+            // ✅ NEW: Special settings for promotions
+            if (channelId.equals(CHANNEL_PROMOTIONS)) {
+                channel.setLightColor(Color.BLUE);
+                channel.enableVibration(true);
+                channel.setVibrationPattern(new long[]{0, 250, 250, 250});
+            }
+
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             if (notificationManager != null) {
                 notificationManager.createNotificationChannel(channel);
@@ -237,7 +290,65 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
         }
     }
 
-    private Intent createIntentForNotification(String type, String referenceId) {
+    // ✅ NEW: Get icon for notification type
+    private int getIconForType(String type) {
+        if (type == null) return R.drawable.ic_notification;
+
+        switch (type.toUpperCase()) {
+            case "MESSAGE":
+                return R.drawable.ic_message;
+            case "OFFER":
+                return R.drawable.ic_local_offer;
+            case "TRANSACTION":
+            case "LISTING_UPDATE":
+                return R.drawable.ic_receipt;
+            case "PROMOTION":
+                return R.drawable.ic_local_offer; // Use offer icon or create new one
+            default:
+                return R.drawable.ic_notification;
+        }
+    }
+
+    // ✅ NEW: Get color for notification type
+    private int getColorForType(String type) {
+        if (type == null) return Color.BLUE;
+
+        switch (type.toUpperCase()) {
+            case "MESSAGE":
+                return Color.GREEN;
+            case "OFFER":
+                return Color.MAGENTA;
+            case "TRANSACTION":
+            case "LISTING_UPDATE":
+                return Color.BLUE;
+            case "PROMOTION":
+                return Color.RED; // Eye-catching color for promotions
+            default:
+                return Color.BLUE;
+        }
+    }
+
+    // ✅ NEW: Add promotion-specific features
+    private void addPromotionFeatures(NotificationCompat.Builder builder, Map<String, String> data) {
+        String promoCode = data.get("promoCode");
+        String promotionType = data.get("promotionType");
+
+        // ✅ FIX: Remove setLargeIcon to avoid ambiguous method call
+        // builder.setLargeIcon(null); // Remove this line
+
+        // Add promotional styling
+        if (promoCode != null && !promoCode.isEmpty()) {
+            builder.setSubText("Promo Code: " + promoCode);
+        }
+
+        // Set high priority for limited-time promotions
+        if ("FLASH_SALE".equals(promotionType) || "LIMITED_TIME".equals(promotionType)) {
+            builder.setPriority(NotificationCompat.PRIORITY_HIGH);
+        }
+    }
+
+    // ✅ UPDATED: Create intent for notification with enhanced routing
+    private Intent createIntentForNotification(String type, String referenceId, Map<String, String> data) {
         Intent intent;
 
         if (type != null) {
@@ -247,19 +358,28 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
                     intent = new Intent(this, MainActivity.class);
                     intent.putExtra("navigate_to", "chat");
                     intent.putExtra("conversation_id", referenceId);
+                    intent.putExtra("sender_name", data.get("senderName"));
                     break;
                 case "OFFER":
                     // Navigate to offer details
                     intent = new Intent(this, MainActivity.class);
                     intent.putExtra("navigate_to", "offers");
                     intent.putExtra("offer_id", referenceId);
+                    intent.putExtra("buyer_name", data.get("buyerName"));
                     break;
                 case "TRANSACTION":
                 case "LISTING_UPDATE":
                     // Navigate to transaction details
                     intent = new Intent(this, MainActivity.class);
-                    intent.putExtra("navigate_to", "transactions");
-                    intent.putExtra("transaction_id", referenceId);
+                    intent.putExtra("navigate_to", "listings");
+                    intent.putExtra("product_id", referenceId);
+                    break;
+                case "PROMOTION":   // ✅ NEW
+                    // Navigate to promotions/deals section
+                    intent = new Intent(this, MainActivity.class);
+                    intent.putExtra("navigate_to", "promotions");
+                    intent.putExtra("promotion_type", data.get("promotionType"));
+                    intent.putExtra("promo_code", data.get("promoCode"));
                     break;
                 default:
                     intent = new Intent(this, NotificationActivity.class);
@@ -270,6 +390,9 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
         }
 
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra("notification_type", type);
+        intent.putExtra("reference_id", referenceId);
+
         return intent;
     }
 
@@ -281,6 +404,8 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
                 return NotificationCompat.PRIORITY_HIGH;
             case "OFFER":
                 return NotificationCompat.PRIORITY_DEFAULT;
+            case "PROMOTION":
+                return NotificationCompat.PRIORITY_DEFAULT;
             case "TRANSACTION":
             case "LISTING_UPDATE":
                 return NotificationCompat.PRIORITY_DEFAULT;
@@ -289,7 +414,9 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
         }
     }
 
-    private void addNotificationActions(NotificationCompat.Builder builder, String type, String referenceId) {
+    // ✅ UPDATED: Add notification actions including promotion actions
+    private void addNotificationActions(NotificationCompat.Builder builder, String type,
+                                        String referenceId, Map<String, String> data) {
         if (type == null) return;
 
         switch (type.toUpperCase()) {
@@ -302,7 +429,7 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
                 PendingIntent replyPendingIntent = PendingIntent.getActivity(
                         this, 1, replyIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                builder.addAction(R.drawable.ic_notification, "Reply", replyPendingIntent);
+                builder.addAction(R.drawable.ic_reply, "Reply", replyPendingIntent);
                 break;
 
             case "OFFER":
@@ -314,7 +441,33 @@ public class TradeUpFirebaseMessagingService extends FirebaseMessagingService {
                 PendingIntent viewPendingIntent = PendingIntent.getActivity(
                         this, 2, viewIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                builder.addAction(R.drawable.ic_notification, "View Offer", viewPendingIntent);
+                builder.addAction(R.drawable.ic_visibility, "View Offer", viewPendingIntent);
+                break;
+
+            case "PROMOTION":   // ✅ NEW
+                // Add "View Deal" action for promotions
+                Intent promoIntent = new Intent(this, MainActivity.class);
+                promoIntent.putExtra("action", "view_promotion");
+                promoIntent.putExtra("promotion_type", data.get("promotionType"));
+                promoIntent.putExtra("promo_code", data.get("promoCode"));
+
+                PendingIntent promoPendingIntent = PendingIntent.getActivity(
+                        this, 3, promoIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+                builder.addAction(R.drawable.ic_local_offer, "View Deal", promoPendingIntent);
+
+                // ✅ Add "Copy Code" action if promo code exists
+                String promoCode = data.get("promoCode");
+                if (promoCode != null && !promoCode.isEmpty()) {
+                    Intent copyIntent = new Intent(this, MainActivity.class);
+                    copyIntent.putExtra("action", "copy_promo_code");
+                    copyIntent.putExtra("promo_code", promoCode);
+
+                    PendingIntent copyPendingIntent = PendingIntent.getActivity(
+                            this, 4, copyIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+                    builder.addAction(R.drawable.ic_content_copy, "Copy Code", copyPendingIntent);
+                }
                 break;
         }
     }

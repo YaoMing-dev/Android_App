@@ -40,6 +40,7 @@ import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.DateUtils;
+import com.example.newtrade.utils.UserBehaviorTracker;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.material.button.MaterialButton;
@@ -62,7 +63,7 @@ import retrofit2.Response;
 public class SearchFragment extends Fragment {
 
     private static final String TAG = "SearchFragment";
-    private static final int SEARCH_DELAY_MS = 300;
+    private static final int SEARCH_DELAY_MS = 200; // ✅ FIXED: FR-3.1.2 (Was 300ms)
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
 
     // UI Components
@@ -87,6 +88,9 @@ public class SearchFragment extends Fragment {
     private SharedPrefsManager prefsManager;
     private FusedLocationProviderClient fusedLocationClient;
     private Geocoder geocoder;
+
+    // ✅ NEW: Behavior tracking
+    private UserBehaviorTracker behaviorTracker;
 
     // Filters
     private Long selectedCategoryId = null;
@@ -121,7 +125,7 @@ public class SearchFragment extends Fragment {
         // ✅ Load tất cả sản phẩm ban đầu
         loadAllProductsInitially();
 
-        Log.d(TAG, "SearchFragment created successfully");
+        Log.d(TAG, "SearchFragment created successfully with behavior tracking");
     }
 
     private void initServices() {
@@ -130,6 +134,9 @@ public class SearchFragment extends Fragment {
         prefsManager = SharedPrefsManager.getInstance(requireContext());
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
         geocoder = new Geocoder(requireContext(), Locale.getDefault());
+
+        // ✅ NEW: Initialize behavior tracker
+        behaviorTracker = UserBehaviorTracker.getInstance(requireContext());
     }
 
     private void initViews(View view) {
@@ -396,221 +403,7 @@ public class SearchFragment extends Fragment {
     }
 
     // ===============================
-    // ✅ CATEGORY FILTER IMPLEMENTATION
-    // ===============================
-
-    private void showCategoryFilterDialog() {
-        Log.d(TAG, "🔍 Showing category filter dialog...");
-
-        if (categories.isEmpty()) {
-            Log.d(TAG, "No categories loaded, loading first...");
-            loadCategoriesForFilter();
-            return;
-        }
-
-        showCategoryDialog();
-    }
-
-    private void loadCategoriesForFilter() {
-        apiService.getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
-                                   @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
-                try {
-                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                        List<Map<String, Object>> categoriesData = response.body().getData();
-
-                        categories.clear();
-                        for (Map<String, Object> categoryData : categoriesData) {
-                            Category category = new Category();
-                            Object idObj = categoryData.get("id");
-                            if (idObj instanceof Number) {
-                                category.setId(((Number) idObj).longValue());
-                            }
-                            category.setName((String) categoryData.get("name"));
-                            category.setDescription((String) categoryData.get("description"));
-                            category.setIcon((String) categoryData.get("icon"));
-                            categories.add(category);
-                        }
-
-                        showCategoryDialog();
-                        Log.d(TAG, "✅ Loaded " + categories.size() + " categories for filter");
-                    } else {
-                        Log.e(TAG, "❌ Failed to load categories for filter");
-                        loadSampleCategoriesForDialog();
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error loading categories for filter", e);
-                    loadSampleCategoriesForDialog();
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
-                Log.e(TAG, "❌ Categories API failed for filter", t);
-                loadSampleCategoriesForDialog();
-            }
-        });
-    }
-
-    private void loadSampleCategoriesForDialog() {
-        categories.clear();
-        categories.add(new Category(1L, "Electronics", "Electronics devices", "electronics", true));
-        categories.add(new Category(2L, "Fashion", "Clothing and accessories", "fashion", true));
-        categories.add(new Category(3L, "Home & Garden", "Home decor and garden", "home", true));
-        categories.add(new Category(4L, "Books", "Books and educational materials", "books", true));
-        categories.add(new Category(5L, "Sports", "Sports and outdoor equipment", "sports", true));
-        categories.add(new Category(6L, "Beauty", "Beauty and health products", "beauty", true));
-        categories.add(new Category(7L, "Vehicles", "Cars and motorbikes", "vehicles", true));
-        categories.add(new Category(8L, "Toys", "Toys and kids items", "toys", true));
-
-        showCategoryDialog();
-        Log.d(TAG, "✅ Loaded sample categories for filter");
-    }
-
-    private void showCategoryDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Select Category");
-
-        // Create category options
-        List<String> categoryNames = new ArrayList<>();
-        List<Long> categoryIds = new ArrayList<>();
-
-        // Add "All Categories" option
-        categoryNames.add("All Categories");
-        categoryIds.add(null);
-
-        // Add actual categories
-        for (Category category : categories) {
-            categoryNames.add(category.getName());
-            categoryIds.add(category.getId());
-        }
-
-        String[] options = categoryNames.toArray(new String[0]);
-
-        // Find current selection
-        int selectedIndex = 0;
-        if (selectedCategoryId != null) {
-            for (int i = 1; i < categoryIds.size(); i++) {
-                if (selectedCategoryId.equals(categoryIds.get(i))) {
-                    selectedIndex = i;
-                    break;
-                }
-            }
-        }
-
-        builder.setSingleChoiceItems(options, selectedIndex, (dialog, which) -> {
-            if (which == 0) {
-                // All Categories selected
-                applyCategoryFilter(null, null);
-            } else {
-                // Specific category selected
-                Long categoryId = categoryIds.get(which);
-                String categoryName = categoryNames.get(which);
-                applyCategoryFilter(categoryId, categoryName);
-            }
-            dialog.dismiss();
-        });
-
-        builder.setNegativeButton("Cancel", null);
-        builder.create().show();
-    }
-
-    // ✅ Apply category filter method
-    private void applyCategoryFilter(Long categoryId, String categoryName) {
-        Log.d(TAG, "🔍 Applying category filter: " + categoryName + " (ID: " + categoryId + ")");
-
-        this.selectedCategoryId = categoryId;
-        this.selectedCategoryName = categoryName;
-
-        // Update UI
-        updateCategoryFilterButton();
-        updateFilterChips();
-
-        // Search with category filter
-        scheduleSearch();
-    }
-
-    private void updateCategoryFilterButton() {
-        if (btnCategoryFilter != null) {
-            if (selectedCategoryName != null) {
-                btnCategoryFilter.setText(selectedCategoryName);
-                btnCategoryFilter.setSelected(true);
-            } else {
-                btnCategoryFilter.setText("Category");
-                btnCategoryFilter.setSelected(false);
-            }
-        }
-    }
-
-    // ===============================
-    // LOAD CATEGORIES FROM BACKEND
-    // ===============================
-
-    private void loadCategories() {
-        Log.d(TAG, "🔄 Loading categories from backend...");
-
-        apiService.getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
-                                   @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<List<Map<String, Object>>> apiResponse = response.body();
-
-                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                        categories.clear();
-
-                        for (Map<String, Object> categoryData : apiResponse.getData()) {
-                            Category category = new Category();
-
-                            Object idObj = categoryData.get("id");
-                            if (idObj instanceof Number) {
-                                category.setId(((Number) idObj).longValue());
-                            }
-
-                            category.setName((String) categoryData.get("name"));
-                            category.setDescription((String) categoryData.get("description"));
-                            category.setIcon((String) categoryData.get("icon"));
-
-                            categories.add(category);
-                        }
-
-                        Log.d(TAG, "✅ Loaded " + categories.size() + " categories from backend");
-                    } else {
-                        Log.w(TAG, "❌ Categories response unsuccessful: " + apiResponse.getMessage());
-                        loadSampleCategories();
-                    }
-                } else {
-                    Log.w(TAG, "❌ Categories response failed: HTTP " + response.code());
-                    loadSampleCategories();
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
-                Log.e(TAG, "❌ Categories API call failed", t);
-                loadSampleCategories();
-            }
-        });
-    }
-
-    private void loadSampleCategories() {
-        categories.clear();
-        categories.add(new Category(1L, "Electronics", "Electronics devices", "electronics", true));
-        categories.add(new Category(2L, "Fashion", "Clothing and accessories", "fashion", true));
-        categories.add(new Category(3L, "Home & Garden", "Home decor and garden", "home", true));
-        categories.add(new Category(4L, "Books", "Books and educational materials", "books", true));
-        categories.add(new Category(5L, "Sports", "Sports and outdoor equipment", "sports", true));
-        categories.add(new Category(6L, "Beauty", "Beauty and health products", "beauty", true));
-        categories.add(new Category(7L, "Vehicles", "Cars and motorbikes", "vehicles", true));
-        categories.add(new Category(8L, "Toys", "Toys and kids items", "toys", true));
-
-        Log.d(TAG, "✅ Loaded sample categories");
-    }
-
-    // ===============================
-    // ✅ IMPROVED SEARCH METHODS
+    // ✅ IMPROVED SEARCH METHODS WITH TRACKING
     // ===============================
 
     private void scheduleSearch() {
@@ -624,6 +417,13 @@ public class SearchFragment extends Fragment {
 
     private void performSearch() {
         String query = currentQuery.trim();
+
+        // ✅ NEW: Track search behavior (FR-3.2.2)
+        behaviorTracker.trackSearch(
+                query.isEmpty() ? null : query,
+                selectedCategoryName,
+                searchLocationName
+        );
 
         // ✅ Nếu không có query và filter, load tất cả sản phẩm
         if (query.isEmpty() && !hasActiveFilters()) {
@@ -651,8 +451,8 @@ public class SearchFragment extends Fragment {
                 query.isEmpty() ? null : query,             // search query
                 selectedCategoryId,                         // categoryId - ✅ QUAN TRỌNG
                 selectedCondition,                          // condition
-                minPrice,                                               // minPrice (Double)
-                maxPrice,  // maxPrice
+                minPrice,                                   // minPrice (Double)
+                maxPrice,                                   // maxPrice
                 getSortByParameter(),                       // sortBy
                 getSortDirectionParameter()                 // sortDir
         ).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
@@ -911,7 +711,226 @@ public class SearchFragment extends Fragment {
     }
 
     // ===============================
-    // OTHER FILTER DIALOGS (giữ nguyên)
+    // ✅ CATEGORY FILTER IMPLEMENTATION WITH TRACKING
+    // ===============================
+
+    private void showCategoryFilterDialog() {
+        Log.d(TAG, "🔍 Showing category filter dialog...");
+
+        if (categories.isEmpty()) {
+            Log.d(TAG, "No categories loaded, loading first...");
+            loadCategoriesForFilter();
+            return;
+        }
+
+        showCategoryDialog();
+    }
+
+    private void loadCategoriesForFilter() {
+        apiService.getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
+                                   @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
+                try {
+                    if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                        List<Map<String, Object>> categoriesData = response.body().getData();
+
+                        categories.clear();
+                        for (Map<String, Object> categoryData : categoriesData) {
+                            Category category = new Category();
+                            Object idObj = categoryData.get("id");
+                            if (idObj instanceof Number) {
+                                category.setId(((Number) idObj).longValue());
+                            }
+                            category.setName((String) categoryData.get("name"));
+                            category.setDescription((String) categoryData.get("description"));
+                            category.setIcon((String) categoryData.get("icon"));
+                            categories.add(category);
+                        }
+
+                        showCategoryDialog();
+                        Log.d(TAG, "✅ Loaded " + categories.size() + " categories for filter");
+                    } else {
+                        Log.e(TAG, "❌ Failed to load categories for filter");
+                        loadSampleCategoriesForDialog();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Error loading categories for filter", e);
+                    loadSampleCategoriesForDialog();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "❌ Categories API failed for filter", t);
+                loadSampleCategoriesForDialog();
+            }
+        });
+    }
+
+    private void loadSampleCategoriesForDialog() {
+        categories.clear();
+        categories.add(new Category(1L, "Electronics", "Electronics devices", "electronics", true));
+        categories.add(new Category(2L, "Fashion", "Clothing and accessories", "fashion", true));
+        categories.add(new Category(3L, "Home & Garden", "Home decor and garden", "home", true));
+        categories.add(new Category(4L, "Books", "Books and educational materials", "books", true));
+        categories.add(new Category(5L, "Sports", "Sports and outdoor equipment", "sports", true));
+        categories.add(new Category(6L, "Beauty", "Beauty and health products", "beauty", true));
+        categories.add(new Category(7L, "Vehicles", "Cars and motorbikes", "vehicles", true));
+        categories.add(new Category(8L, "Toys", "Toys and kids items", "toys", true));
+
+        showCategoryDialog();
+        Log.d(TAG, "✅ Loaded sample categories for filter");
+    }
+
+    private void showCategoryDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Select Category");
+
+        // Create category options
+        List<String> categoryNames = new ArrayList<>();
+        List<Long> categoryIds = new ArrayList<>();
+
+        // Add "All Categories" option
+        categoryNames.add("All Categories");
+        categoryIds.add(null);
+
+        // Add actual categories
+        for (Category category : categories) {
+            categoryNames.add(category.getName());
+            categoryIds.add(category.getId());
+        }
+
+        String[] options = categoryNames.toArray(new String[0]);
+
+        // Find current selection
+        int selectedIndex = 0;
+        if (selectedCategoryId != null) {
+            for (int i = 1; i < categoryIds.size(); i++) {
+                if (selectedCategoryId.equals(categoryIds.get(i))) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        builder.setSingleChoiceItems(options, selectedIndex, (dialog, which) -> {
+            if (which == 0) {
+                // All Categories selected
+                applyCategoryFilter(null, null);
+            } else {
+                // Specific category selected
+                Long categoryId = categoryIds.get(which);
+                String categoryName = categoryNames.get(which);
+                applyCategoryFilter(categoryId, categoryName);
+            }
+            dialog.dismiss();
+        });
+
+        builder.setNegativeButton("Cancel", null);
+        builder.create().show();
+    }
+
+    // ✅ Apply category filter method with tracking
+    private void applyCategoryFilter(Long categoryId, String categoryName) {
+        Log.d(TAG, "🔍 Applying category filter: " + categoryName + " (ID: " + categoryId + ")");
+
+        this.selectedCategoryId = categoryId;
+        this.selectedCategoryName = categoryName;
+
+        // ✅ NEW: Track category browsing
+        if (categoryId != null && categoryName != null) {
+            behaviorTracker.trackCategoryBrowse(categoryId, categoryName);
+        }
+
+        // Update UI
+        updateCategoryFilterButton();
+        updateFilterChips();
+
+        // Search with category filter
+        scheduleSearch();
+    }
+
+    private void updateCategoryFilterButton() {
+        if (btnCategoryFilter != null) {
+            if (selectedCategoryName != null) {
+                btnCategoryFilter.setText(selectedCategoryName);
+                btnCategoryFilter.setSelected(true);
+            } else {
+                btnCategoryFilter.setText("Category");
+                btnCategoryFilter.setSelected(false);
+            }
+        }
+    }
+
+    // ===============================
+    // LOAD CATEGORIES FROM BACKEND
+    // ===============================
+
+    private void loadCategories() {
+        Log.d(TAG, "🔄 Loading categories from backend...");
+
+        apiService.getCategories().enqueue(new Callback<StandardResponse<List<Map<String, Object>>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call,
+                                   @NonNull Response<StandardResponse<List<Map<String, Object>>>> response) {
+
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<List<Map<String, Object>>> apiResponse = response.body();
+
+                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                        categories.clear();
+
+                        for (Map<String, Object> categoryData : apiResponse.getData()) {
+                            Category category = new Category();
+
+                            Object idObj = categoryData.get("id");
+                            if (idObj instanceof Number) {
+                                category.setId(((Number) idObj).longValue());
+                            }
+
+                            category.setName((String) categoryData.get("name"));
+                            category.setDescription((String) categoryData.get("description"));
+                            category.setIcon((String) categoryData.get("icon"));
+
+                            categories.add(category);
+                        }
+
+                        Log.d(TAG, "✅ Loaded " + categories.size() + " categories from backend");
+                    } else {
+                        Log.w(TAG, "❌ Categories response unsuccessful: " + apiResponse.getMessage());
+                        loadSampleCategories();
+                    }
+                } else {
+                    Log.w(TAG, "❌ Categories response failed: HTTP " + response.code());
+                    loadSampleCategories();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<List<Map<String, Object>>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "❌ Categories API call failed", t);
+                loadSampleCategories();
+            }
+        });
+    }
+
+    private void loadSampleCategories() {
+        categories.clear();
+        categories.add(new Category(1L, "Electronics", "Electronics devices", "electronics", true));
+        categories.add(new Category(2L, "Fashion", "Clothing and accessories", "fashion", true));
+        categories.add(new Category(3L, "Home & Garden", "Home decor and garden", "home", true));
+        categories.add(new Category(4L, "Books", "Books and educational materials", "books", true));
+        categories.add(new Category(5L, "Sports", "Sports and outdoor equipment", "sports", true));
+        categories.add(new Category(6L, "Beauty", "Beauty and health products", "beauty", true));
+        categories.add(new Category(7L, "Vehicles", "Cars and motorbikes", "vehicles", true));
+        categories.add(new Category(8L, "Toys", "Toys and kids items", "toys", true));
+
+        Log.d(TAG, "✅ Loaded sample categories");
+    }
+
+    // ===============================
+    // OTHER FILTER DIALOGS (giữ nguyên logic, chỉ thêm tracking where needed)
     // ===============================
 
     private void showPriceFilterDialog() {
@@ -1020,17 +1039,14 @@ public class SearchFragment extends Fragment {
             public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        // ✅ SỬA: Use Current Location - tự động điền address
         btnUseCurrentLocation.setOnClickListener(v -> {
             getCurrentLocationWithGeocoding(etCustomLocation, tvCurrentLocationStatus, btnApply);
         });
 
-        // ✅ Use Custom Location - manual input
         btnUseCustomLocation.setOnClickListener(v -> {
             String customLocation = etCustomLocation.getText().toString().trim();
             if (!customLocation.isEmpty()) {
                 searchLocationName = customLocation;
-                // Clear GPS coordinates since using custom text
                 searchLatitude = null;
                 searchLongitude = null;
 
@@ -1044,7 +1060,6 @@ public class SearchFragment extends Fragment {
             }
         });
 
-        // ✅ Clear all location data
         btnClear.setOnClickListener(v -> {
             searchLocationName = "";
             searchLatitude = null;
@@ -1060,9 +1075,14 @@ public class SearchFragment extends Fragment {
             Toast.makeText(getContext(), "Location filter cleared", Toast.LENGTH_SHORT).show();
         });
 
-        // ✅ Apply location filter
         btnApply.setOnClickListener(v -> {
             Log.d(TAG, "✅ Applying location filter: " + searchLocationName);
+
+            // ✅ NEW: Track location activity
+            if (searchLatitude != null && searchLongitude != null) {
+                behaviorTracker.trackLocationActivity(searchLocationName, searchLatitude, searchLongitude);
+            }
+
             updateFilterChips();
             scheduleSearch();
             builder.create().dismiss();
@@ -1086,10 +1106,9 @@ public class SearchFragment extends Fragment {
             return;
         }
 
-        // ✅ Show loading state
         statusView.setText("🔄 Getting your location...");
         statusView.setVisibility(View.VISIBLE);
-        etCustomLocation.setText(""); // Clear manual input
+        etCustomLocation.setText("");
         applyButton.setEnabled(false);
 
         fusedLocationClient.getLastLocation()
@@ -1100,7 +1119,6 @@ public class SearchFragment extends Fragment {
 
                         Log.d(TAG, "✅ Got GPS location: " + searchLatitude + ", " + searchLongitude);
 
-                        // ✅ Convert coordinates to address và điền vào EditText
                         convertCoordinatesToAddress(location.getLatitude(), location.getLongitude(),
                                 etCustomLocation, statusView, applyButton);
 
@@ -1133,10 +1151,8 @@ public class SearchFragment extends Fragment {
                     if (addresses != null && !addresses.isEmpty()) {
                         Address address = addresses.get(0);
 
-                        // ✅ Build readable address
                         StringBuilder addressText = new StringBuilder();
 
-                        // Add street number and name
                         if (address.getSubThoroughfare() != null) {
                             addressText.append(address.getSubThoroughfare()).append(" ");
                         }
@@ -1144,19 +1160,16 @@ public class SearchFragment extends Fragment {
                             addressText.append(address.getThoroughfare()).append(", ");
                         }
 
-                        // Add district/area
                         if (address.getSubLocality() != null) {
                             addressText.append(address.getSubLocality()).append(", ");
                         }
 
-                        // Add city
                         if (address.getLocality() != null) {
                             addressText.append(address.getLocality());
                         } else if (address.getAdminArea() != null) {
                             addressText.append(address.getAdminArea());
                         }
 
-                        // Add country if needed
                         if (address.getCountryName() != null && !address.getCountryName().equals("Vietnam")) {
                             addressText.append(", ").append(address.getCountryName());
                         }
@@ -1166,12 +1179,10 @@ public class SearchFragment extends Fragment {
                             finalAddress = "Current Location";
                         }
 
-                        // ✅ Clean up address formatting
-                        finalAddress = finalAddress.replaceAll(", $", ""); // Remove trailing comma
+                        finalAddress = finalAddress.replaceAll(", $", "");
                         searchLocationName = finalAddress;
 
                         requireActivity().runOnUiThread(() -> {
-                            // ✅ TỰ ĐỘNG ĐIỀN VÀO EDITTEXT
                             etCustomLocation.setText(searchLocationName);
                             statusView.setText("📍 Location detected: " + searchLocationName);
                             statusView.setVisibility(View.VISIBLE);
@@ -1182,7 +1193,6 @@ public class SearchFragment extends Fragment {
                         });
 
                     } else {
-                        // ✅ Fallback: Use coordinates as text
                         requireActivity().runOnUiThread(() -> {
                             searchLocationName = "Lat: " + String.format("%.4f", latitude) +
                                     ", Lng: " + String.format("%.4f", longitude);
@@ -1196,7 +1206,6 @@ public class SearchFragment extends Fragment {
                         });
                     }
                 } else {
-                    // ✅ Geocoder not available - use coordinates
                     requireActivity().runOnUiThread(() -> {
                         searchLocationName = "Current Location (" +
                                 String.format("%.4f", latitude) + ", " +
@@ -1214,7 +1223,6 @@ public class SearchFragment extends Fragment {
             } catch (IOException e) {
                 Log.e(TAG, "Geocoding failed", e);
 
-                // ✅ Error fallback
                 requireActivity().runOnUiThread(() -> {
                     searchLocationName = "Current Location";
 
@@ -1298,6 +1306,9 @@ public class SearchFragment extends Fragment {
                 tvSortOption.setText(sortOptions[which]);
             }
             applySorting();
+            if (searchAdapter != null) {
+                searchAdapter.notifyDataSetChanged();
+            }
             dialog.dismiss();
         });
         builder.show();
@@ -1383,10 +1394,6 @@ public class SearchFragment extends Fragment {
     // UI STATE MANAGEMENT
     // ===============================
 
-    private void showInitialState() {
-        loadAllProductsInitially();
-    }
-
     private void showLoadingState() {
         isSearching = true;
         if (llLoadingState != null) llLoadingState.setVisibility(View.VISIBLE);
@@ -1437,11 +1444,16 @@ public class SearchFragment extends Fragment {
         Log.e(TAG, "Error: " + message);
     }
 
+    // ✅ ENHANCED: Navigate to product detail with tracking
     private void navigateToProductDetail(Product product) {
         if (getContext() != null && product != null) {
+            // ✅ NEW: Track product view for recommendations
+            behaviorTracker.trackProductView(product.getId(), product.getCategoryName(), currentQuery);
+
             Intent intent = new Intent(getContext(), ProductDetailActivity.class);
             intent.putExtra("product_id", product.getId());
             intent.putExtra("product_title", product.getTitle());
+            intent.putExtra("search_query", currentQuery); // Pass search context
             if (product.getPrice() != null) {
                 intent.putExtra("product_price", product.getPrice().toString());
             }

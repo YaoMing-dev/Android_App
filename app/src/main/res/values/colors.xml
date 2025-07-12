@@ -14,6 +14,16 @@
     <color name="secondary_light">#FFE0B2</color>
     <color name="icon_tint">#FF9800</color> <!-- hoặc bất kỳ màu nào bạn muốn -->
     <color name="chat_background">#F5F5F5</color>
+    <color name="message_color">#1E88E5</color>         <!-- Blue -->
+    <color name="offer_color">#F9A825</color>           <!-- Amber -->
+    <color name="transaction_color">#43A047</color>     <!-- Green -->
+    <color name="review_color">#FDD835</color>          <!-- Yellow -->
+    <color name="promotion_color">#D81B60</color>       <!-- Pink/Red -->
+    <color name="listing_color">#8E24AA</color>         <!-- Purple -->
+    <color name="general_color">#9E9E9E</color>         <!-- Gray -->
+
+    <!-- Background for promotion items -->
+    <color name="promotion_background_tint">#FFF0F4F8</color>
 
 
     <!-- Background Colors -->
