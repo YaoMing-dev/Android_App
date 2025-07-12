@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.AuthFlowManager;
 import com.example.newtrade.utils.ValidationUtils;
 import com.google.gson.Gson;
 
@@ -76,7 +77,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
             public void afterTextChanged(Editable s) {}
         });
 
-        // ✅ GỬI OTP CHO FORGOT PASSWORD
+        // ✅ Send OTP for forgot password
         btnReset.setOnClickListener(v -> attemptSendOtpForForgotPassword());
         tvLogin.setOnClickListener(v -> navigateToLogin());
 
@@ -113,7 +114,7 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
 
-        // ✅ GỬI OTP CHO FORGOT PASSWORD
+        // ✅ Send OTP for forgot password
         ApiClient.getAuthService().sendOtp(request)
                 .enqueue(new Callback<StandardResponse<Map<String, String>>>() {
                     @Override
@@ -175,17 +176,18 @@ public class ForgotPasswordActivity extends AppCompatActivity {
         Log.d(TAG, "✅ OTP sent successfully for forgot password");
 
         Toast.makeText(this,
-                "Mã OTP đã được gửi đến email " + email + ". Vui lòng kiểm tra hộp thư.",
+                "Mã OTP đã được gửi đến email " + email + ".\nVui lòng kiểm tra hộp thư.",
                 Toast.LENGTH_LONG).show();
 
-        // ✅ Navigate to OTP verification cho FORGOT PASSWORD
+        // ✅ Navigate to OTP verification for FORGOT PASSWORD using AuthFlowManager
         navigateToOtpVerification(email);
     }
 
+    /**
+     * ✅ Navigate to OTP verification using AuthFlowManager
+     */
     private void navigateToOtpVerification(String email) {
-        Intent intent = new Intent(this, OtpVerificationActivity.class);
-        intent.putExtra("email", email);
-        intent.putExtra("fromRegister", false); // ✅ FALSE = forgot password flow
+        Intent intent = AuthFlowManager.createOtpIntent(this, email, AuthFlowManager.AuthFlow.FORGOT_PASSWORD);
         startActivity(intent);
         finish();
     }

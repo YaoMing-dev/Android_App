@@ -21,6 +21,7 @@ import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.AuthFlowManager;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.ValidationUtils;
@@ -47,6 +48,9 @@ public class OtpVerificationActivity extends AppCompatActivity {
     // Data
     private String email;
     private boolean fromRegister; // ✅ TRUE = register, FALSE = forgot password
+    private boolean isAccountActivation; // ✅ Account activation từ login
+    private boolean fromLogin; // ✅ Đến từ login
+    private AuthFlowManager.AuthFlow currentFlow; // ✅ Track current flow
     private CountDownTimer resendTimer;
     private boolean isLoading = false;
 
@@ -66,7 +70,7 @@ public class OtpVerificationActivity extends AppCompatActivity {
         setupListeners();
         setupOtpInputs();
 
-        // Update subtitle with email
+        // Update subtitle with email and context
         updateSubtitle();
 
         // Start resend timer
@@ -75,20 +79,61 @@ public class OtpVerificationActivity extends AppCompatActivity {
         // Send OTP automatically
         sendOtp();
 
-        Log.d(TAG, "OtpVerificationActivity created - fromRegister: " + fromRegister + ", email: " + email);
+        Log.d(TAG, "OtpVerificationActivity created - Flow: " + currentFlow +
+                ", Email: " + email +
+                ", IsAccountActivation: " + isAccountActivation +
+                ", FromLogin: " + fromLogin);
     }
 
+    /**
+     * ✅ Get intent data với support cho account activation
+     */
     private void getIntentData() {
         Intent intent = getIntent();
         email = intent.getStringExtra("email");
-        fromRegister = intent.getBooleanExtra("fromRegister", true); // Default true
+        fromRegister = intent.getBooleanExtra("fromRegister", true);
+        isAccountActivation = intent.getBooleanExtra("isAccountActivation", false); // ✅ Account activation
+        fromLogin = intent.getBooleanExtra("fromLogin", false); // ✅ Từ login
 
+        // ✅ Determine current flow based on context
+        if (AuthFlowManager.isAccountActivationFromLogin(isAccountActivation, fromLogin)) {
+            // ✅ ACCOUNT ACTIVATION từ login
+            currentFlow = AuthFlowManager.AuthFlow.REGISTER; // Use REGISTER flow for activation
+            Log.d(TAG, "✅ Detected: Account activation from login");
+        } else if (fromRegister && !fromLogin) {
+            // ✅ REGISTER FLOW bình thường
+            currentFlow = AuthFlowManager.AuthFlow.REGISTER;
+            Log.d(TAG, "✅ Detected: Normal register flow");
+        } else {
+            // ✅ FORGOT PASSWORD FLOW
+            currentFlow = AuthFlowManager.AuthFlow.FORGOT_PASSWORD;
+            Log.d(TAG, "✅ Detected: Forgot password flow");
+        }
+
+        // ✅ Validate required data
         if (email == null || email.isEmpty()) {
             Log.e(TAG, "❌ Email not provided in intent");
             Toast.makeText(this, "Lỗi: Không có email", Toast.LENGTH_LONG).show();
             finish();
+            return;
         }
-        Log.d(TAG, "Email: " + email + ", fromRegister: " + fromRegister);
+
+        if (!AuthFlowManager.isValidFlowData(email, currentFlow)) {
+            Log.e(TAG, "❌ Invalid flow data");
+            Toast.makeText(this, "Lỗi: Dữ liệu flow không hợp lệ", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
+        // ✅ Log flow information for debugging
+        AuthFlowManager.logFlowInfo(currentFlow, email, false); // false vì đang cần verify
+
+        Log.d(TAG, "✅ Flow Context:");
+        Log.d(TAG, "✅ - Flow: " + AuthFlowManager.getFlowDescription(currentFlow));
+        Log.d(TAG, "✅ - Email: " + email);
+        Log.d(TAG, "✅ - FromRegister: " + fromRegister);
+        Log.d(TAG, "✅ - IsAccountActivation: " + isAccountActivation);
+        Log.d(TAG, "✅ - FromLogin: " + fromLogin);
     }
 
     private void initViews() {
@@ -166,14 +211,39 @@ public class OtpVerificationActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * ✅ Update subtitle theo flow và context
+     */
     private void updateSubtitle() {
         if (tvSubtitle != null) {
-            if (fromRegister) {
-                tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email + "\nđể xác thực tài khoản của bạn");
+            String subtitle;
+
+            if (AuthFlowManager.isAccountActivationFromLogin(isAccountActivation, fromLogin)) {
+                // ✅ ACCOUNT ACTIVATION từ login - FR-1.1.2
+                subtitle = "🔐 Tài khoản chưa được kích hoạt!\n\n" +
+                        "Chúng tôi đã gửi mã xác thực đến:\n" + email +
+                        "\n\nVui lòng nhập mã để kích hoạt tài khoản và tiếp tục sử dụng app.";
             } else {
-                // ✅ FORGOT PASSWORD MESSAGE
-                tvSubtitle.setText("Chúng tôi đã gửi mã xác thực đến\n" + email + "\nđể khôi phục mật khẩu của bạn");
+                // ✅ CÁC FLOW KHÁC
+                switch (currentFlow) {
+                    case REGISTER:
+                        subtitle = "📧 Xác thực email để kích hoạt tài khoản\n\n" +
+                                "Chúng tôi đã gửi mã xác thực đến:\n" + email +
+                                "\n\nVui lòng nhập mã để kích hoạt tài khoản của bạn.";
+                        break;
+
+                    case FORGOT_PASSWORD:
+                        subtitle = "🔑 Khôi phục mật khẩu\n\n" +
+                                "Chúng tôi đã gửi mã xác thực đến:\n" + email +
+                                "\n\nVui lòng nhập mã để tiếp tục đặt lại mật khẩu.";
+                        break;
+
+                    default:
+                        subtitle = "Chúng tôi đã gửi mã xác thực đến:\n" + email;
+                        break;
+                }
             }
+            tvSubtitle.setText(subtitle);
         }
     }
 
@@ -192,7 +262,11 @@ public class OtpVerificationActivity extends AppCompatActivity {
     }
 
     private void sendOtp() {
-        Log.d(TAG, "🔍 Sending OTP to: " + email);
+        Log.d(TAG, "🔍 Sending OTP for " + currentFlow + " to: " + email);
+
+        if (isAccountActivation && fromLogin) {
+            Log.d(TAG, "🔍 Context: Account activation from login (FR-1.1.2)");
+        }
 
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
@@ -203,7 +277,12 @@ public class OtpVerificationActivity extends AppCompatActivity {
                                    @NonNull Response<StandardResponse<Map<String, String>>> response) {
                 if (response.isSuccessful() && response.body() != null) {
                     StandardResponse<Map<String, String>> apiResponse = response.body();
-                    Log.d(TAG, "✅ OTP sent successfully");
+                    if (apiResponse.isSuccess()) {
+                        Log.d(TAG, "✅ OTP sent successfully for " + currentFlow);
+                    } else {
+                        Log.e(TAG, "❌ Failed to send OTP: " + apiResponse.getMessage());
+                        showError("Gửi mã OTP thất bại: " + apiResponse.getMessage());
+                    }
                 } else {
                     Log.e(TAG, "❌ Failed to send OTP - Response code: " + response.code());
                     showError("Gửi mã OTP thất bại");
@@ -232,7 +311,11 @@ public class OtpVerificationActivity extends AppCompatActivity {
     }
 
     private void performOtpVerification(String otp) {
-        Log.d(TAG, "🔍 Verifying OTP for: " + email);
+        Log.d(TAG, "🔍 Verifying OTP for " + currentFlow + ": " + email);
+
+        if (isAccountActivation && fromLogin) {
+            Log.d(TAG, "🔍 Context: Account activation verification (FR-1.1.2)");
+        }
 
         showLoading(true);
 
@@ -273,7 +356,11 @@ public class OtpVerificationActivity extends AppCompatActivity {
     }
 
     private void resendOtp() {
-        Log.d(TAG, "Resending OTP");
+        Log.d(TAG, "📤 Resending OTP for " + currentFlow);
+
+        if (isAccountActivation && fromLogin) {
+            Log.d(TAG, "📤 Context: Resending OTP for account activation");
+        }
 
         Map<String, String> request = new HashMap<>();
         request.put("email", email);
@@ -305,25 +392,63 @@ public class OtpVerificationActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * ✅ Handle OTP verification success với support cho account activation
+     */
     private void handleOtpVerificationSuccess(Map<String, Object> data) {
-        Log.d(TAG, "✅ OTP verification successful");
+        Log.d(TAG, "✅ OTP verification successful for " + currentFlow +
+                " (AccountActivation: " + isAccountActivation +
+                ", FromLogin: " + fromLogin + ")");
 
-        if (fromRegister) {
-            // ✅ REGISTER FLOW: OTP verify → MainActivity
-            Toast.makeText(this, "Xác thực email thành công! Chào mừng bạn đến với TradeUp.", Toast.LENGTH_LONG).show();
-            navigateToMain();
-        } else {
-            // ✅ FORGOT PASSWORD FLOW: OTP verify → ResetPasswordActivity
-            Toast.makeText(this, "Xác thực OTP thành công! Vui lòng tạo mật khẩu mới.", Toast.LENGTH_SHORT).show();
-            navigateToResetPassword();
+        switch (currentFlow) {
+            case REGISTER:
+                // ✅ Update email verification status in local storage
+                prefsManager.setEmailVerified(true);
+
+                if (AuthFlowManager.isAccountActivationFromLogin(isAccountActivation, fromLogin)) {
+                    // ✅ ACCOUNT ACTIVATION từ login - FR-1.1.2 compliance
+                    Log.d(TAG, "✅ FR-1.1.2: Account activation completed successfully");
+                    Log.d(TAG, "✅ User can now access the app");
+
+                    Toast.makeText(this,
+                            "🎉 Tài khoản đã được kích hoạt thành công!\n\n" +
+                                    "Chào mừng bạn đến với TradeUp. Bạn có thể sử dụng đầy đủ tính năng của app.",
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    // ✅ REGISTER FLOW bình thường
+                    Log.d(TAG, "✅ REGISTER FLOW: Email verified, account activated");
+
+                    Toast.makeText(this,
+                            "✅ Xác thực email thành công!\n" +
+                                    "Tài khoản đã được kích hoạt. Chào mừng bạn đến với TradeUp!",
+                            Toast.LENGTH_LONG).show();
+                }
+
+                navigateToMain();
+                break;
+
+            case FORGOT_PASSWORD:
+                // ✅ FORGOT PASSWORD FLOW
+                Log.d(TAG, "✅ FORGOT PASSWORD FLOW: OTP verified, navigating to ResetPasswordActivity");
+
+                Toast.makeText(this,
+                        "✅ Xác thực OTP thành công!\nVui lòng tạo mật khẩu mới.",
+                        Toast.LENGTH_SHORT).show();
+
+                navigateToResetPassword();
+                break;
+
+            default:
+                Log.w(TAG, "⚠️ Unknown flow: " + currentFlow + ", navigating to login");
+                navigateToLogin();
+                break;
         }
     }
 
-    // ✅ NAVIGATE TO RESET PASSWORD (không cần token)
     private void navigateToResetPassword() {
         Intent intent = new Intent(this, ResetPasswordActivity.class);
         intent.putExtra("email", email);
-        intent.putExtra("fromOtpVerification", true); // ✅ Đánh dấu từ OTP verification
+        intent.putExtra("fromOtpVerification", true);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
@@ -380,7 +505,18 @@ public class OtpVerificationActivity extends AppCompatActivity {
     private void showLoading(boolean show) {
         isLoading = show;
         btnVerify.setEnabled(!show && ValidationUtils.isValidOtp(getOtpCode()));
-        btnVerify.setText(show ? "Đang xác thực..." : "Xác thực");
+
+        if (show) {
+            btnVerify.setText("Đang xác thực...");
+        } else {
+            if (isAccountActivation && fromLogin) {
+                btnVerify.setText("Kích hoạt tài khoản");
+            } else if (currentFlow == AuthFlowManager.AuthFlow.REGISTER) {
+                btnVerify.setText("Xác thực");
+            } else {
+                btnVerify.setText("Xác thực");
+            }
+        }
 
         // Disable OTP inputs during loading
         etOtp1.setEnabled(!show);
@@ -405,15 +541,41 @@ public class OtpVerificationActivity extends AppCompatActivity {
         Log.d(TAG, "OtpVerificationActivity destroyed");
     }
 
+    /**
+     * ✅ Back behavior theo flow và context
+     */
     @Override
     public void onBackPressed() {
         super.onBackPressed();
-        if (fromRegister) {
-            // From register → go back to login
+
+        if (AuthFlowManager.isAccountActivationFromLogin(isAccountActivation, fromLogin)) {
+            // ✅ Account activation từ login → về login để thử lại
+            Log.d(TAG, "🔙 Back from ACCOUNT ACTIVATION → Login");
+            Toast.makeText(this,
+                    "Tài khoản chưa được kích hoạt.\nVui lòng xác thực email để tiếp tục sử dụng app.",
+                    Toast.LENGTH_SHORT).show();
             navigateToLogin();
         } else {
-            // From forgot password → go back to login
-            navigateToLogin();
+            // ✅ CÁC FLOW KHÁC
+            switch (currentFlow) {
+                case REGISTER:
+                    Log.d(TAG, "🔙 Back from REGISTER flow → Login");
+                    Toast.makeText(this,
+                            "Đăng ký chưa hoàn tất. Vui lòng xác thực email để kích hoạt tài khoản.",
+                            Toast.LENGTH_SHORT).show();
+                    navigateToLogin();
+                    break;
+
+                case FORGOT_PASSWORD:
+                    Log.d(TAG, "🔙 Back from FORGOT_PASSWORD flow → Login");
+                    navigateToLogin();
+                    break;
+
+                default:
+                    Log.d(TAG, "🔙 Back from unknown flow → Login");
+                    navigateToLogin();
+                    break;
+            }
         }
     }
 }

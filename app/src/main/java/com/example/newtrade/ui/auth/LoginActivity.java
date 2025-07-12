@@ -22,6 +22,7 @@ import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.utils.AuthFlowManager;
 import com.example.newtrade.utils.Constants;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.ValidationUtils;
@@ -77,6 +78,9 @@ public class LoginActivity extends AppCompatActivity {
                 initUtils();
                 setupListeners();
 
+                // ✅ Check prefill data từ ResetPasswordActivity
+                checkPrefillData();
+
                 // Check if already logged in
                 if (prefsManager.isLoggedIn()) {
                     Log.d(TAG, "User already logged in, redirecting to main");
@@ -87,11 +91,32 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onFailure(String error) {
                 Log.e(TAG, "❌ Backend connection failed: " + error);
-
-                // Show IP configuration dialog
                 showIPConfigDialog(error);
             }
         });
+    }
+
+    /**
+     * ✅ Check prefill data từ ResetPasswordActivity
+     */
+    private void checkPrefillData() {
+        Intent intent = getIntent();
+        String prefillEmail = intent.getStringExtra("prefill_email");
+        String prefillPassword = intent.getStringExtra("prefill_password");
+
+        if (prefillEmail != null && etEmail != null) {
+            etEmail.setText(prefillEmail);
+            Log.d(TAG, "✅ Prefilled email: " + prefillEmail);
+        }
+
+        if (prefillPassword != null && etPassword != null) {
+            etPassword.setText(prefillPassword);
+            Log.d(TAG, "✅ Prefilled password");
+        }
+
+        if (prefillEmail != null && prefillPassword != null) {
+            Toast.makeText(this, "Mật khẩu đã được đặt lại thành công! Bạn có thể đăng nhập ngay.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void showIPConfigDialog(String error) {
@@ -438,9 +463,13 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * ✅ MANDATORY EMAIL VERIFICATION - FR-1.1.2 Implementation
+     * Handle login success với kiểm tra account activation
+     */
     private void handleLoginSuccess(Map<String, Object> data) {
         try {
-            Log.d(TAG, "=== HANDLE LOGIN SUCCESS DEBUG ===");
+            Log.d(TAG, "=== HANDLE LOGIN SUCCESS - FR-1.1.2 MANDATORY VERIFICATION ===");
             Log.d(TAG, "🔍 FULL BACKEND RESPONSE: " + new Gson().toJson(data));
 
             // Parse user data from response
@@ -449,19 +478,8 @@ public class LoginActivity extends AppCompatActivity {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> userMap = (Map<String, Object>) userObj;
 
-                // Extract user info (existing logic)
-                Long userId = null;
-                Object idObj = userMap.get("id");
-                if (idObj instanceof Number) {
-                    userId = ((Number) idObj).longValue();
-                } else if (idObj instanceof String) {
-                    try {
-                        userId = Long.parseLong((String) idObj);
-                    } catch (NumberFormatException e) {
-                        Log.e(TAG, "❌ Cannot parse user ID: " + idObj);
-                    }
-                }
-
+                // Extract user info
+                Long userId = extractUserId(userMap);
                 String email = (String) userMap.get("email");
                 String displayName = (String) userMap.get("displayName");
                 Boolean isEmailVerified = (Boolean) userMap.get("isEmailVerified");
@@ -472,31 +490,44 @@ public class LoginActivity extends AppCompatActivity {
                 Log.d(TAG, "🔍 Display Name: " + displayName);
                 Log.d(TAG, "🔍 Email Verified: " + isEmailVerified);
 
-                // ❌ CRITICAL EMAIL CHECK
-
-
+                // ✅ VALIDATION
                 if (userId != null && email != null && displayName != null) {
-                    // Save user session (existing logic)
+                    // Save user session
                     prefsManager.saveUserSession(userId, email, displayName,
                             isEmailVerified != null ? isEmailVerified : false);
 
                     Log.d(TAG, "✅ User session saved successfully");
 
-                    // ✅ VERIFICATION AFTER SAVE
-                    Log.d(TAG, "✅ VERIFICATION AFTER SAVE:");
-                    Log.d(TAG, "✅ Saved User ID: " + prefsManager.getUserId());
-                    Log.d(TAG, "✅ Saved Email: " + prefsManager.getUserEmail());
-                    Log.d(TAG, "✅ Saved Name: " + prefsManager.getUserName());
+                    // ✅ FR-1.1.2: MANDATORY EMAIL VERIFICATION FOR ACCOUNT ACTIVATION
+                    boolean emailVerified = Boolean.TRUE.equals(isEmailVerified);
 
-                    // Check if OTP verification is required (existing logic)
-                    Boolean requiresOtp = (Boolean) data.get("requiresOtp");
-                    if (requiresOtp != null && requiresOtp && !Boolean.TRUE.equals(isEmailVerified)) {
-                        Log.d(TAG, "🔍 OTP verification required");
-                        navigateToOtpVerification(email);
+                    // Log flow information
+                    AuthFlowManager.logFlowInfo(AuthFlowManager.AuthFlow.LOGIN, email, emailVerified);
+
+                    if (AuthFlowManager.needsAccountActivation(emailVerified)) {
+                        // ❌ ACCOUNT NOT ACTIVATED - FORCE EMAIL VERIFICATION
+                        Log.d(TAG, "⚠️ LOGIN: Account not activated - email verification required");
+                        Log.d(TAG, "⚠️ FR-1.1.2: Enforcing mandatory email verification for account activation");
+
+                        String activationMessage = AuthFlowManager.getActivationMessage(
+                                AuthFlowManager.AuthFlow.REGISTER, true);
+
+                        Toast.makeText(this, activationMessage, Toast.LENGTH_LONG).show();
+
+                        // ✅ REDIRECT TO ACCOUNT ACTIVATION
+                        navigateToAccountActivation(email);
+
                     } else {
-                        Log.d(TAG, "🔍 Login complete, navigating to main");
+                        // ✅ ACCOUNT ACTIVATED - ACCESS GRANTED
+                        Log.d(TAG, "✅ LOGIN: Account activated, email verified - access granted");
+                        Log.d(TAG, "✅ FR-1.1.2: Account activation verified, allowing app access");
+
+                        Toast.makeText(this,
+                                "Đăng nhập thành công! Chào mừng " + displayName,
+                                Toast.LENGTH_SHORT).show();
                         navigateToMain();
                     }
+
                 } else {
                     Log.e(TAG, "❌ Incomplete user data received");
                     Log.e(TAG, "❌ UserID: " + userId + ", Email: " + email + ", DisplayName: " + displayName);
@@ -506,11 +537,37 @@ public class LoginActivity extends AppCompatActivity {
                 Log.e(TAG, "❌ Invalid user data format");
                 showError("Định dạng dữ liệu không hợp lệ");
             }
-            Log.d(TAG, "=== END HANDLE LOGIN SUCCESS DEBUG ===");
+            Log.d(TAG, "=== END HANDLE LOGIN SUCCESS - FR-1.1.2 ===");
         } catch (Exception e) {
             Log.e(TAG, "❌ Error processing login success", e);
             showError("Lỗi xử lý đăng nhập: " + e.getMessage());
         }
+    }
+
+    /**
+     * ✅ Navigate to account activation (email verification từ login)
+     */
+    private void navigateToAccountActivation(String email) {
+        Intent intent = AuthFlowManager.createAccountActivationIntent(this, email);
+        startActivity(intent);
+        finish(); // ✅ Clear login activity from stack
+    }
+
+    /**
+     * ✅ Extract user ID helper method
+     */
+    private Long extractUserId(Map<String, Object> userMap) {
+        Object idObj = userMap.get("id");
+        if (idObj instanceof Number) {
+            return ((Number) idObj).longValue();
+        } else if (idObj instanceof String) {
+            try {
+                return Long.parseLong((String) idObj);
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "❌ Cannot parse user ID: " + idObj);
+            }
+        }
+        return null;
     }
 
     private void handleErrorResponse(Response<?> response) {
@@ -551,23 +608,12 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void navigateToRegister() {
-        // ❌ XÓA DÒNG NÀY:
-        // showError("Chức năng đăng ký đang được phát triển");
-
-        // ✅ THÊM DÒNG NÀY:
         Intent intent = new Intent(this, RegisterActivity.class);
         startActivity(intent);
     }
 
     private void navigateToForgotPassword() {
         Intent intent = new Intent(this, ForgotPasswordActivity.class);
-        startActivity(intent);
-    }
-
-    private void navigateToOtpVerification(String email) {
-        Intent intent = new Intent(this, OtpVerificationActivity.class);
-        intent.putExtra("email", email);
-        intent.putExtra("fromRegister", false); // false vì đến từ login
         startActivity(intent);
     }
 }

@@ -19,7 +19,7 @@ import com.example.newtrade.MainActivity;
 import com.example.newtrade.R;
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.models.StandardResponse;
-import com.example.newtrade.models.User;
+import com.example.newtrade.utils.AuthFlowManager;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.example.newtrade.utils.ValidationUtils;
 import com.google.gson.Gson;
@@ -54,7 +54,7 @@ public class RegisterActivity extends AppCompatActivity {
         initUtils();
         setupListeners();
 
-        Log.d(TAG, "RegisterActivity created");
+        Log.d(TAG, "RegisterActivity created - FR-1.1.2: Email verification required for account activation");
     }
 
     private void initViews() {
@@ -175,6 +175,7 @@ public class RegisterActivity extends AppCompatActivity {
 
     private void performRegister(String displayName, String email, String password) {
         Log.d(TAG, "🔍 Registering user: " + email);
+        Log.d(TAG, "🔍 FR-1.1.2: Will require email verification for account activation");
 
         showLoading(true);
 
@@ -183,7 +184,6 @@ public class RegisterActivity extends AppCompatActivity {
         request.put("email", email);
         request.put("password", password);
 
-        // ✅ SỬA: Đổi từ StandardResponse<User> thành StandardResponse<Map<String, Object>>
         ApiClient.getAuthService().register(request).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
@@ -197,9 +197,7 @@ public class RegisterActivity extends AppCompatActivity {
                     Log.d(TAG, "🔍 Register response: " + new Gson().toJson(apiResponse));
 
                     if (apiResponse.isSuccess() && apiResponse.hasData()) {
-                        // ✅ SỬA: Parse user từ response data
-                        Map<String, Object> responseData = apiResponse.getData();
-                        handleRegisterSuccess(responseData, email);
+                        handleRegisterSuccess(apiResponse.getData(), email);
                     } else {
                         showError(apiResponse.getMessage() != null ?
                                 apiResponse.getMessage() : "Đăng ký thất bại");
@@ -242,50 +240,104 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
-    // ✅ SỬA: Đổi parameter từ User thành Map<String, Object>
+    /**
+     * ✅ Handle register success với FR-1.1.2 compliance
+     */
     private void handleRegisterSuccess(Map<String, Object> responseData, String email) {
-        Log.d(TAG, "✅ Registration successful");
+        Log.d(TAG, "✅ Registration successful - implementing FR-1.1.2 email verification requirement");
 
         try {
-            // ✅ Parse user object từ response
+            // Parse user object từ response
             Object userObj = responseData.get("user");
             if (userObj instanceof Map) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> userMap = (Map<String, Object>) userObj;
 
                 // Extract user info
-                Object idObj = userMap.get("id");
+                Long userId = extractUserId(userMap);
                 String userEmail = (String) userMap.get("email");
                 String displayName = (String) userMap.get("displayName");
+                Boolean isEmailVerified = (Boolean) userMap.get("isEmailVerified");
 
-                Long userId = null;
-                if (idObj instanceof Number) {
-                    userId = ((Number) idObj).longValue();
-                }
+                Log.d(TAG, "🔍 REGISTER RESPONSE PARSED:");
+                Log.d(TAG, "🔍 User ID: " + userId);
+                Log.d(TAG, "🔍 Email: " + userEmail);
+                Log.d(TAG, "🔍 Display Name: " + displayName);
+                Log.d(TAG, "🔍 Email Verified: " + isEmailVerified);
 
                 if (userId != null && userEmail != null && displayName != null) {
-                    // ✅ Save user session
-                    prefsManager.saveUserSession(userId, userEmail, displayName, true);
+                    // ✅ SAVE USER SESSION (but mark as not activated yet)
+                    prefsManager.saveUserSession(userId, userEmail, displayName,
+                            isEmailVerified != null ? isEmailVerified : false);
 
-                    Toast.makeText(this, "Đăng ký thành công! Chào mừng " + displayName, Toast.LENGTH_LONG).show();
+                    // ✅ FR-1.1.2: EMAIL VERIFICATION REQUIRED for account activation
+                    boolean emailVerified = Boolean.TRUE.equals(isEmailVerified);
 
-                    // ✅ Navigate directly to MainActivity - KHÔNG CẦN OTP
-                    navigateToMain();
+                    // Log flow information
+                    AuthFlowManager.logFlowInfo(AuthFlowManager.AuthFlow.REGISTER, userEmail, emailVerified);
+
+                    if (AuthFlowManager.requiresEmailVerification(AuthFlowManager.AuthFlow.REGISTER, emailVerified)) {
+                        // ✅ ACCOUNT ACTIVATION REQUIRED - FR-1.1.2 compliance
+                        Log.d(TAG, "✅ FR-1.1.2: Email verification required for account activation");
+                        Log.d(TAG, "✅ Redirecting to email verification to activate account");
+
+                        Toast.makeText(this,
+                                "🎉 Đăng ký thành công!\n\n" +
+                                        "📧 Vui lòng xác thực email để kích hoạt tài khoản và bắt đầu sử dụng TradeUp.",
+                                Toast.LENGTH_LONG).show();
+
+                        navigateToEmailVerification(userEmail);
+                    } else {
+                        // ✅ ALREADY VERIFIED (ít khi xảy ra trong register flow)
+                        Log.d(TAG, "✅ Email already verified during registration, activating account");
+
+                        Toast.makeText(this,
+                                "🎉 Đăng ký và kích hoạt tài khoản thành công!\nChào mừng " + displayName + " đến với TradeUp!",
+                                Toast.LENGTH_LONG).show();
+
+                        navigateToMain();
+                    }
                 } else {
-                    Log.e(TAG, "❌ Invalid user data in response");
-                    showError("Đăng ký thành công nhưng không thể lưu thông tin. Vui lòng đăng nhập lại.");
+                    Log.e(TAG, "❌ Invalid user data in register response");
+                    showError("Đăng ký thành công nhưng không thể lưu thông tin.\nVui lòng đăng nhập lại để tiếp tục.");
                     navigateToLogin();
                 }
             } else {
-                Log.e(TAG, "❌ User object not found in response");
-                showError("Đăng ký thành công nhưng không thể lấy thông tin user. Vui lòng đăng nhập lại.");
+                Log.e(TAG, "❌ User object not found in register response");
+                showError("Đăng ký thành công nhưng không thể lấy thông tin user.\nVui lòng đăng nhập lại để tiếp tục.");
                 navigateToLogin();
             }
         } catch (Exception e) {
-            Log.e(TAG, "❌ Error parsing user data", e);
-            showError("Đăng ký thành công nhưng có lỗi xử lý dữ liệu. Vui lòng đăng nhập lại.");
+            Log.e(TAG, "❌ Error parsing register success data", e);
+            showError("Đăng ký thành công nhưng có lỗi xử lý dữ liệu.\nVui lòng đăng nhập lại để tiếp tục.");
             navigateToLogin();
         }
+    }
+
+    /**
+     * ✅ Extract user ID helper method
+     */
+    private Long extractUserId(Map<String, Object> userMap) {
+        Object idObj = userMap.get("id");
+        if (idObj instanceof Number) {
+            return ((Number) idObj).longValue();
+        } else if (idObj instanceof String) {
+            try {
+                return Long.parseLong((String) idObj);
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "Cannot parse user ID: " + idObj);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * ✅ Navigate to email verification cho register flow
+     */
+    private void navigateToEmailVerification(String email) {
+        Intent intent = AuthFlowManager.createOtpIntent(this, email, AuthFlowManager.AuthFlow.REGISTER);
+        startActivity(intent);
+        finish();
     }
 
     private void navigateToMain() {
