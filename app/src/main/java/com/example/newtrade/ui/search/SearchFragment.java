@@ -3,6 +3,7 @@ package com.example.newtrade.ui.search;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
@@ -17,9 +18,12 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -27,6 +31,7 @@ import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.newtrade.R;
@@ -63,8 +68,192 @@ import retrofit2.Response;
 public class SearchFragment extends Fragment {
 
     private static final String TAG = "SearchFragment";
-    private static final int SEARCH_DELAY_MS = 200; // ✅ FIXED: FR-3.1.2 (Was 300ms)
+    private static final int SEARCH_DELAY_MS = 200;
+    private static final int SUGGESTION_DELAY_MS = 100;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
+
+    // ===============================
+    // ✅ SEARCH SUGGESTION MODELS
+    // ===============================
+
+    public static class SearchSuggestion {
+        private String text;
+        private String type; // "RECENT", "POPULAR", "PRODUCT", "CATEGORY"
+        private String description;
+        private Long productId;
+        private Long categoryId;
+        private int count;
+
+        public SearchSuggestion(String text, String type) {
+            this.text = text;
+            this.type = type;
+        }
+
+        public SearchSuggestion(String text, String type, String description) {
+            this.text = text;
+            this.type = type;
+            this.description = description;
+        }
+
+        // Getters and setters
+        public String getText() { return text; }
+        public void setText(String text) { this.text = text; }
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+        public Long getProductId() { return productId; }
+        public void setProductId(Long productId) { this.productId = productId; }
+        public Long getCategoryId() { return categoryId; }
+        public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
+        public int getCount() { return count; }
+        public void setCount(int count) { this.count = count; }
+    }
+
+    // ===============================
+    // ✅ SEARCH SUGGESTION ADAPTER
+    // ===============================
+
+    public class SearchSuggestionAdapter extends RecyclerView.Adapter<SearchSuggestionAdapter.SuggestionViewHolder> {
+        private List<SearchSuggestion> suggestions;
+
+        public SearchSuggestionAdapter(List<SearchSuggestion> suggestions) {
+            this.suggestions = suggestions;
+        }
+
+        @NonNull
+        @Override
+        public SuggestionViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            // Create simple suggestion item programmatically
+            LinearLayout layout = new LinearLayout(parent.getContext());
+            layout.setLayoutParams(new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            layout.setOrientation(LinearLayout.HORIZONTAL);
+            layout.setPadding(48, 32, 48, 32);
+            layout.setBackground(getActivity().getDrawable(android.R.drawable.list_selector_background));
+
+            // Icon
+            ImageView icon = new ImageView(parent.getContext());
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(72, 72);
+            iconParams.setMarginEnd(36);
+            icon.setLayoutParams(iconParams);
+            icon.setAlpha(0.6f);
+            layout.addView(icon);
+
+            // Text container
+            LinearLayout textContainer = new LinearLayout(parent.getContext());
+            textContainer.setLayoutParams(new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+            textContainer.setOrientation(LinearLayout.VERTICAL);
+
+            // Main text
+            TextView mainText = new TextView(parent.getContext());
+            mainText.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            mainText.setTextSize(16);
+            mainText.setTextColor(getResources().getColor(android.R.color.black, null));
+            textContainer.addView(mainText);
+
+            // Type text
+            TextView typeText = new TextView(parent.getContext());
+            typeText.setLayoutParams(new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            typeText.setTextSize(12);
+            typeText.setTextColor(getResources().getColor(android.R.color.darker_gray, null));
+            typeText.setVisibility(View.GONE);
+            textContainer.addView(typeText);
+
+            layout.addView(textContainer);
+
+            // Insert arrow
+            ImageView insertArrow = new ImageView(parent.getContext());
+            LinearLayout.LayoutParams arrowParams = new LinearLayout.LayoutParams(72, 72);
+            insertArrow.setLayoutParams(arrowParams);
+            insertArrow.setPadding(12, 12, 12, 12);
+            insertArrow.setImageResource(android.R.drawable.ic_menu_edit);
+            insertArrow.setAlpha(0.4f);
+            insertArrow.setBackground(getActivity().getDrawable(android.R.drawable.list_selector_background));
+            layout.addView(insertArrow);
+
+            return new SuggestionViewHolder(layout, icon, mainText, typeText, insertArrow);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull SuggestionViewHolder holder, int position) {
+            holder.bind(suggestions.get(position));
+        }
+
+        @Override
+        public int getItemCount() {
+            return suggestions.size();
+        }
+
+        public void updateSuggestions(List<SearchSuggestion> newSuggestions) {
+            this.suggestions = newSuggestions;
+            notifyDataSetChanged();
+        }
+
+        class SuggestionViewHolder extends RecyclerView.ViewHolder {
+            private ImageView icon, insertArrow;
+            private TextView mainText, typeText;
+
+            public SuggestionViewHolder(@NonNull View itemView, ImageView icon,
+                                        TextView mainText, TextView typeText, ImageView insertArrow) {
+                super(itemView);
+                this.icon = icon;
+                this.mainText = mainText;
+                this.typeText = typeText;
+                this.insertArrow = insertArrow;
+
+                // Click to search immediately
+                itemView.setOnClickListener(v -> {
+                    int pos = getAdapterPosition();
+                    if (pos != RecyclerView.NO_POSITION) {
+                        applySuggestionAndSearch(suggestions.get(pos));
+                    }
+                });
+
+                // Click insert arrow to just fill search box
+                insertArrow.setOnClickListener(v -> {
+                    int pos = getAdapterPosition();
+                    if (pos != RecyclerView.NO_POSITION) {
+                        insertSuggestionToSearchBox(suggestions.get(pos));
+                    }
+                });
+            }
+
+            public void bind(SearchSuggestion suggestion) {
+                mainText.setText(suggestion.getText());
+
+                if (suggestion.getDescription() != null) {
+                    typeText.setText(suggestion.getDescription());
+                    typeText.setVisibility(View.VISIBLE);
+                } else {
+                    typeText.setVisibility(View.GONE);
+                }
+
+                // Set icon based on type
+                switch (suggestion.getType()) {
+                    case "RECENT":
+                        icon.setImageResource(android.R.drawable.ic_menu_recent_history);
+                        break;
+                    case "POPULAR":
+                        icon.setImageResource(android.R.drawable.ic_menu_sort_by_size);
+                        break;
+                    case "PRODUCT":
+                        icon.setImageResource(android.R.drawable.ic_search_category_default);
+                        break;
+                    case "CATEGORY":
+                        icon.setImageResource(android.R.drawable.ic_menu_view);
+                        break;
+                    default:
+                        icon.setImageResource(android.R.drawable.ic_search_category_default);
+                        break;
+                }
+            }
+        }
+    }
 
     // UI Components
     private TextInputEditText etSearch;
@@ -74,6 +263,12 @@ public class SearchFragment extends Fragment {
     private LinearLayout llEmptyState, llRecentSearches, llLoadingState;
     private TextView tvResultsCount, tvSortOption;
 
+    // Search Suggestions UI
+    private RecyclerView rvSearchSuggestions;
+    private SearchSuggestionAdapter suggestionAdapter;
+    private final List<SearchSuggestion> searchSuggestions = new ArrayList<>();
+    private boolean showingSuggestions = false;
+
     // Data & Adapters
     private ProductAdapter searchAdapter;
     private final List<Product> searchResults = new ArrayList<>();
@@ -82,14 +277,16 @@ public class SearchFragment extends Fragment {
     private final Handler searchHandler = new Handler(Looper.getMainLooper());
     private Runnable searchRunnable;
 
+    // Suggestion handler
+    private final Handler suggestionHandler = new Handler(Looper.getMainLooper());
+    private Runnable suggestionRunnable;
+
     // Services
     private ProductService productService;
     private ApiService apiService;
     private SharedPrefsManager prefsManager;
     private FusedLocationProviderClient fusedLocationClient;
     private Geocoder geocoder;
-
-    // ✅ NEW: Behavior tracking
     private UserBehaviorTracker behaviorTracker;
 
     // Filters
@@ -119,13 +316,12 @@ public class SearchFragment extends Fragment {
         initServices();
         initViews(view);
         setupRecyclerViews();
+        setupSuggestions();
         setupListeners();
         loadCategories();
-
-        // ✅ Load tất cả sản phẩm ban đầu
         loadAllProductsInitially();
 
-        Log.d(TAG, "SearchFragment created successfully with behavior tracking");
+        Log.d(TAG, "SearchFragment created successfully with search suggestions");
     }
 
     private void initServices() {
@@ -134,8 +330,6 @@ public class SearchFragment extends Fragment {
         prefsManager = SharedPrefsManager.getInstance(requireContext());
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
         geocoder = new Geocoder(requireContext(), Locale.getDefault());
-
-        // ✅ NEW: Initialize behavior tracker
         behaviorTracker = UserBehaviorTracker.getInstance(requireContext());
     }
 
@@ -153,7 +347,34 @@ public class SearchFragment extends Fragment {
         tvResultsCount = view.findViewById(R.id.tv_results_count);
         tvSortOption = view.findViewById(R.id.tv_sort_option);
 
+        // Create suggestions RecyclerView programmatically
+        createSuggestionsRecyclerView(view);
+
         Log.d(TAG, "✅ SearchFragment views initialized");
+    }
+
+    private void createSuggestionsRecyclerView(View parentView) {
+        // Find the parent container after search input
+        ViewGroup searchContainer = parentView.findViewById(R.id.til_search);
+        if (searchContainer != null && searchContainer.getParent() instanceof ViewGroup) {
+            ViewGroup mainContainer = (ViewGroup) searchContainer.getParent();
+
+            // Create suggestions RecyclerView
+            rvSearchSuggestions = new RecyclerView(requireContext());
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            params.setMargins(48, 0, 48, 0);
+            rvSearchSuggestions.setLayoutParams(params);
+            rvSearchSuggestions.setBackgroundColor(getResources().getColor(android.R.color.white, null));
+            rvSearchSuggestions.setElevation(12f);
+            rvSearchSuggestions.setVisibility(View.GONE);
+
+            // Add to container after search input
+            int searchIndex = mainContainer.indexOfChild(searchContainer);
+            mainContainer.addView(rvSearchSuggestions, searchIndex + 1);
+
+            Log.d(TAG, "✅ Created suggestions RecyclerView programmatically");
+        }
     }
 
     private void setupRecyclerViews() {
@@ -161,6 +382,16 @@ public class SearchFragment extends Fragment {
             searchAdapter = new ProductAdapter(searchResults, this::navigateToProductDetail);
             rvSearchResults.setLayoutManager(new GridLayoutManager(getContext(), 2));
             rvSearchResults.setAdapter(searchAdapter);
+        }
+    }
+
+    private void setupSuggestions() {
+        if (rvSearchSuggestions != null) {
+            suggestionAdapter = new SearchSuggestionAdapter(searchSuggestions);
+            rvSearchSuggestions.setLayoutManager(new LinearLayoutManager(getContext()));
+            rvSearchSuggestions.setAdapter(suggestionAdapter);
+            rvSearchSuggestions.setVisibility(View.GONE);
+            Log.d(TAG, "✅ Search suggestions setup completed");
         }
     }
 
@@ -173,6 +404,15 @@ public class SearchFragment extends Fragment {
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
                     String query = s.toString().trim();
+
+                    // Handle search suggestions
+                    if (query.length() >= 1) {
+                        scheduleSuggestions(query);
+                    } else {
+                        hideSuggestions();
+                    }
+
+                    // Handle actual search
                     if (!query.equals(currentQuery)) {
                         currentQuery = query;
                         scheduleSearch();
@@ -181,6 +421,26 @@ public class SearchFragment extends Fragment {
 
                 @Override
                 public void afterTextChanged(Editable s) {}
+            });
+
+            // Handle focus changes
+            etSearch.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus && !currentQuery.trim().isEmpty()) {
+                    scheduleSuggestions(currentQuery.trim());
+                } else if (!hasFocus) {
+                    suggestionHandler.postDelayed(this::hideSuggestions, 150);
+                }
+            });
+
+            // Handle search action
+            etSearch.setOnEditorActionListener((v, actionId, event) -> {
+                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    hideSuggestions();
+                    performSearch();
+                    hideKeyboard();
+                    return true;
+                }
+                return false;
             });
         }
 
@@ -211,7 +471,242 @@ public class SearchFragment extends Fragment {
     }
 
     // ===============================
-    // ✅ LOAD PRODUCTS METHODS
+    // ✅ SEARCH SUGGESTIONS IMPLEMENTATION
+    // ===============================
+
+    private void scheduleSuggestions(String query) {
+        if (suggestionRunnable != null) {
+            suggestionHandler.removeCallbacks(suggestionRunnable);
+        }
+
+        suggestionRunnable = () -> loadSearchSuggestions(query);
+        suggestionHandler.postDelayed(suggestionRunnable, SUGGESTION_DELAY_MS);
+    }
+
+    private void loadSearchSuggestions(String query) {
+        if (query.trim().isEmpty()) {
+            hideSuggestions();
+            return;
+        }
+
+        Log.d(TAG, "🔍 Loading suggestions for: '" + query + "'");
+
+        searchSuggestions.clear();
+
+        // 1. Add recent searches
+        addRecentSearchSuggestions(query);
+
+        // 2. Add popular searches
+        addPopularSearchSuggestions(query);
+
+        // 3. Add category suggestions
+        addCategorySuggestions(query);
+
+        // 4. Add product name suggestions
+        loadProductSuggestions(query);
+
+        // Show suggestions if we have any
+        if (!searchSuggestions.isEmpty()) {
+            showSuggestions();
+        }
+    }
+
+    private void addRecentSearchSuggestions(String query) {
+        List<String> recentSearches = behaviorTracker.getSearchHistory();
+
+        int added = 0;
+        for (String recentSearch : recentSearches) {
+            if (containsIgnoreCase(recentSearch, query) && added < 3) {
+                SearchSuggestion suggestion = new SearchSuggestion(recentSearch, "RECENT", "Recent search");
+                searchSuggestions.add(suggestion);
+                added++;
+            }
+        }
+
+        Log.d(TAG, "✅ Added " + added + " recent search suggestions");
+    }
+
+    private void addPopularSearchSuggestions(String query) {
+        // ✅ Popular searches for all languages
+        String[] popularSearches = {
+                // Vietnamese
+                "máy tính", "máy ảnh", "máy giặt", "máy lạnh", "máy xay",
+                "điện thoại", "laptop", "ny hoàng", "áo thun", "áo dài",
+                "giày", "túi xách", "xe máy", "oto", "iphone", "samsung",
+                "macbook", "quần jean", "đồng hồ", "tai nghe",
+                // English
+                "headphones", "headset", "hello kitty", "helmet", "heavy metal",
+                "heart", "heating", "health", "help", "hero", "her", "he",
+                // Mixed
+                "iphone", "samsung", "laptop", "gaming", "fashion", "beauty"
+        };
+
+        int added = 0;
+        for (String popular : popularSearches) {
+            if (containsIgnoreCase(popular, query) && added < 4) {
+                SearchSuggestion suggestion = new SearchSuggestion(popular, "POPULAR", "Popular search");
+                searchSuggestions.add(suggestion);
+                added++;
+            }
+        }
+
+        Log.d(TAG, "✅ Added " + added + " popular search suggestions");
+    }
+
+    private void addCategorySuggestions(String query) {
+        int added = 0;
+        for (Category category : categories) {
+            if (containsIgnoreCase(category.getName(), query) && added < 2) {
+                SearchSuggestion suggestion = new SearchSuggestion(category.getName(), "CATEGORY", "Category");
+                suggestion.setCategoryId(category.getId());
+                searchSuggestions.add(suggestion);
+                added++;
+            }
+        }
+
+        Log.d(TAG, "✅ Added " + added + " category suggestions");
+    }
+
+    private void loadProductSuggestions(String query) {
+        // API call to get product suggestions
+        ApiClient.getApiService().getProducts(
+                0, 8, // Get more results to filter
+                query,
+                null, null, null, null,
+                "createdAt", "desc"
+        ).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                try {
+                    if (response.isSuccessful() && response.body() != null) {
+                        StandardResponse<Map<String, Object>> apiResponse = response.body();
+
+                        if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                            Map<String, Object> data = apiResponse.getData();
+                            @SuppressWarnings("unchecked")
+                            List<Map<String, Object>> productList = (List<Map<String, Object>>) data.get("content");
+
+                            if (productList != null) {
+                                int added = 0;
+                                for (Map<String, Object> productData : productList) {
+                                    if (added >= 3) break; // Max 3 product suggestions
+
+                                    String title = (String) productData.get("title");
+                                    Object idObj = productData.get("id");
+
+                                    // ✅ STRICT FILTERING: Only show if title contains query
+                                    if (title != null && idObj instanceof Number &&
+                                            containsIgnoreCase(title, query)) {
+                                        SearchSuggestion suggestion = new SearchSuggestion(title, "PRODUCT", "Product");
+                                        suggestion.setProductId(((Number) idObj).longValue());
+                                        searchSuggestions.add(suggestion);
+                                        added++;
+                                    }
+                                }
+
+                                // Update UI on main thread
+                                requireActivity().runOnUiThread(() -> {
+                                    if (suggestionAdapter != null) {
+                                        suggestionAdapter.notifyDataSetChanged();
+                                    }
+
+                                    if (!searchSuggestions.isEmpty()) {
+                                        showSuggestions();
+                                    }
+                                });
+
+                                Log.d(TAG, "✅ Added " + added + " product suggestions");
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Error loading product suggestions", e);
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "❌ Product suggestions API failed", t);
+            }
+        });
+    }
+
+    // ✅ Helper method for case-insensitive contains check
+    private boolean containsIgnoreCase(String text, String query) {
+        if (text == null || query == null) return false;
+        return text.toLowerCase().contains(query.toLowerCase());
+    }
+
+    private void showSuggestions() {
+        if (rvSearchSuggestions != null && !searchSuggestions.isEmpty()) {
+            rvSearchSuggestions.setVisibility(View.VISIBLE);
+            showingSuggestions = true;
+
+            if (suggestionAdapter != null) {
+                suggestionAdapter.notifyDataSetChanged();
+            }
+
+            Log.d(TAG, "✅ Showing " + searchSuggestions.size() + " suggestions");
+        }
+    }
+
+    private void hideSuggestions() {
+        if (rvSearchSuggestions != null) {
+            rvSearchSuggestions.setVisibility(View.GONE);
+            showingSuggestions = false;
+            Log.d(TAG, "✅ Hidden suggestions");
+        }
+    }
+
+    private void applySuggestionAndSearch(SearchSuggestion suggestion) {
+        Log.d(TAG, "🔍 Applying suggestion: " + suggestion.getText());
+
+        // Set search text
+        if (etSearch != null) {
+            etSearch.setText(suggestion.getText());
+            etSearch.setSelection(suggestion.getText().length());
+        }
+
+        // Track search
+        behaviorTracker.trackSearch(suggestion.getText(), selectedCategoryName, searchLocationName);
+
+        // Apply filters if needed
+        if ("CATEGORY".equals(suggestion.getType()) && suggestion.getCategoryId() != null) {
+            applyCategoryFilter(suggestion.getCategoryId(), suggestion.getText());
+        }
+
+        // Hide suggestions
+        hideSuggestions();
+
+        // Hide keyboard
+        hideKeyboard();
+
+        // Perform search
+        currentQuery = suggestion.getText();
+        performSearch();
+    }
+
+    private void insertSuggestionToSearchBox(SearchSuggestion suggestion) {
+        if (etSearch != null) {
+            etSearch.setText(suggestion.getText());
+            etSearch.setSelection(suggestion.getText().length());
+            // Keep suggestions open for further editing
+            scheduleSuggestions(suggestion.getText());
+        }
+    }
+
+    private void hideKeyboard() {
+        if (getActivity() != null && etSearch != null) {
+            InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(etSearch.getWindowToken(), 0);
+            }
+        }
+    }
+
+    // ===============================
+    // ✅ ENHANCED SEARCH METHODS
     // ===============================
 
     private void loadAllProductsInitially() {
@@ -343,10 +838,10 @@ public class SearchFragment extends Fragment {
                 product.setStatus(Product.ProductStatus.AVAILABLE);
             }
 
-            // ✅ IMAGE PARSING - Enhanced handling
+            // Image handling
             boolean imageFound = false;
 
-            // Option 1: Try imageUrls array first
+            // Try imageUrls array first
             Object imageUrlsObj = productData.get("imageUrls");
             if (imageUrlsObj instanceof List) {
                 @SuppressWarnings("unchecked")
@@ -359,26 +854,23 @@ public class SearchFragment extends Fragment {
             } else if (imageUrlsObj instanceof String && !((String) imageUrlsObj).isEmpty()) {
                 product.setImageUrl((String) imageUrlsObj);
                 imageFound = true;
-                Log.d(TAG, "✅ Product " + product.getId() + " has imageUrls as string");
             }
 
-            // Option 2: Fallback to "imageUrl" field
+            // Fallback to "imageUrl" field
             if (!imageFound) {
                 String imageUrl = (String) productData.get("imageUrl");
                 if (imageUrl != null && !imageUrl.isEmpty()) {
                     product.setImageUrl(imageUrl);
                     imageFound = true;
-                    Log.d(TAG, "✅ Product " + product.getId() + " has fallback imageUrl");
                 }
             }
 
-            // Option 3: Try primaryImageUrl field
+            // Try primaryImageUrl field
             if (!imageFound) {
                 String primaryImageUrl = (String) productData.get("primaryImageUrl");
                 if (primaryImageUrl != null && !primaryImageUrl.isEmpty()) {
                     product.setImageUrl(primaryImageUrl);
                     imageFound = true;
-                    Log.d(TAG, "✅ Product " + product.getId() + " has primaryImageUrl");
                 }
             }
 
@@ -402,10 +894,6 @@ public class SearchFragment extends Fragment {
         }
     }
 
-    // ===============================
-    // ✅ IMPROVED SEARCH METHODS WITH TRACKING
-    // ===============================
-
     private void scheduleSearch() {
         if (searchRunnable != null) {
             searchHandler.removeCallbacks(searchRunnable);
@@ -418,22 +906,20 @@ public class SearchFragment extends Fragment {
     private void performSearch() {
         String query = currentQuery.trim();
 
-        // ✅ NEW: Track search behavior (FR-3.2.2)
+        // Track search behavior
         behaviorTracker.trackSearch(
                 query.isEmpty() ? null : query,
                 selectedCategoryName,
                 searchLocationName
         );
 
-        // ✅ Nếu không có query và filter, load tất cả sản phẩm
+        // ✅ STRICT SEARCH: If there's a query, it must be in results
         if (query.isEmpty() && !hasActiveFilters()) {
             loadAllProductsInitially();
             return;
         }
 
         showLoadingState();
-
-        // ✅ TRY SEARCH API FIRST - sử dụng search API với filters
         searchWithFiltersAPI(query);
     }
 
@@ -444,14 +930,14 @@ public class SearchFragment extends Fragment {
         Log.d(TAG, "  - Price: " + minPrice + " - " + maxPrice);
         Log.d(TAG, "  - Condition: " + selectedCondition);
 
-        // ✅ SỬ DỤNG SEARCH API với filters
+        // Use search API with filters
         ApiClient.getApiService().getProducts(
                 0,                                          // page
                 50,                                         // size
                 query.isEmpty() ? null : query,             // search query
-                selectedCategoryId,                         // categoryId - ✅ QUAN TRỌNG
+                selectedCategoryId,                         // categoryId
                 selectedCondition,                          // condition
-                minPrice,                                   // minPrice (Double)
+                minPrice,                                   // minPrice
                 maxPrice,                                   // maxPrice
                 getSortByParameter(),                       // sortBy
                 getSortDirectionParameter()                 // sortDir
@@ -465,7 +951,7 @@ public class SearchFragment extends Fragment {
             @Override
             public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
                 Log.e(TAG, "❌ Search API failed, falling back to client filtering", t);
-                fallbackToClientFiltering();
+                fallbackToClientFiltering(query);
             }
         });
     }
@@ -487,7 +973,10 @@ public class SearchFragment extends Fragment {
                         for (Map<String, Object> productData : productList) {
                             Product product = parseProductFromMapHomeStyle(productData);
                             if (product != null) {
-                                searchResults.add(product);
+                                // ✅ STRICT FILTERING: Double-check if product matches query
+                                if (query.isEmpty() || productMatchesQuery(product, query)) {
+                                    searchResults.add(product);
+                                }
                             }
                         }
 
@@ -504,15 +993,44 @@ public class SearchFragment extends Fragment {
 
             // If API search failed, fallback to client filtering
             Log.w(TAG, "❌ Search API unsuccessful, falling back to client filtering");
-            fallbackToClientFiltering();
+            fallbackToClientFiltering(query);
 
         } catch (Exception e) {
             Log.e(TAG, "❌ Error parsing search response, falling back to client filtering", e);
-            fallbackToClientFiltering();
+            fallbackToClientFiltering(query);
         }
     }
 
-    private void fallbackToClientFiltering() {
+    // ✅ STRICT PRODUCT MATCHING
+    private boolean productMatchesQuery(Product product, String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return true; // No query means show all
+        }
+
+        String queryLower = query.toLowerCase().trim();
+
+        // Check title
+        if (product.getTitle() != null &&
+                product.getTitle().toLowerCase().contains(queryLower)) {
+            return true;
+        }
+
+        // Check description
+        if (product.getDescription() != null &&
+                product.getDescription().toLowerCase().contains(queryLower)) {
+            return true;
+        }
+
+        // Check category name
+        if (product.getCategoryName() != null &&
+                product.getCategoryName().toLowerCase().contains(queryLower)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private void fallbackToClientFiltering(String query) {
         Log.d(TAG, "🔄 Fallback: Loading all products and applying client-side filters...");
 
         ApiClient.getApiService().getProducts().enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
@@ -537,8 +1055,8 @@ public class SearchFragment extends Fragment {
                                     }
                                 }
 
-                                // ✅ Apply client-side filtering
-                                applyClientSideFilters();
+                                // Apply client-side filtering
+                                applyClientSideFilters(query);
                                 applySorting();
 
                                 if (searchAdapter != null) {
@@ -591,8 +1109,8 @@ public class SearchFragment extends Fragment {
         }
     }
 
-    // ✅ CLIENT-SIDE FILTERING (backup method)
-    private void applyClientSideFilters() {
+    // ✅ ENHANCED CLIENT-SIDE FILTERING
+    private void applyClientSideFilters(String query) {
         if (searchResults.isEmpty()) return;
 
         List<Product> originalResults = new ArrayList<>(searchResults);
@@ -601,15 +1119,9 @@ public class SearchFragment extends Fragment {
         for (Product product : originalResults) {
             boolean passesFilters = true;
 
-            // Query filter
-            if (!currentQuery.trim().isEmpty() && product.getTitle() != null) {
-                String query = currentQuery.trim().toLowerCase();
-                String title = product.getTitle().toLowerCase();
-                String description = product.getDescription() != null ? product.getDescription().toLowerCase() : "";
-
-                if (!title.contains(query) && !description.contains(query)) {
-                    passesFilters = false;
-                }
+            // ✅ STRICT Query filter - must contain the search term
+            if (!query.trim().isEmpty() && !productMatchesQuery(product, query)) {
+                passesFilters = false;
             }
 
             // Price filter
@@ -631,7 +1143,7 @@ public class SearchFragment extends Fragment {
                 }
             }
 
-            // ✅ Category filter - QUAN TRỌNG
+            // Category filter
             if (selectedCategoryId != null && product.getCategoryId() != null) {
                 if (!selectedCategoryId.equals(product.getCategoryId())) {
                     passesFilters = false;
@@ -643,7 +1155,7 @@ public class SearchFragment extends Fragment {
             }
         }
 
-        Log.d(TAG, "✅ Client-side filtering applied - Results: " + searchResults.size());
+        Log.d(TAG, "✅ Client-side filtering applied - Results: " + searchResults.size() + " (Query: '" + query + "')");
     }
 
     private void applySorting() {
@@ -711,7 +1223,7 @@ public class SearchFragment extends Fragment {
     }
 
     // ===============================
-    // ✅ CATEGORY FILTER IMPLEMENTATION WITH TRACKING
+    // CATEGORY FILTER IMPLEMENTATION
     // ===============================
 
     private void showCategoryFilterDialog() {
@@ -831,14 +1343,13 @@ public class SearchFragment extends Fragment {
         builder.create().show();
     }
 
-    // ✅ Apply category filter method with tracking
     private void applyCategoryFilter(Long categoryId, String categoryName) {
         Log.d(TAG, "🔍 Applying category filter: " + categoryName + " (ID: " + categoryId + ")");
 
         this.selectedCategoryId = categoryId;
         this.selectedCategoryName = categoryName;
 
-        // ✅ NEW: Track category browsing
+        // Track category browsing
         if (categoryId != null && categoryName != null) {
             behaviorTracker.trackCategoryBrowse(categoryId, categoryName);
         }
@@ -930,7 +1441,7 @@ public class SearchFragment extends Fragment {
     }
 
     // ===============================
-    // OTHER FILTER DIALOGS (giữ nguyên logic, chỉ thêm tracking where needed)
+    // OTHER FILTER DIALOGS
     // ===============================
 
     private void showPriceFilterDialog() {
@@ -1018,12 +1529,12 @@ public class SearchFragment extends Fragment {
         MaterialButton btnClear = dialogView.findViewById(R.id.btn_clear);
         MaterialButton btnApply = dialogView.findViewById(R.id.btn_apply);
 
-        // ✅ Set current values
+        // Set current values
         etCustomLocation.setText(searchLocationName);
         seekBarRadius.setProgress(Math.max(0, searchRadiusKm - 5));
         tvRadiusValue.setText(searchRadiusKm + " km");
 
-        // ✅ Radius seekbar listener
+        // Radius seekbar listener
         seekBarRadius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -1078,7 +1589,7 @@ public class SearchFragment extends Fragment {
         btnApply.setOnClickListener(v -> {
             Log.d(TAG, "✅ Applying location filter: " + searchLocationName);
 
-            // ✅ NEW: Track location activity
+            // Track location activity
             if (searchLatitude != null && searchLongitude != null) {
                 behaviorTracker.trackLocationActivity(searchLocationName, searchLatitude, searchLongitude);
             }
@@ -1444,16 +1955,15 @@ public class SearchFragment extends Fragment {
         Log.e(TAG, "Error: " + message);
     }
 
-    // ✅ ENHANCED: Navigate to product detail with tracking
     private void navigateToProductDetail(Product product) {
         if (getContext() != null && product != null) {
-            // ✅ NEW: Track product view for recommendations
+            // Track product view for recommendations
             behaviorTracker.trackProductView(product.getId(), product.getCategoryName(), currentQuery);
 
             Intent intent = new Intent(getContext(), ProductDetailActivity.class);
             intent.putExtra("product_id", product.getId());
             intent.putExtra("product_title", product.getTitle());
-            intent.putExtra("search_query", currentQuery); // Pass search context
+            intent.putExtra("search_query", currentQuery);
             if (product.getPrice() != null) {
                 intent.putExtra("product_price", product.getPrice().toString());
             }
