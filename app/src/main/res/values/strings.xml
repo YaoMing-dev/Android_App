@@ -11,6 +11,24 @@
     <string name="nav_profile">Profile</string>
     <color name="accent_color">#FF4081</color> <!-- Pink Accent (Material default) -->
 
+    <string name="error_loading_product">Error loading product</string>
+    <string name="no_title">No title</string>
+    <string name="price_not_available">Price not available</string>
+    <string name="location_not_specified">Location not specified</string>
+
+
+    <string name="no_listings_found">No listings found</string>
+    <string name="start_by_adding_first_product">Start by adding your first product</string>
+    <string name="no_available_listings">No available listings</string>
+    <string name="all_listings_sold_or_paused">All your listings are sold or paused</string>
+    <string name="no_sold_listings">No sold listings</string>
+    <string name="complete_sales_to_see_here">Complete some sales to see them here</string>
+    <string name="no_paused_listings">No paused listings</string>
+    <string name="pause_listings_to_manage">Pause listings to manage inventory</string>
+
+    <!-- ✅ Status Strings -->
+    <string name="status_archived">Archived</string>
+
 
 
     <!-- Authentication -->

@@ -1,0 +1,8 @@
+<!-- res/drawable/bg_condition_badge.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/warning" />
+    <size
+        android:width="24dp"
+        android:height="24dp" />
+</shape>

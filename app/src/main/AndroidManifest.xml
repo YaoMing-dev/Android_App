@@ -209,6 +209,12 @@
             android:theme="@style/Theme.Material3.DayNight.NoActionBar"
             android:parentActivityName=".MainActivity" />
 
+        <activity
+            android:name=".ui.analytics.ProductAnalyticsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+            android:parentActivityName=".ui.profile.MyListingsActivity" />
+
         <!-- ✅ THÊM: FileProvider cho camera/gallery image handling -->
         <provider
             android:name="androidx.core.content.FileProvider"

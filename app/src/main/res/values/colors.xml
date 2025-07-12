@@ -26,6 +26,10 @@
     <color name="promotion_background_tint">#FFF0F4F8</color>
 
 
+    <color name="success_light">#E8F5E8</color>
+
+
+
     <!-- Background Colors -->
     <color name="background_light">#FAFAFA</color>
     <color name="background_white">#FFFFFF</color>

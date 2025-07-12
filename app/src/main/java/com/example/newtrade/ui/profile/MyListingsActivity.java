@@ -8,13 +8,13 @@ import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -26,12 +26,16 @@ import com.example.newtrade.api.ProductService;
 import com.example.newtrade.api.AnalyticsService;
 import com.example.newtrade.models.Product;
 import com.example.newtrade.models.StandardResponse;
+import com.example.newtrade.ui.analytics.ProductAnalyticsActivity;
 import com.example.newtrade.ui.product.AddProductActivity;
 import com.example.newtrade.ui.product.EditProductActivity;
 import com.example.newtrade.ui.product.ProductDetailActivity;
 import com.example.newtrade.utils.SharedPrefsManager;
+import com.example.newtrade.utils.UserBehaviorTracker;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.tabs.TabLayout;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -49,48 +53,83 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
 
     // UI Components
     private MaterialToolbar toolbar;
+    private TabLayout tabLayoutStatus;
     private SwipeRefreshLayout swipeRefresh;
     private RecyclerView rvMyListings;
+    private LinearLayout llEmptyStateContainer;
     private TextView tvEmptyState;
+    private TextView tvEmptySubtitle;
+    private MaterialButton btnAddFirstProduct;
     private FloatingActionButton fabAddProduct;
 
+    // ✅ Stats Summary Views
+    private CardView cardStatsSummary;
+    private TextView tvTotalListings;
+    private TextView tvAvailableCount;
+    private TextView tvSoldCount;
+    private TextView tvPausedCount;
+
     // Data & Adapters
-    private final List<Product> myProducts = new ArrayList<>();
+    private final List<Product> allProducts = new ArrayList<>();
+    private final List<Product> filteredProducts = new ArrayList<>();
     private ProductAdapter productAdapter;
     private SharedPrefsManager prefsManager;
-    private LinearLayout llEmptyStateContainer;
 
     // Services
     private ProductService productService;
     private AnalyticsService analyticsService;
+    private UserBehaviorTracker behaviorTracker;
+
+    // ✅ Status Filtering
+    private String currentStatusFilter = "ALL";
+    private final Map<String, Integer> statusCounts = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_my_listings);
-        prefsManager = SharedPrefsManager.getInstance(this);
+
         initViews();
+        initServices();
         setupToolbar();
+        setupTabs();
         setupRecyclerView();
         setupListeners();
-        initServices();
+        setupStatsCard();
 
-        prefsManager = SharedPrefsManager.getInstance(this);
+        // Load data
         loadMyProducts();
         loadDashboardAnalytics();
-
-        debugApiResponse();
-
-        Log.d(TAG, "MyListingsActivity created");
     }
+
+    // ===== INITIALIZATION =====
 
     private void initViews() {
         toolbar = findViewById(R.id.toolbar);
+        tabLayoutStatus = findViewById(R.id.tab_layout_status);
         swipeRefresh = findViewById(R.id.swipe_refresh);
         rvMyListings = findViewById(R.id.rv_my_listings);
-        tvEmptyState = findViewById(R.id.tv_empty_state);
-        fabAddProduct = findViewById(R.id.fab_add_product);
         llEmptyStateContainer = findViewById(R.id.ll_empty_state_container);
+        tvEmptyState = findViewById(R.id.tv_empty_state);
+        tvEmptySubtitle = findViewById(R.id.tv_empty_subtitle);
+        btnAddFirstProduct = findViewById(R.id.btn_add_first_product);
+        fabAddProduct = findViewById(R.id.fab_add_product);
+
+        // ✅ Stats Summary Views (safe findViewById)
+        cardStatsSummary = findViewById(R.id.card_stats_summary);
+        tvTotalListings = findViewById(R.id.tv_total_listings);
+        tvAvailableCount = findViewById(R.id.tv_available_count);
+        tvSoldCount = findViewById(R.id.tv_sold_count);
+        tvPausedCount = findViewById(R.id.tv_paused_count);
+
+        Log.d(TAG, "✅ Views initialized");
+    }
+
+    private void initServices() {
+        productService = ApiClient.getProductService();
+        analyticsService = ApiClient.getAnalyticsService();
+        prefsManager = SharedPrefsManager.getInstance(this);
+        behaviorTracker = UserBehaviorTracker.getInstance(this);
     }
 
     private void setupToolbar() {
@@ -98,8 +137,7 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
-            // ✅ KIỂM TRA NULL SAFETY
-            String currentUserName = (prefsManager != null) ? prefsManager.getUserName() : null;
+            String currentUserName = prefsManager.getUserName();
             String title = (currentUserName != null && !currentUserName.isEmpty())
                     ? currentUserName + "'s Listings"
                     : "My Listings";
@@ -108,8 +146,49 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
         }
     }
 
+    // ===== ✅ TAB SETUP =====
+
+    private void setupTabs() {
+        if (tabLayoutStatus == null) return;
+
+        tabLayoutStatus.addTab(tabLayoutStatus.newTab().setText("All"));
+        tabLayoutStatus.addTab(tabLayoutStatus.newTab().setText("Available"));
+        tabLayoutStatus.addTab(tabLayoutStatus.newTab().setText("Sold"));
+        tabLayoutStatus.addTab(tabLayoutStatus.newTab().setText("Paused"));
+
+        tabLayoutStatus.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                switch (tab.getPosition()) {
+                    case 0:
+                        currentStatusFilter = "ALL";
+                        break;
+                    case 1:
+                        currentStatusFilter = "AVAILABLE";
+                        break;
+                    case 2:
+                        currentStatusFilter = "SOLD";
+                        break;
+                    case 3:
+                        currentStatusFilter = "PAUSED";
+                        break;
+                }
+
+                Log.d(TAG, "🔍 Status filter changed to: " + currentStatusFilter);
+                filterProductsByStatus();
+                updateEmptyStateForFilter();
+            }
+
+            @Override
+            public void onTabUnselected(TabLayout.Tab tab) {}
+
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) {}
+        });
+    }
+
     private void setupRecyclerView() {
-        productAdapter = new ProductAdapter(myProducts, this);
+        productAdapter = new ProductAdapter(filteredProducts, this, true);
         rvMyListings.setLayoutManager(new LinearLayoutManager(this));
         rvMyListings.setAdapter(productAdapter);
         rvMyListings.setHasFixedSize(true);
@@ -118,79 +197,41 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
     private void setupListeners() {
         swipeRefresh.setOnRefreshListener(this::refreshData);
         fabAddProduct.setOnClickListener(v -> openAddProduct());
+
+        if (btnAddFirstProduct != null) {
+            btnAddFirstProduct.setOnClickListener(v -> openAddProduct());
+        }
     }
 
-    private void initServices() {
-        productService = ApiClient.getProductService();
-        analyticsService = ApiClient.getAnalyticsService();
+    private void setupStatsCard() {
+        if (cardStatsSummary != null) {
+            cardStatsSummary.setOnClickListener(v -> showDetailedStats());
+        }
     }
+
+    // ===== DATA LOADING =====
 
     private void refreshData() {
         loadMyProducts();
         loadDashboardAnalytics();
     }
 
-    // ===== DASHBOARD ANALYTICS =====
-
-    private void loadDashboardAnalytics() {
-        Long userId = prefsManager.getUserId();
-        if (userId == null || userId <= 0) return;
-
-        analyticsService.getDashboard().enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> standardResponse = response.body();
-                    if (standardResponse.isSuccess()) {
-                        Map<String, Object> dashboard = standardResponse.getData();
-                        updateDashboardUI(dashboard);
-                        Log.d(TAG, "✅ Dashboard analytics loaded");
-                    }
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                Log.e(TAG, "❌ Failed to load dashboard analytics", t);
-            }
-        });
-    }
-
-    private void updateDashboardUI(Map<String, Object> dashboard) {
-        // Update toolbar subtitle with stats
-        if (getSupportActionBar() != null && dashboard != null) {
-            Object productsListed = dashboard.get("productsListed");
-            Object productsSold = dashboard.get("productsSold");
-
-            String subtitle = String.format("Listed: %s • Sold: %s",
-                    productsListed != null ? productsListed.toString() : "0",
-                    productsSold != null ? productsSold.toString() : "0"
-            );
-            getSupportActionBar().setSubtitle(subtitle);
-        }
-    }
-
-    // ===== PRODUCT LOADING =====
-
+    // ✅ FIXED: Using existing ProductService methods
     private void loadMyProducts() {
-        if (swipeRefresh != null) {
-            swipeRefresh.setRefreshing(true);
-        }
-
         Long userId = prefsManager.getUserId();
         if (userId == null || userId <= 0) {
-            Log.w(TAG, "User not logged in");
-            showEmptyState("Please log in to view your listings");
+            showError("User not logged in");
             return;
         }
 
-        Log.d(TAG, "Loading products for user: " + userId);
+        allProducts.clear();
+        filteredProducts.clear();
+        if (productAdapter != null) {
+            productAdapter.notifyDataSetChanged();
+        }
 
-        Call<StandardResponse<Map<String, Object>>> call = productService.getProductsByUser(userId);
-
-        call.enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+        // ✅ Use getProductsByUser method từ ProductService hiện có
+        productService.getProductsByUser(userId).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
             @Override
             public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
                                    @NonNull Response<StandardResponse<Map<String, Object>>> response) {
@@ -201,30 +242,14 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
 
                 if (response.isSuccessful() && response.body() != null) {
                     StandardResponse<Map<String, Object>> standardResponse = response.body();
-
                     if (standardResponse.isSuccess()) {
-                        Map<String, Object> paginatedData = standardResponse.getData();
-                        List<Map<String, Object>> productDataList = extractProductsFromPaginatedResponse(paginatedData);
-
-                        if (productDataList != null && !productDataList.isEmpty()) {
-                            parseAndDisplayProducts(productDataList);
-                            Log.d(TAG, "✅ Loaded " + productDataList.size() + " user products");
-                        } else {
-                            Log.w(TAG, "No products found for user - showing empty state");
-                            // ✅ THAY THẾ loadMockProducts() bằng empty state
-                            showEmptyState("You haven't listed any products yet.\n\nTap the + button to create your first listing!");
-                        }
+                        parseProductsResponse(standardResponse.getData());
+                        Log.d(TAG, "✅ Loaded " + allProducts.size() + " products");
                     } else {
-                        Log.w(TAG, "❌ Failed to load user products: " + standardResponse.getMessage());
-                        showError("Failed to load your products");
-                        // ✅ THAY THẾ loadMockProducts() bằng empty state
-                        showEmptyState("Unable to load your listings.\nPlease try again.");
+                        showError("Failed to load products: " + standardResponse.getMessage());
                     }
                 } else {
-                    Log.w(TAG, "❌ User products API response not successful: " + response.code());
-                    showError("Failed to load your products");
-                    // ✅ THAY THẾ loadMockProducts() bằng empty state
-                    showEmptyState("Unable to load your listings.\nPlease try again.");
+                    showError("Service unavailable");
                 }
             }
 
@@ -233,171 +258,268 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
                 if (swipeRefresh != null) {
                     swipeRefresh.setRefreshing(false);
                 }
-                Log.e(TAG, "❌ User products API call failed", t);
-                showError("Network error while loading your products");
-                // ✅ THAY THẾ loadMockProducts() bằng empty state
-                showEmptyState("Network error.\nPlease check your connection and try again.");
+                Log.e(TAG, "❌ Failed to load products", t);
+                showError("Network error");
             }
         });
     }
 
-    private void showEmptyState(String message) {
-        myProducts.clear();
-        updateUI(); // This will show empty state container
+    // ===== ✅ PRODUCT PARSING =====
 
-        if (tvEmptyState != null) {
-            tvEmptyState.setText(message);
-        }
+    private void parseProductsResponse(Map<String, Object> data) {
+        allProducts.clear();
+        statusCounts.clear();
 
-        Log.d(TAG, "Showing empty state: " + message);
-    }
+        // Initialize status counts
+        statusCounts.put("ALL", 0);
+        statusCounts.put("AVAILABLE", 0);
+        statusCounts.put("SOLD", 0);
+        statusCounts.put("PAUSED", 0);
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> extractProductsFromPaginatedResponse(Map<String, Object> paginatedData) {
-        if (paginatedData == null) {
-            Log.w(TAG, "Paginated data is null");
-            return null;
-        }
+        try {
+            // ✅ Flexible parsing - handle both direct list and paginated response
+            List<Map<String, Object>> productList = extractProductListFromResponse(data);
 
-        Log.d(TAG, "🔍 Paginated response keys: " + paginatedData.keySet());
+            for (Map<String, Object> productData : productList) {
+                try {
+                    Product product = parseProductFromMap(productData);
+                    if (product != null) {
+                        allProducts.add(product);
 
-        // Spring Boot pagination thường có field "content"
-        Object contentObj = paginatedData.get("content");
-        if (contentObj instanceof List) {
-            List<Map<String, Object>> content = (List<Map<String, Object>>) contentObj;
-            Log.d(TAG, "✅ Found 'content' field with " + content.size() + " items");
-            return content;
-        }
+                        statusCounts.put("ALL", statusCounts.get("ALL") + 1);
 
-        // Thử các field khác có thể có
-        String[] possibleFields = {"items", "data", "products", "results"};
-        for (String field : possibleFields) {
-            Object fieldValue = paginatedData.get(field);
-            if (fieldValue instanceof List) {
-                List<Map<String, Object>> list = (List<Map<String, Object>>) fieldValue;
-                Log.d(TAG, "✅ Found '" + field + "' field with " + list.size() + " items");
-                return list;
-            }
-        }
-
-        Log.w(TAG, "❌ Could not find product list in paginated response");
-        return new ArrayList<>();
-    }
-
-    private void debugApiResponse() {
-        Long userId = prefsManager.getUserId();
-        if (userId == null) return;
-
-        // Test getMyProducts endpoint
-        productService.getMyProducts(0, 10).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-
-                Log.d(TAG, "🔍 DEBUG getMyProducts response:");
-                Log.d(TAG, "  - Success: " + response.isSuccessful());
-                Log.d(TAG, "  - Code: " + response.code());
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> standardResponse = response.body();
-                    Log.d(TAG, "  - StandardResponse success: " + standardResponse.isSuccess());
-                    Log.d(TAG, "  - StandardResponse message: " + standardResponse.getMessage());
-
-                    Map<String, Object> data = standardResponse.getData();
-                    if (data != null) {
-                        Log.d(TAG, "  - Data keys: " + data.keySet());
-                        for (String key : data.keySet()) {
-                            Object value = data.get(key);
-                            Log.d(TAG, "    - " + key + ": " + (value != null ? value.getClass().getSimpleName() : "null"));
+                        Product.ProductStatus status = product.getStatus();
+                        if (status != null) {
+                            String statusKey = status.name();
+                            statusCounts.put(statusKey, statusCounts.getOrDefault(statusKey, 0) + 1);
+                        } else {
+                            statusCounts.put("AVAILABLE", statusCounts.get("AVAILABLE") + 1);
                         }
                     }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing individual product", e);
                 }
             }
-
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                Log.e(TAG, "🔍 DEBUG getMyProducts failed", t);
-            }
-        });
-    }
-
-    private void parseAndDisplayProducts(@NonNull List<Map<String, Object>> productDataList) {
-        myProducts.clear();
-
-        for (Map<String, Object> productData : productDataList) {
-            try {
-                Product product = new Product();
-
-                // Basic info
-                Object idObj = productData.get("id");
-                if (idObj instanceof Number) {
-                    product.setId(((Number) idObj).longValue());
-                }
-
-                product.setTitle((String) productData.get("title"));
-                product.setDescription((String) productData.get("description"));
-                product.setLocation((String) productData.get("location"));
-
-                // Price
-                Object priceObj = productData.get("price");
-                if (priceObj instanceof Number) {
-                    product.setPrice(BigDecimal.valueOf(((Number) priceObj).doubleValue()));
-                }
-
-                // Condition
-                String conditionStr = (String) productData.get("condition");
-                if (conditionStr != null) {
-                    try {
-                        Product.ProductCondition condition = Product.ProductCondition.valueOf(conditionStr);
-                        product.setCondition(condition);
-                    } catch (IllegalArgumentException e) {
-                        product.setCondition(Product.ProductCondition.GOOD);
-                    }
-                }
-
-                // Status
-                String statusStr = (String) productData.get("status");
-                if (statusStr != null) {
-                    try {
-                        Product.ProductStatus status = Product.ProductStatus.valueOf(statusStr);
-                        product.setStatus(status);
-                    } catch (IllegalArgumentException e) {
-                        product.setStatus(Product.ProductStatus.AVAILABLE);
-                    }
-                }
-
-                // Image URLs
-                Object imageUrlsObj = productData.get("imageUrls");
-                if (imageUrlsObj instanceof List) {
-                    @SuppressWarnings("unchecked")
-                    List<String> imageUrls = (List<String>) imageUrlsObj;
-                    product.setImageUrls(imageUrls);
-                } else if (imageUrlsObj instanceof String) {
-                    List<String> imageUrls = new ArrayList<>();
-                    imageUrls.add((String) imageUrlsObj);
-                    product.setImageUrls(imageUrls);
-                }
-
-                // Additional fields
-                Object viewCountObj = productData.get("viewCount");
-                if (viewCountObj instanceof Number) {
-                    product.setViewCount(((Number) viewCountObj).intValue());
-                }
-
-                product.setCreatedAt((String) productData.get("createdAt"));
-                product.setCategoryName((String) productData.get("categoryName"));
-
-                myProducts.add(product);
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error parsing product data", e);
-            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing products response", e);
         }
 
+        updateStatsCard();
+        updateTabTitlesWithCounts();
+        filterProductsByStatus();
         updateUI();
     }
 
+    // ✅ Flexible parsing để handle different response formats
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> extractProductListFromResponse(Map<String, Object> data) {
+        if (data == null) {
+            return new ArrayList<>();
+        }
 
+        // Try different possible keys for product list
+        String[] possibleKeys = {"products", "content", "data", "items", "results"};
+
+        for (String key : possibleKeys) {
+            Object value = data.get(key);
+            if (value instanceof List) {
+                try {
+                    return (List<Map<String, Object>>) value;
+                } catch (ClassCastException e) {
+                    Log.w(TAG, "Found list under key '" + key + "' but wrong type: " + e.getMessage());
+                }
+            }
+        }
+
+        // If no list found, check if data itself is a list
+        if (data instanceof List) {
+            try {
+                return (List<Map<String, Object>>) data;
+            } catch (ClassCastException e) {
+                Log.w(TAG, "Data is list but wrong type: " + e.getMessage());
+            }
+        }
+
+        Log.w(TAG, "❌ Could not find product list in response. Available keys: " + data.keySet());
+        return new ArrayList<>();
+    }
+
+    private Product parseProductFromMap(Map<String, Object> productData) {
+        try {
+            Product product = new Product();
+
+            // Parse ID
+            Object idObj = productData.get("id");
+            if (idObj instanceof Number) {
+                product.setId(((Number) idObj).longValue());
+            }
+
+            // Basic fields
+            product.setTitle((String) productData.get("title"));
+            product.setDescription((String) productData.get("description"));
+            product.setLocation((String) productData.get("location"));
+
+            // Parse price
+            Object priceObj = productData.get("price");
+            if (priceObj instanceof Number) {
+                product.setPrice(new BigDecimal(priceObj.toString()));
+            }
+
+            // Parse status
+            Object statusObj = productData.get("status");
+            if (statusObj != null) {
+                try {
+                    Product.ProductStatus status = Product.ProductStatus.valueOf(statusObj.toString());
+                    product.setStatus(status);
+                } catch (IllegalArgumentException e) {
+                    product.setStatus(Product.ProductStatus.AVAILABLE);
+                }
+            } else {
+                product.setStatus(Product.ProductStatus.AVAILABLE);
+            }
+
+            // Parse condition
+            Object conditionObj = productData.get("condition");
+            if (conditionObj != null) {
+                try {
+                    Product.ProductCondition condition = Product.ProductCondition.valueOf(conditionObj.toString());
+                    product.setCondition(condition);
+                } catch (IllegalArgumentException e) {
+                    product.setCondition(Product.ProductCondition.GOOD);
+                }
+            }
+
+            // Parse image URLs
+            Object imageUrlsObj = productData.get("imageUrls");
+            if (imageUrlsObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<String> imageUrls = (List<String>) imageUrlsObj;
+                product.setImageUrls(imageUrls);
+            } else if (imageUrlsObj instanceof String) {
+                List<String> imageUrls = new ArrayList<>();
+                imageUrls.add((String) imageUrlsObj);
+                product.setImageUrls(imageUrls);
+            }
+
+            // Additional fields
+            Object viewCountObj = productData.get("viewCount");
+            if (viewCountObj instanceof Number) {
+                product.setViewCount(((Number) viewCountObj).intValue());
+            }
+
+            product.setCreatedAt((String) productData.get("createdAt"));
+            product.setCategoryName((String) productData.get("categoryName"));
+
+            return product;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing product data", e);
+            return null;
+        }
+    }
+
+    // ===== ✅ STATUS FILTERING =====
+
+    private void filterProductsByStatus() {
+        filteredProducts.clear();
+
+        for (Product product : allProducts) {
+            if (shouldIncludeProduct(product)) {
+                filteredProducts.add(product);
+            }
+        }
+
+        if (productAdapter != null) {
+            productAdapter.notifyDataSetChanged();
+        }
+
+        Log.d(TAG, "🔍 Filtered " + filteredProducts.size() + " products for status: " + currentStatusFilter);
+    }
+
+    private boolean shouldIncludeProduct(Product product) {
+        if ("ALL".equals(currentStatusFilter)) {
+            return true;
+        }
+
+        Product.ProductStatus status = product.getStatus();
+        if (status == null) {
+            status = Product.ProductStatus.AVAILABLE;
+        }
+
+        return currentStatusFilter.equals(status.name());
+    }
+
+    // ===== ✅ STATS CARD UPDATES =====
+
+    private void updateStatsCard() {
+        if (tvTotalListings != null) {
+            tvTotalListings.setText(String.valueOf(statusCounts.get("ALL")));
+        }
+        if (tvAvailableCount != null) {
+            tvAvailableCount.setText(String.valueOf(statusCounts.get("AVAILABLE")));
+        }
+        if (tvSoldCount != null) {
+            tvSoldCount.setText(String.valueOf(statusCounts.get("SOLD")));
+        }
+        if (tvPausedCount != null) {
+            tvPausedCount.setText(String.valueOf(statusCounts.get("PAUSED")));
+        }
+    }
+
+    private void updateTabTitlesWithCounts() {
+        if (tabLayoutStatus != null && tabLayoutStatus.getTabCount() >= 4) {
+            TabLayout.Tab allTab = tabLayoutStatus.getTabAt(0);
+            if (allTab != null) {
+                allTab.setText("All (" + statusCounts.get("ALL") + ")");
+            }
+
+            TabLayout.Tab availableTab = tabLayoutStatus.getTabAt(1);
+            if (availableTab != null) {
+                availableTab.setText("Available (" + statusCounts.get("AVAILABLE") + ")");
+            }
+
+            TabLayout.Tab soldTab = tabLayoutStatus.getTabAt(2);
+            if (soldTab != null) {
+                soldTab.setText("Sold (" + statusCounts.get("SOLD") + ")");
+            }
+
+            TabLayout.Tab pausedTab = tabLayoutStatus.getTabAt(3);
+            if (pausedTab != null) {
+                pausedTab.setText("Paused (" + statusCounts.get("PAUSED") + ")");
+            }
+        }
+    }
+
+    // ===== ✅ EMPTY STATE MANAGEMENT =====
+
+    private void updateEmptyStateForFilter() {
+        if (filteredProducts.isEmpty()) {
+            updateEmptyStateMessage();
+        }
+    }
+
+    private void updateEmptyStateMessage() {
+        if (tvEmptyState != null && tvEmptySubtitle != null) {
+            switch (currentStatusFilter) {
+                case "ALL":
+                    tvEmptyState.setText("No listings found");
+                    tvEmptySubtitle.setText("Start by adding your first product");
+                    break;
+                case "AVAILABLE":
+                    tvEmptyState.setText("No available listings");
+                    tvEmptySubtitle.setText("All your listings are sold or paused");
+                    break;
+                case "SOLD":
+                    tvEmptyState.setText("No sold listings");
+                    tvEmptySubtitle.setText("Complete some sales to see them here");
+                    break;
+                case "PAUSED":
+                    tvEmptyState.setText("No paused listings");
+                    tvEmptySubtitle.setText("Pause listings to manage inventory");
+                    break;
+            }
+        }
+    }
 
     private void updateUI() {
         if (swipeRefresh != null) {
@@ -408,34 +530,69 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
             productAdapter.notifyDataSetChanged();
         }
 
-        // Show/hide empty state container
-        if (myProducts.isEmpty()) {
-            rvMyListings.setVisibility(View.GONE);
-            if (llEmptyStateContainer != null) {
-                llEmptyStateContainer.setVisibility(View.VISIBLE);
-            }
-        } else {
-            rvMyListings.setVisibility(View.VISIBLE);
-            if (llEmptyStateContainer != null) {
-                llEmptyStateContainer.setVisibility(View.GONE);
-            }
+        boolean isEmpty = filteredProducts.isEmpty();
+        if (rvMyListings != null) {
+            rvMyListings.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+        }
+        if (llEmptyStateContainer != null) {
+            llEmptyStateContainer.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
         }
 
-        Log.d(TAG, "UI updated with " + myProducts.size() + " products");
+        if (cardStatsSummary != null) {
+            cardStatsSummary.setVisibility(allProducts.isEmpty() ? View.GONE : View.VISIBLE);
+        }
     }
 
-    // ===== PRODUCT ACTIONS =====
+    // ===== ✅ PRODUCT ADAPTER CALLBACKS =====
 
     @Override
     public void onProductClick(Product product) {
-        // Hiển thị dialog với 3 lựa chọn thay vì trực tiếp vào chi tiết
-        showProductOptionsDialog(product);
+        if (product.getStatus() == Product.ProductStatus.AVAILABLE) {
+            navigateToProductDetail(product);
+        } else {
+            showProductOptionsMenu(product);
+        }
     }
 
-    private void showProductOptionsDialog(Product product) {
+    @Override
+    public void onProductLongClick(Product product) {
+        showProductOptionsMenu(product);
+    }
+
+    @Override
+    public void onAnalyticsClick(Product product) {
+        navigateToProductAnalytics(product);
+    }
+
+    @Override
+    public void onStatusChangeClick(Product product) {
+        showStatusChangeDialog(product);
+    }
+
+    // ===== NAVIGATION & DIALOGS =====
+
+    private void navigateToProductDetail(Product product) {
+        Intent intent = new Intent(this, ProductDetailActivity.class);
+        intent.putExtra("product_id", product.getId());
+        intent.putExtra("product_title", product.getTitle());
+        intent.putExtra("product_price", product.getFormattedPrice());
+        startActivity(intent);
+    }
+
+    private void navigateToProductAnalytics(Product product) {
+        Intent intent = new Intent(this, ProductAnalyticsActivity.class);
+        intent.putExtra("product_id", product.getId());
+        intent.putExtra("product_title", product.getTitle());
+        startActivity(intent);
+
+        Log.d(TAG, "📊 Opening analytics for: " + product.getTitle());
+    }
+
+    private void showProductOptionsMenu(Product product) {
         String[] options = {
-                "👁️ View Product",
+                "📊 View Analytics",
                 "✏️ Edit Product",
+                "🔄 Change Status",
                 "🗑️ Delete Product"
         };
 
@@ -443,13 +600,16 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
                 .setTitle(product.getTitle())
                 .setItems(options, (dialog, which) -> {
                     switch (which) {
-                        case 0: // View Product
-                            openProductDetail(product);
+                        case 0:
+                            navigateToProductAnalytics(product);
                             break;
-                        case 1: // Edit Product
+                        case 1:
                             editProduct(product);
                             break;
-                        case 2: // Delete Product
+                        case 2:
+                            showStatusChangeDialog(product);
+                            break;
+                        case 3:
                             confirmDeleteProduct(product);
                             break;
                     }
@@ -457,187 +617,7 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
                 .show();
     }
 
-    @Override
-    public void onProductLongClick(Product product) {
-        showProductActionsMenu(product);
-    }
-
-    private void showProductActionsMenu(Product product) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
-        String[] actions = {
-                "✏️ Edit Product",
-                "📊 View Analytics",
-                "🔄 Change Status",
-                "🗑️ Delete Product"
-        };
-
-        builder.setTitle(product.getTitle())
-                .setItems(actions, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // Edit
-                            editProduct(product);
-                            break;
-                        case 1: // Analytics
-                            viewProductAnalytics(product);
-                            break;
-                        case 2: // Change Status
-                            showStatusMenu(product);
-                            break;
-                        case 3: // Delete
-                            confirmDeleteProduct(product);
-                            break;
-                    }
-                })
-                .show();
-    }
-
-    private void showStatusMenu(Product product) {
-        String[] statusOptions = {
-                "🟢 Mark as Available",
-                "🔴 Mark as Sold",
-                "⏸️ Pause Listing",
-                "📦 Archive"
-        };
-
-        new AlertDialog.Builder(this)
-                .setTitle("Change Status")
-                .setItems(statusOptions, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // Available
-                            updateProductStatus(product, Product.ProductStatus.AVAILABLE);
-                            break;
-                        case 1: // Sold
-                            markProductAsSold(product);
-                            break;
-                        case 2: // Paused
-                            updateProductStatus(product, Product.ProductStatus.PAUSED);
-                            break;
-                        case 3: // Archive
-                            updateProductStatus(product, Product.ProductStatus.ARCHIVED);
-                            break;
-                    }
-                })
-                .show();
-    }
-
-    private void markProductAsSold(Product product) {
-        ApiClient.getProductService().markProductAsSold(product.getId())
-                .enqueue(new Callback<StandardResponse<Void>>() {
-                    @Override
-                    public void onResponse(@NonNull Call<StandardResponse<Void>> call,
-                                           @NonNull Response<StandardResponse<Void>> response) {
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            product.setStatus(Product.ProductStatus.SOLD);
-                            productAdapter.notifyDataSetChanged();
-                            showSuccess("Product marked as sold!");
-                            Log.d(TAG, "✅ Product marked as sold: " + product.getTitle());
-                        } else {
-                            showError("Failed to mark as sold");
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<StandardResponse<Void>> call, @NonNull Throwable t) {
-                        Log.e(TAG, "❌ Failed to mark as sold", t);
-                        showError("Network error");
-                    }
-                });
-    }
-
-    private void viewProductAnalytics(Product product) {
-        // Simple analytics dialog
-        String message = String.format(
-                "📊 Product Analytics\n\n" +
-                        "👁️ Views: %d\n" +
-                        "📅 Listed: %s\n" +
-                        "📍 Location: %s\n" +
-                        "🏷️ Status: %s",
-                product.getViewCount() != null ? product.getViewCount() : 0,
-                product.getCreatedAt() != null ? product.getCreatedAt() : "Recently",
-                product.getLocation() != null ? product.getLocation() : "Unknown",
-                product.getStatus() != null ? product.getStatus().getDisplayName() : "Unknown"
-        );
-
-        new AlertDialog.Builder(this)
-                .setTitle("Analytics")
-                .setMessage(message)
-                .setPositiveButton("OK", null)
-                .show();
-    }
-
-    // ===== ANALYTICS =====
-
-    private void showProductAnalytics(Product product) {
-        analyticsService.getProductStats(product.getId()).enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-            @Override
-            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-
-                if (response.isSuccessful() && response.body() != null) {
-                    StandardResponse<Map<String, Object>> standardResponse = response.body();
-                    if (standardResponse.isSuccess()) {
-                        Map<String, Object> stats = standardResponse.getData();
-                        displayAnalyticsDialog(product, stats);
-                    }
-                } else {
-                    showError("Failed to load analytics");
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                Log.e(TAG, "❌ Failed to load product analytics", t);
-                showError("Network error while loading analytics");
-            }
-        });
-    }
-
-    private void displayAnalyticsDialog(Product product, Map<String, Object> stats) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-
-        String message = String.format(
-                "📊 Analytics for %s\n\n" +
-                        "👁️ Views: %s\n" +
-                        "💾 Saves: %s\n" +
-                        "💰 Offers: %s\n" +
-                        "💬 Conversations: %s",
-                product.getTitle(),
-                stats.get("viewCount"),
-                stats.get("saveCount"),
-                stats.get("offerCount"),
-                stats.get("conversationCount")
-        );
-
-        builder.setTitle("Product Analytics")
-                .setMessage(message)
-                .setPositiveButton("OK", null)
-                .show();
-    }
-
-    // ===== EDIT PRODUCT =====
-
-    private void editProduct(Product product) {
-        Intent intent = new Intent(this, com.example.newtrade.ui.product.EditProductActivity.class);
-
-        // Pass product data
-        intent.putExtra("product_id", product.getId());
-        intent.putExtra("product_title", product.getTitle());
-        intent.putExtra("product_description", product.getDescription());
-        intent.putExtra("product_price", product.getPrice() != null ? product.getPrice().toString() : "");
-        intent.putExtra("product_location", product.getLocation());
-        intent.putExtra("product_condition", product.getCondition() != null ? product.getCondition().name() : "");
-        intent.putExtra("product_category", product.getCategoryName());
-
-        if (product.getImageUrls() != null && !product.getImageUrls().isEmpty()) {
-            intent.putExtra("product_image_url", product.getImageUrls().get(0));
-        }
-
-        startActivityForResult(intent, 100); // Request code for edit
-        Log.d(TAG, "Opening edit for product: " + product.getTitle());
-    }
-
-    // ===== STATUS CHANGE =====
+    // ===== STATUS CHANGE DIALOG =====
 
     private void showStatusChangeDialog(Product product) {
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_product_status, null);
@@ -681,117 +661,166 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
         } else if (selectedId == R.id.rb_paused) {
             return Product.ProductStatus.PAUSED;
         }
-        return Product.ProductStatus.AVAILABLE; // Default
+        return Product.ProductStatus.AVAILABLE;
     }
 
-    // ===== FIX: UPDATE PRODUCT STATUS METHODS =====
-
-    // Method chính nhận ProductStatus enum
+    // ✅ FIXED: Using existing ProductService methods
     private void updateProductStatus(Product product, Product.ProductStatus newStatus) {
-        // ✅ THÊM: Show loading với progress dialog
         android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
-        progressDialog.setMessage("Updating product status...");
-        progressDialog.setCancelable(false);
+        progressDialog.setMessage("Updating status...");
         progressDialog.show();
 
-        Map<String, Object> updateData = new HashMap<>();
-        updateData.put("status", newStatus.name());
+        // Track status change
+        behaviorTracker.trackProductInteraction(product.getId(), "STATUS_CHANGE",
+                Map.of("oldStatus", product.getStatus().name(), "newStatus", newStatus.name()));
 
-        ApiClient.getProductService().updateProduct(product.getId(), updateData)
-                .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
-                    @Override
-                    public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
-                                           @NonNull Response<StandardResponse<Map<String, Object>>> response) {
-                        progressDialog.dismiss();
+        if (newStatus == Product.ProductStatus.SOLD) {
+            // ✅ Use markProductAsSold from ProductService
+            productService.markProductAsSold(product.getId())
+                    .enqueue(new Callback<StandardResponse<Void>>() {
+                        @Override
+                        public void onResponse(@NonNull Call<StandardResponse<Void>> call,
+                                               @NonNull Response<StandardResponse<Void>> response) {
+                            progressDialog.dismiss();
 
-                        if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            // Update local product status
-                            product.setStatus(newStatus);
-                            productAdapter.notifyDataSetChanged();
-
-                            // ✅ THÊM: Better success feedback
-                            String statusName = getStatusDisplayName(newStatus);
-                            showSuccessWithSnackbar("✅ Product status changed to " + statusName);
-
-                        } else {
-                            String error = response.body() != null ?
-                                    response.body().getMessage() : "Failed to update status";
-                            showErrorWithSnackbar("❌ " + error);
+                            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                                product.setStatus(newStatus);
+                                refreshData();
+                                showSuccess("Product marked as sold!");
+                                Log.d(TAG, "✅ Product marked as sold: " + product.getTitle());
+                            } else {
+                                showError("Failed to mark as sold");
+                            }
                         }
-                    }
 
-                    @Override
-                    public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
-                        progressDialog.dismiss();
-                        Log.e(TAG, "❌ Failed to update product status", t);
-                        showErrorWithSnackbar("❌ Network error. Please try again.");
-                    }
-                });
-    }
+                        @Override
+                        public void onFailure(@NonNull Call<StandardResponse<Void>> call, @NonNull Throwable t) {
+                            progressDialog.dismiss();
+                            Log.e(TAG, "❌ Failed to mark as sold", t);
+                            showError("Network error");
+                        }
+                    });
+        } else {
+            // ✅ Use updateProduct for other status changes
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("status", newStatus.name());
 
-    private String getStatusDisplayName(Product.ProductStatus status) {
-        switch (status) {
-            case AVAILABLE: return "Available";
-            case SOLD: return "Sold";
-            case PAUSED: return "Paused";
-            case ARCHIVED: return "Archived";
-            default: return status.name();
-        }
-    }
-    private void showSuccessWithSnackbar(String message) {
-        com.google.android.material.snackbar.Snackbar snackbar =
-                com.google.android.material.snackbar.Snackbar.make(
-                        findViewById(android.R.id.content), message,
-                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
-        snackbar.setBackgroundTint(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_green_dark));
-        snackbar.show();
-    }
-    private void showErrorWithSnackbar(String message) {
-        com.google.android.material.snackbar.Snackbar snackbar =
-                com.google.android.material.snackbar.Snackbar.make(
-                        findViewById(android.R.id.content), message,
-                        com.google.android.material.snackbar.Snackbar.LENGTH_LONG);
-        snackbar.setBackgroundTint(androidx.core.content.ContextCompat.getColor(this, android.R.color.holo_red_dark));
-        snackbar.setAction("RETRY", v -> refreshData());
-        snackbar.show();
-    }
+            productService.updateProduct(product.getId(), updateData)
+                    .enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                               @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+                            progressDialog.dismiss();
 
-    // Overload method để hỗ trợ String (backward compatibility)
-    private void updateProductStatus(Product product, String statusString) {
-        try {
-            Product.ProductStatus statusEnum = Product.ProductStatus.valueOf(statusString);
-            updateProductStatus(product, statusEnum);
-        } catch (IllegalArgumentException e) {
-            Log.w(TAG, "Unknown status string: " + statusString);
-            showError("Invalid status: " + statusString);
+                            if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                                product.setStatus(newStatus);
+                                refreshData();
+                                showSuccess("Status updated successfully!");
+                                Log.d(TAG, "✅ Status updated: " + product.getTitle() + " -> " + newStatus);
+                            } else {
+                                showError("Failed to update status");
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                            progressDialog.dismiss();
+                            Log.e(TAG, "❌ Failed to update status", t);
+                            showError("Network error");
+                        }
+                    });
         }
     }
 
-    // ===== DELETE PRODUCT =====
+    // ===== DASHBOARD ANALYTICS =====
+
+    private void loadDashboardAnalytics() {
+        Long userId = prefsManager.getUserId();
+        if (userId == null || userId <= 0) return;
+
+        analyticsService.getDashboard().enqueue(new Callback<StandardResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<StandardResponse<Map<String, Object>>> call,
+                                   @NonNull Response<StandardResponse<Map<String, Object>>> response) {
+
+                if (response.isSuccessful() && response.body() != null) {
+                    StandardResponse<Map<String, Object>> standardResponse = response.body();
+                    if (standardResponse.isSuccess()) {
+                        Map<String, Object> dashboard = standardResponse.getData();
+                        updateDashboardUI(dashboard);
+                        Log.d(TAG, "✅ Dashboard analytics loaded");
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<StandardResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                Log.e(TAG, "❌ Failed to load dashboard analytics", t);
+            }
+        });
+    }
+
+    private void updateDashboardUI(Map<String, Object> dashboard) {
+        if (getSupportActionBar() != null && dashboard != null) {
+            Object productsListed = dashboard.get("productsListed");
+            Object productsSold = dashboard.get("productsSold");
+
+            String subtitle = String.format("Listed: %s • Sold: %s",
+                    productsListed != null ? productsListed.toString() : "0",
+                    productsSold != null ? productsSold.toString() : "0");
+
+            getSupportActionBar().setSubtitle(subtitle);
+        }
+    }
+
+    // ===== UTILITY METHODS =====
+
+    private void editProduct(Product product) {
+        Intent intent = new Intent(this, EditProductActivity.class);
+
+        intent.putExtra("product_id", product.getId());
+        intent.putExtra("product_title", product.getTitle());
+        intent.putExtra("product_description", product.getDescription());
+        intent.putExtra("product_price", product.getPrice() != null ?
+                product.getPrice().toString() : "");
+        intent.putExtra("product_location", product.getLocation());
+        intent.putExtra("product_condition", product.getCondition() != null ?
+                product.getCondition().name() : "");
+        intent.putExtra("product_category", product.getCategoryName());
+
+        if (product.getImageUrls() != null && !product.getImageUrls().isEmpty()) {
+            intent.putExtra("product_image_url", product.getImageUrls().get(0));
+        }
+
+        startActivityForResult(intent, 100);
+        Log.d(TAG, "✏️ Opening edit for: " + product.getTitle());
+    }
 
     private void confirmDeleteProduct(Product product) {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Product")
-                .setMessage("Are you sure you want to delete \"" + product.getTitle() + "\"?\n\nThis action cannot be undone.")
+                .setMessage("Are you sure you want to delete '" + product.getTitle() + "'?")
                 .setPositiveButton("Delete", (dialog, which) -> deleteProduct(product))
                 .setNegativeButton("Cancel", null)
-                .setIcon(android.R.drawable.ic_dialog_alert)
                 .show();
     }
 
+    // ✅ Using existing deleteProduct method
     private void deleteProduct(Product product) {
-        ApiClient.getProductService().deleteProduct(product.getId())
+        behaviorTracker.trackProductInteraction(product.getId(), "DELETE", null);
+
+        productService.deleteProduct(product.getId())
                 .enqueue(new Callback<StandardResponse<Void>>() {
                     @Override
                     public void onResponse(@NonNull Call<StandardResponse<Void>> call,
                                            @NonNull Response<StandardResponse<Void>> response) {
                         if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                            // Remove from list
-                            myProducts.remove(product);
-                            productAdapter.notifyDataSetChanged();
-                            updateUI();
+                            allProducts.remove(product);
+                            filteredProducts.remove(product);
+
+                            refreshData();
                             showSuccess("Product deleted successfully");
-                            Log.d(TAG, "✅ Product deleted: " + product.getTitle());
+                            Log.d(TAG, "🗑️ Product deleted: " + product.getTitle());
                         } else {
                             showError("Failed to delete product");
                         }
@@ -805,59 +834,68 @@ public class MyListingsActivity extends AppCompatActivity implements ProductAdap
                 });
     }
 
-    private void showSuccess(String message) {
-        showSuccessWithSnackbar("✅ " + message);
-        Log.d(TAG, "Success: " + message);
-    }
-
-    // ===== NAVIGATION =====
-
-    private void openProductDetail(Product product) {
-        Intent intent = new Intent(this, ProductDetailActivity.class);
-        intent.putExtra("product_id", product.getId());
-        intent.putExtra("product_title", product.getTitle());
-        if (product.getPrice() != null) {
-            intent.putExtra("product_price", product.getPrice().toString());
-        }
-        startActivity(intent);
-    }
-
     private void openAddProduct() {
         Intent intent = new Intent(this, AddProductActivity.class);
-        startActivity(intent);
+        startActivityForResult(intent, 200);
+        Log.d(TAG, "➕ Opening add product");
     }
 
-    // ===== UTILITY =====
+    private void showDetailedStats() {
+        String message = String.format(
+                "📊 Your Listing Statistics\n\n" +
+                        "📋 Total Listings: %d\n" +
+                        "🟢 Available: %d\n" +
+                        "🔴 Sold: %d\n" +
+                        "⏸️ Paused: %d\n\n" +
+                        "💡 Keep your listings active for better visibility!",
+                statusCounts.get("ALL"),
+                statusCounts.get("AVAILABLE"),
+                statusCounts.get("SOLD"),
+                statusCounts.get("PAUSED")
+        );
+
+        new AlertDialog.Builder(this)
+                .setTitle("Listing Statistics")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private void showSuccess(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
 
     private void showError(String message) {
-        showErrorWithSnackbar("❌ " + message);
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         Log.e(TAG, "Error: " + message);
     }
 
+    // ===== ACTIVITY LIFECYCLE =====
+
     @Override
-    protected void onResume() {
-        super.onResume();
-        // Refresh products when returning to this activity
-        refreshData();
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (resultCode == RESULT_OK) {
+            if (requestCode == 100 || requestCode == 200) {
+                refreshData();
+                Log.d(TAG, "🔄 Refreshing after add/edit product");
+            }
+        }
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            getOnBackPressedDispatcher().onBackPressed();
+            onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == 100 && resultCode == RESULT_OK) {
-            // Product was edited successfully, refresh list
-            showSuccess("Product updated successfully");
-            loadMyProducts(); // Refresh data
-        }
+    protected void onResume() {
+        super.onResume();
+        // Optional: refresh on resume
     }
 }
