@@ -2,15 +2,19 @@
 package com.example.newtrade.utils;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.example.newtrade.api.ApiClient;
 import com.example.newtrade.api.NotificationService;
 import com.example.newtrade.models.StandardResponse;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -19,6 +23,30 @@ import retrofit2.Response;
 public class PromotionNotificationHelper {
 
     private static final String TAG = "PromotionHelper";
+
+    // ===== ✅ SCHEDULING VARIABLES =====
+    private static Handler promotionHandler;
+    private static Runnable promotionRunnable;
+    private static boolean isSchedulingActive = false;
+
+    // ✅ Thời gian interval: 5 phút = 5 * 60 * 1000 ms
+    private static final long PROMOTION_INTERVAL_MS = 5 * 60 * 1000; // 5 phút
+
+    // ✅ Danh sách test user IDs
+    private static final List<Long> TEST_USER_IDS = Arrays.asList(1L, 2L, 3L, 4L, 5L);
+
+    // ✅ Random promotion data
+    private static final String[] PROMO_CODES = {
+            "FLASH20", "SUMMER15", "WELCOME10", "DEAL25", "SAVE30", "HOT10", "MEGA50", "COOL40"
+    };
+
+    private static final String[] DISCOUNTS = {
+            "10%", "15%", "20%", "25%", "30%", "35%", "40%"
+    };
+
+    private static final String[] SEASONS = {
+            "Summer", "Winter", "Spring", "Holiday", "Weekend", "Flash", "Mega", "Super"
+    };
 
     // ===== SINGLE USER PROMOTION =====
     public static void sendPromotionToUser(Context context, Long userId, String title,
@@ -231,6 +259,170 @@ public class PromotionNotificationHelper {
         String message = "You're near " + storeName + "! Get " + discount + " off today only.";
 
         sendLocationBasedPromotion(context, latitude, longitude, 2.0, title, message, promoCode);
+    }
+
+    // ===== ✅ NEW: AUTOMATIC SCHEDULING - MỖI 5 PHÚT =====
+
+    /**
+     * ✅ BẮT ĐẦU SCHEDULE - Mỗi 5 phút gửi 1 promotion ngẫu nhiên
+     */
+    public static void startRandomPromotionScheduling(Context context) {
+        Log.d(TAG, "🎯 Starting random promotion scheduling every 5 minutes...");
+
+        if (isSchedulingActive) {
+            Log.w(TAG, "⚠️ Promotion scheduling is already active");
+            return;
+        }
+
+        // ✅ Tạo Handler cho main thread
+        promotionHandler = new Handler(Looper.getMainLooper());
+
+        // ✅ Tạo Runnable để chạy promotion
+        promotionRunnable = new Runnable() {
+            @Override
+            public void run() {
+                // Gửi random promotion
+                sendRandomPromotion(context);
+
+                // Schedule lần tiếp theo sau 5 phút
+                if (isSchedulingActive && promotionHandler != null) {
+                    promotionHandler.postDelayed(this, PROMOTION_INTERVAL_MS);
+                }
+            }
+        };
+
+        // ✅ Bắt đầu schedule
+        isSchedulingActive = true;
+
+        // Gửi promotion đầu tiên ngay lập tức
+        sendRandomPromotion(context);
+
+        // Schedule lần tiếp theo sau 5 phút
+        promotionHandler.postDelayed(promotionRunnable, PROMOTION_INTERVAL_MS);
+
+        Log.d(TAG, "✅ Random promotion scheduling started successfully");
+    }
+
+    /**
+     * ✅ DỪNG SCHEDULE
+     */
+    public static void stopRandomPromotionScheduling() {
+        Log.d(TAG, "🛑 Stopping random promotion scheduling...");
+
+        isSchedulingActive = false;
+
+        if (promotionHandler != null && promotionRunnable != null) {
+            promotionHandler.removeCallbacks(promotionRunnable);
+        }
+
+        promotionHandler = null;
+        promotionRunnable = null;
+
+        Log.d(TAG, "✅ Random promotion scheduling stopped");
+    }
+
+    /**
+     * ✅ KIỂM TRA TRẠNG THÁI SCHEDULING
+     */
+    public static boolean isPromotionSchedulingActive() {
+        return isSchedulingActive;
+    }
+
+    /**
+     * ✅ GỬI RANDOM PROMOTION - Core logic
+     */
+    private static void sendRandomPromotion(Context context) {
+        try {
+            Random random = new Random();
+
+            // ✅ Random chọn 1 trong 4 loại promotion
+            int promotionType = random.nextInt(4);
+
+            Log.d(TAG, "🎲 Sending random promotion type: " + promotionType);
+
+            switch (promotionType) {
+                case 0:
+                    sendRandomFlashSale(context, random);
+                    break;
+                case 1:
+                    sendRandomWelcome(context, random);
+                    break;
+                case 2:
+                    sendRandomSeasonal(context, random);
+                    break;
+                case 3:
+                    sendRandomLocation(context, random);
+                    break;
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error sending random promotion", e);
+        }
+    }
+
+    /**
+     * ✅ RANDOM FLASH SALE
+     */
+    private static void sendRandomFlashSale(Context context, Random random) {
+        String discount = DISCOUNTS[random.nextInt(DISCOUNTS.length)];
+        String promoCode = PROMO_CODES[random.nextInt(PROMO_CODES.length)];
+        String duration = random.nextBoolean() ? "2 hours" : "3 hours";
+
+        Log.d(TAG, "⚡ Sending Flash Sale: " + discount + " off, Code: " + promoCode);
+
+        sendFlashSalePromotion(context, TEST_USER_IDS, discount, duration, promoCode);
+    }
+
+    /**
+     * ✅ RANDOM WELCOME PROMOTION
+     */
+    private static void sendRandomWelcome(Context context, Random random) {
+        Long randomUserId = TEST_USER_IDS.get(random.nextInt(TEST_USER_IDS.size()));
+        String promoCode = PROMO_CODES[random.nextInt(PROMO_CODES.length)];
+
+        Log.d(TAG, "🎉 Sending Welcome promotion to user: " + randomUserId + ", Code: " + promoCode);
+
+        sendWelcomePromotion(context, randomUserId, promoCode);
+    }
+
+    /**
+     * ✅ RANDOM SEASONAL PROMOTION
+     */
+    private static void sendRandomSeasonal(Context context, Random random) {
+        String season = SEASONS[random.nextInt(SEASONS.length)];
+        String discount = DISCOUNTS[random.nextInt(DISCOUNTS.length)];
+        String promoCode = PROMO_CODES[random.nextInt(PROMO_CODES.length)];
+
+        Log.d(TAG, "🌟 Sending " + season + " promotion: " + discount + " off, Code: " + promoCode);
+
+        sendSeasonalPromotion(context, TEST_USER_IDS, season, discount, promoCode);
+    }
+
+    /**
+     * ✅ RANDOM LOCATION-BASED PROMOTION
+     */
+    private static void sendRandomLocation(Context context, Random random) {
+        String promoCode = PROMO_CODES[random.nextInt(PROMO_CODES.length)];
+        String discount = DISCOUNTS[random.nextInt(DISCOUNTS.length)];
+
+        // ✅ Random tọa độ xung quanh Hồ Chí Minh
+        double latitude = 10.8231 + (random.nextDouble() - 0.5) * 0.1;
+        double longitude = 106.6297 + (random.nextDouble() - 0.5) * 0.1;
+
+        String[] storeNames = {"TradeUp Store", "Mega Mall", "Tech Center", "Shopping Plaza"};
+        String storeName = storeNames[random.nextInt(storeNames.length)];
+
+        Log.d(TAG, "📍 Sending Location promotion at " + storeName + ": " + discount + " off, Code: " + promoCode);
+
+        sendNearbyStorePromotion(context, latitude, longitude, storeName, discount, promoCode);
+    }
+
+    /**
+     * ✅ MANUAL TRIGGER - Gửi promotion ngay lập tức (để test)
+     */
+    public static void triggerRandomPromotionNow(Context context) {
+        Log.d(TAG, "🚀 Manual trigger - sending random promotion now...");
+        sendRandomPromotion(context);
     }
 
     // ===== CALLBACK INTERFACE =====

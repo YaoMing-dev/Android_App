@@ -31,6 +31,7 @@ import com.example.newtrade.api.NotificationService;
 import com.example.newtrade.api.UserService;
 import com.example.newtrade.models.StandardResponse;
 import com.example.newtrade.ui.auth.LoginActivity;
+import com.example.newtrade.utils.PromotionNotificationHelper;
 import com.example.newtrade.utils.SharedPrefsManager;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -98,9 +99,18 @@ public class MainActivity extends AppCompatActivity {
         // Setup notifications
         checkNotificationPermissions();
         setupFirebaseMessaging();
+        setupPromotionScheduler();
 
         Log.d(TAG, "MainActivity created successfully");
     }
+
+    private void setupPromotionScheduler() {
+        // ✅ Bắt đầu schedule promotion mỗi 5 phút
+        PromotionNotificationHelper.startRandomPromotionScheduling(this);
+        Log.d(TAG, "✅ Promotion scheduler started - every 5 minutes");
+        showSingleToast("🎁 Random promotions will arrive every 5 minutes!");
+    }
+
 
     private void initViews() {
         bottomNavigation = findViewById(R.id.bottom_navigation);
@@ -588,6 +598,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // ✅ Dừng hoàn toàn khi app close
+        PromotionNotificationHelper.stopRandomPromotionScheduling();
         Log.d(TAG, "MainActivity destroyed");
     }
 }
