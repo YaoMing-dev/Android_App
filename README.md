@@ -1,48 +1,214 @@
-1. GIỚI THIỆU PHẦN MỀM
-Ứng dụng TradeUp là một nền tảng di động được thiết kế để kết nối người mua và người bán, cho phép họ dễ dàng mua bán các mặt hàng đã qua sử dụng tại địa phương. Ứng dụng hỗ trợ các tính năng chính như quản lý người dùng, đăng tải và quản lý sản phẩm, tìm kiếm và duyệt sản phẩm nâng cao, giao tiếp an toàn trong ứng dụng, quản lý giao dịch và đề nghị mua, hệ thống đánh giá, và tích hợp thanh toán.
-2. KIẾN TRÚC HỆ THỐNG
-1.	CƠ SỞ DỮ LIỆU: MySQL
-2.	BACKEND: SPRINGBOOT
-3.	FRONTEND: ANDROID STUDIO
-Các thành phần chính của ứng dụng Android:
-•	LoginActivity: Quản lý đăng nhập người dùng, bao gồm đăng nhập bằng Google và sử dụng JWT + Refresh token để xác thực.
-•	HomeActivity: Hiển thị danh sách sản phẩm, hỗ trợ các tùy chọn tìm kiếm và lọc nâng cao (filter, khoảng cách, tình trạng, sắp xếp).
-•	ProductDetailActivity: Cho phép người dùng xem chi tiết sản phẩm và gửi đề nghị mua hàng.
-•	ChatActivity: Hỗ trợ tính năng nhắn tin trực tiếp giữa người mua và người bán, bao gồm gửi tin nhắn văn bản, ảnh và emoji.
-•	ChatListActivity: Hiển thị danh sách các cuộc hội thoại gần đây của người dùng.
-•	TransactionHistoryActivity: Trình bày lịch sử các giao dịch đã thực hiện.
-Thư viện sử dụng:
-•  Retrofit
-•  Glidex
-•  Google Sign-In (OAuth2)
-•  WebSocket: Được sử dụng để thiết lập kết nối song công cho các tính năng yêu cầu cập nhật thời gian thực như chat và vị trí.
-•  Firebase: Được tích hợp để hỗ trợ các tính năng thời gian thực, đặc biệt là Firebase Cloud Messaging cho thông báo đẩy, và quản lý dữ liệu.
+# TradeUp — P2P Marketplace Android App
 
-3. CÁC TÍNH NĂNG CHÍNH
-Ứng dụng TradeUp cung cấp các tính năng cốt lõi sau:
-•	Quản lý người dùng:
-o	Đăng ký & Đăng nhập: Người dùng có thể đăng ký bằng email/mật khẩu (có xác thực định dạng) hoặc thông qua Google Sign-In. Yêu cầu xác minh email để kích hoạt tài khoản và hỗ trợ khôi phục mật khẩu qua email. Nút đăng nhập sẽ bị vô hiệu hóa cho đến khi các trường được điền đầy đủ và chính xác. Tùy chọn đăng xuất có thể truy cập qua hồ sơ/cài đặt.
-o	Hồ sơ người dùng: Hồ sơ bao gồm tên hiển thị, ảnh đại diện, tiểu sử, thông tin liên hệ và xếp hạng. Người dùng có thể cập nhật hồ sơ và ảnh đại diện, cũng như tùy chọn hủy kích hoạt hoặc xóa vĩnh viễn tài khoản (yêu cầu xác nhận). Cho phép xem hồ sơ công khai của người dùng khác.
-•	Đăng tải và Quản lý sản phẩm:
-o	Thêm sản phẩm: Các trường bắt buộc bao gồm tiêu đề, mô tả, giá, danh mục, tình trạng, địa điểm và ít nhất 1 ảnh. Các trường tùy chọn: hành vi mặt hàng, thẻ bổ sung. Hỗ trợ tự động điền địa điểm bằng GPS (có kiểm tra quyền) và tải lên tối đa 10 ảnh (JPEG/PNG). Người dùng có thể xem trước sản phẩm trước khi đăng.
-o	Quản lý sản phẩm đã đăng: Người dùng có thể xem, chỉnh sửa hoặc xóa các sản phẩm đã đăng từ bảng điều khiển cá nhân. Các tùy chọn trạng thái sản phẩm: Có sẵn, Đã bán, Tạm dừng. Cung cấp phân tích sản phẩm (lượt xem, tương tác).
-•	Duyệt và Tìm kiếm:
-o	Tìm kiếm: Cho phép tìm kiếm sản phẩm theo từ khóa, danh mục, khoảng giá, tình trạng và khoảng cách (với GPS hoặc nhập thủ công). Chức năng tìm kiếm kích hoạt 200ms sau khi bắt đầu nhập. Các tùy chọn sắp xếp: Mức độ liên quan, Mới nhất, Giá (tăng/giảm). Người dùng có thể tìm kiếm sản phẩm theo bán kính địa điểm (ví dụ: 5-100 km) và ghi đè GPS để nhập địa điểm tùy chỉnh.
-o	Đề xuất: Các mặt hàng được tổ chức theo danh mục. Cung cấp các đề xuất được cá nhân hóa dựa trên lịch sử duyệt web của người dùng, mức độ phổ biến và các mặt hàng gần đó.
-•	Giao tiếp:
-o	Nhắn tin trong ứng dụng: Cung cấp tính năng trò chuyện an toàn giữa người mua và người bán. Hỗ trợ tin nhắn văn bản, emoji và chia sẻ ảnh tùy chọn. Người dùng có thể chặn/báo cáo các cuộc trò chuyện không phù hợp.
-o	Thông báo: Gửi thông báo đẩy cho các sự kiện như tin nhắn mới, đề nghị giá, cập nhật danh sách sản phẩm và các chương trình khuyến mãi (tùy chọn).
-•	Đề nghị & Giao dịch:
-o	Đề nghị: Người mua có thể đưa ra đề nghị nếu giá sản phẩm có thể thương lượng. Người bán có thể chấp nhận/từ chối/đề xuất lại đề nghị.
-o	Giao dịch: Người bán có thể đánh dấu mặt hàng là "Đã bán". Các mặt hàng đã bán được lưu trữ trong lịch sử giao dịch của người dùng.
-•	Dịch vụ vị trí:
-o	Người dùng có thể tìm kiếm sản phẩm theo bán kính địa điểm (ví dụ: 5-100 km).
-o	Người dùng có thể ghi đè GPS và nhập địa điểm tùy chỉnh.
-•	Đánh giá & Nhận xét:
-o	Phản hồi: Người dùng có thể đánh giá lẫn nhau (1-5 sao) sau các giao dịch. Hỗ trợ phản hồi bằng văn bản tùy chọn.
-o	Uy tín: Hồ sơ người dùng hiển thị xếp hạng trung bình và tổng số giao dịch. Các đánh giá được kiểm duyệt để loại bỏ nội dung lạm dụng.
-•	Phân tích & Lịch sử:
-o	Người bán: Theo dõi lượt xem, cuộc trò chuyện và đề nghị cho mỗi sản phẩm đã đăng. Cung cấp "Lịch sử bán hàng" cho các mặt hàng đã bán.
-o	Người mua: Xem các mặt hàng đã lưu, lịch sử đề nghị và lịch sử mua hàng.
-•	Thanh toán:
-o	Cổng thanh toán: Hỗ trợ thanh toán trong ứng dụng qua thẻ tín dụng/ghi nợ và UPI hoặc Ví điện tử (nếu được hỗ trợ theo khu vực). Lịch sử thanh toán hiển thị trong hồ sơ người dùng.
+<p align="left">
+  <img src="https://img.shields.io/badge/Android-Java-3DDC84?logo=android&logoColor=white&style=flat-square" />
+  <img src="https://img.shields.io/badge/Min_SDK-24_(Android_7.0)-brightgreen?style=flat-square" />
+  <img src="https://img.shields.io/badge/Target_SDK-34_(Android_14)-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/Backend-Spring_Boot-6DB33F?logo=springboot&logoColor=white&style=flat-square" />
+  <img src="https://img.shields.io/badge/Database-MySQL-4479A1?logo=mysql&logoColor=white&style=flat-square" />
+  <img src="https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square" />
+</p>
+
+A peer-to-peer marketplace Android application that connects local buyers and sellers for secondhand item transactions. Supports real-time chat, GPS-based search, price negotiation, and OAuth authentication.
+
+---
+
+## System Architecture
+
+```
+┌────────────────────┐     REST API      ┌─────────────────────┐
+│   Android Client   │ ◄────────────────► │  Spring Boot Backend │
+│   (Java, MVVM)     │                   │  + MySQL Database    │
+│                    │   WebSocket       │                     │
+│   Firebase FCM     │ ◄────────────────► │  Real-time Events   │
+└────────────────────┘                   └─────────────────────┘
+```
+
+- **Frontend:** Android (Java), Min SDK 24, Target SDK 34
+- **Backend:** Spring Boot + MySQL
+- **Real-time:** Java-WebSocket for chat and live location updates
+- **Push Notifications:** Firebase Cloud Messaging
+- **Auth:** JWT + Refresh Token, Google OAuth 2.0
+
+---
+
+## Features
+
+**User Management**
+- Email/password registration with OTP email verification
+- Google Sign-In (OAuth 2.0)
+- JWT authentication with automatic refresh token handling
+- Public user profiles with ratings, listing count, and join date
+- Edit profile (avatar, bio, contact info)
+- Account deactivation and permanent deletion
+
+**Product Listings**
+- Create listings with title, description, price, category (9 categories), condition, and up to 10 photos
+- GPS auto-location with manual override
+- Negotiable/fixed price toggle
+- Product preview before publishing
+- Status management: Available, Sold, Paused
+- Per-listing analytics: views, likes, contact requests
+- Edit and delete listings from personal dashboard
+
+**Search & Discovery**
+- Keyword search with 200ms debounce
+- Filters: category, price range, condition, distance radius (1–100 km)
+- Sort by: relevance, newest, price (ascending/descending), distance, popularity
+- GPS-based proximity search with manual location entry
+- Personalized recommendations based on browsing history
+- Category browsing with featured and recently added sections
+
+**In-App Chat**
+- Real-time messaging via WebSocket
+- Text, image, and emoji support
+- Delivery status indicators: Sent, Delivered, Read, Failed
+- Typing indicators and online/offline status
+- Block and report functionality
+- Firebase push notifications for new messages
+
+**Price Negotiation**
+- Buyers can make offers on negotiable listings
+- Sellers can accept, reject, or counter-offer
+- Offer status tracking: Pending, Accepted, Rejected, Countered, Expired
+
+**Transactions & Reviews**
+- Mark items as sold and track transaction history
+- Payment method records: Cash, Bank Transfer, Digital Wallet
+- Post-transaction ratings (1–5 stars) with optional written reviews
+- Average rating displayed on seller profiles
+- Review moderation for abuse filtering
+
+**Notifications**
+- Firebase Cloud Messaging for push notifications
+- Events: new messages, offer updates, listing status changes
+- In-app notification center with configurable preferences
+
+---
+
+## Tech Stack
+
+| Category | Library / Technology |
+|---|---|
+| **Language** | Java |
+| **UI** | Material Design 3, ConstraintLayout, ViewPager2, RecyclerView |
+| **Navigation** | Android Navigation Component (nav graph) |
+| **Networking** | Retrofit 2.9.0, OkHttp 4.11.0 (logging interceptor), Gson 2.10.1 |
+| **Real-time** | Java-WebSocket 1.5.4 |
+| **Auth** | Google Sign-In (Play Services Auth 20.7.0), JWT |
+| **Push Notifications** | Firebase Cloud Messaging (BOM 32.7.0), Firebase Analytics |
+| **Location & Maps** | Google Play Services Location 21.0.1, Maps 18.2.0 |
+| **Image Loading** | Glide 4.16.0, ExifInterface 1.3.6 |
+| **Permissions** | Dexter 6.2.3 |
+| **State Management** | ViewModel 2.7.0, LiveData 2.7.0 |
+| **Build System** | Gradle (Kotlin DSL), Version Catalog (libs.versions.toml) |
+
+---
+
+## Project Structure
+
+```
+app/src/main/
+├── java/
+│   ├── activities/
+│   │   ├── LoginActivity.java          # Email/password + Google Sign-In
+│   │   ├── RegisterActivity.java       # Account creation
+│   │   ├── OtpVerificationActivity.java # Email OTP verification
+│   │   ├── ForgotPasswordActivity.java
+│   │   ├── MainActivity.java           # Container: bottom nav + FAB
+│   │   ├── ProductDetailActivity.java  # View product, make offer
+│   │   ├── ChatActivity.java           # Real-time one-on-one chat
+│   │   ├── EditProfileActivity.java
+│   │   ├── SettingsActivity.java
+│   │   ├── MyListingsActivity.java     # Seller dashboard
+│   │   ├── SavedItemsActivity.java
+│   │   ├── UserProfileActivity.java    # Public profile view
+│   │   ├── LocationPickerActivity.java # Map-based location selection
+│   │   └── RealtimeLocationActivity.java
+│   ├── fragments/
+│   │   ├── HomeFragment.java           # Feed: recommendations, categories
+│   │   ├── SearchFragment.java         # Search + advanced filters
+│   │   ├── AddProductFragment.java     # Create/edit listing
+│   │   ├── MessagesFragment.java       # Conversation list
+│   │   ├── ProfileFragment.java        # User dashboard
+│   │   ├── FilterBottomSheetDialogFragment.java
+│   │   └── MakeOfferBottomSheetDialogFragment.java
+│   ├── services/
+│   │   └── RealtimeWebSocketService.java # Persistent WebSocket connection
+│   └── utils/
+│       └── SharedPrefsManager.java     # JWT token & user prefs storage
+└── res/
+    ├── navigation/main_nav_graph.xml
+    ├── values/colors.xml       # 200+ semantic color tokens
+    ├── values/dimens.xml       # 160+ dimension constants
+    ├── values/styles.xml       # Material 3 component styles
+    └── values/themes.xml       # Light/dark theme definitions
+```
+
+---
+
+## Screens Overview
+
+| Screen | Description |
+|---|---|
+| **Home** | Personalized feed, category filters, nearby items |
+| **Search** | Keyword search with price/distance/condition filters |
+| **Add Product** | Multi-step listing creation with GPS and photo upload |
+| **Messages** | Conversation list with unread indicators |
+| **Profile** | User dashboard, listings, saved items, transaction history |
+| **Product Detail** | Full listing view, offer panel, seller profile link |
+| **Chat** | Real-time messaging with image and emoji support |
+| **Settings** | Notifications, privacy (online status, location sharing), dark mode |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Android Studio Hedgehog (2023.1.1) or newer
+- JDK 11+
+- A running instance of the Spring Boot backend
+- `google-services.json` placed in `app/` (from Firebase Console)
+
+### Setup
+
+```bash
+git clone https://github.com/YaoMing-dev/Android_App.git
+cd Android_App
+```
+
+1. Open the project in Android Studio
+2. Add your `google-services.json` to `app/`
+3. Configure the backend base URL in the Retrofit client
+4. Configure OAuth credentials (Google Sign-In client ID)
+5. Sync Gradle and run on an emulator or physical device (API 24+)
+
+### Required Permissions
+
+```xml
+INTERNET
+ACCESS_NETWORK_STATE
+ACCESS_FINE_LOCATION
+ACCESS_COARSE_LOCATION
+POST_NOTIFICATIONS
+CAMERA
+READ_EXTERNAL_STORAGE
+```
+
+---
+
+## Security
+
+- JWT access token + refresh token stored in SharedPreferences
+- Automatic token refresh on expiry
+- Google OAuth 2.0 for social login
+- Email verification required on registration
+- User blocking and content reporting
+- Privacy controls: toggle online status and location sharing
+
+---
+
+## License
+
+[MIT](LICENSE) © [YaoMing-dev](https://github.com/YaoMing-dev)
